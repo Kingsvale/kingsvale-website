@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist-server",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "jsx": "react-jsx"
+  },
+  "include": ["server.ts", "src/lib/auth-token.ts", "src/lib/prisma.ts", "src/lib/realtime.ts"],
+  "exclude": ["node_modules"]
+}

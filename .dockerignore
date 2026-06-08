@@ -1,0 +1,14 @@
+.git
+.env
+.env.local
+node_modules
+data
+.vite
+playwright-report
+test-results
+coverage
+*.tsbuildinfo
+*.log
+*.tar
+*.tar.gz
+id_ed25519.pub

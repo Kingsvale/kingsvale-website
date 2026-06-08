@@ -1,0 +1,144 @@
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { Homepage } from "./pages/Homepage";
+import { useSiteContent } from "./hooks/useSiteContent";
+import { studioPath } from "./lib/studioRoute";
+import { usePageSeo } from "./lib/seo";
+
+const AboutPage = lazyNamed("AboutPage");
+const ContactPage = lazyNamed("ContactPage");
+const DesignBuildPage = lazyNamed("DesignBuildPage");
+const DevelopmentDetailPage = lazyNamed("DevelopmentDetailPage");
+const DevelopmentsIndexPage = lazyNamed("DevelopmentsIndexPage");
+const LandWantedPage = lazyNamed("LandWantedPage");
+const LegalPage = lazyNamed("LegalPage");
+const NotFoundPage = lazyNamed("NotFoundPage");
+const SecurityReviewPage = lazyNamed("SecurityReviewPage");
+const VisionProcessPage = lazyNamed("VisionProcessPage");
+const AdminDecoyPage = lazy(() =>
+  import("./pages/StudioAuthPage").then((module) => ({ default: module.AdminDecoyPage }))
+);
+const StudioAuthPage = lazy(() =>
+  import("./pages/StudioAuthPage").then((module) => ({ default: module.StudioAuthPage }))
+);
+
+export function App() {
+  const content = useSiteContent();
+  const route = window.location.pathname;
+  usePageSeo(content, route);
+
+  if (route === "/") {
+    return <Homepage content={content} />;
+  }
+
+  if (route === studioPath) {
+    return (
+      <RouteBoundary>
+        <StudioAuthPage publishedContent={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/admin") {
+    return (
+      <RouteBoundary>
+        <AdminDecoyPage />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/developments") {
+    return (
+      <RouteBoundary>
+        <DevelopmentsIndexPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route.startsWith("/developments/")) {
+    const developmentId = route.split("/").filter(Boolean)[1];
+    const development = content.developments.find((item) => item.id === developmentId);
+    return (
+      <RouteBoundary>
+        {development ? (
+          <DevelopmentDetailPage content={content} development={development} />
+        ) : (
+          <NotFoundPage content={content} />
+        )}
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/design-build") {
+    return (
+      <RouteBoundary>
+        <DesignBuildPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/vision-process") {
+    return (
+      <RouteBoundary>
+        <VisionProcessPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/about") {
+    return (
+      <RouteBoundary>
+        <AboutPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/land-wanted") {
+    return (
+      <RouteBoundary>
+        <LandWantedPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/contact") {
+    return (
+      <RouteBoundary>
+        <ContactPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/privacy" || route === "/terms") {
+    return (
+      <RouteBoundary>
+        <LegalPage content={content} kind={route === "/privacy" ? "privacy" : "terms"} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/security-review") {
+    return (
+      <RouteBoundary>
+        <SecurityReviewPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  return (
+    <RouteBoundary>
+      <NotFoundPage content={content} />
+    </RouteBoundary>
+  );
+}
+
+function RouteBoundary({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="route-loading" />}>{children}</Suspense>;
+}
+
+function lazyNamed<T extends keyof typeof import("./pages/ContentPages")>(name: T) {
+  return lazy(() =>
+    import("./pages/ContentPages").then((module) => ({
+      default: module[name] as ComponentType<any>
+    }))
+  );
+}

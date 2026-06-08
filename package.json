@@ -1,0 +1,43 @@
+{
+  "name": "kingsvale-luxury-real-estate",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build && npm run prerender",
+    "build:docker": "vite build && node scripts/create-app-shell.mjs",
+    "prerender": "tsx --tsconfig tsconfig.app.json scripts/prerender.tsx",
+    "preview": "vite preview --host 127.0.0.1",
+    "serve:secure": "node server/secure-server.mjs",
+    "check:performance": "node scripts/performance-budget.mjs",
+    "check:prod-ready": "node scripts/prod-readiness.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "tsc -b --pretty false",
+    "lint:strict": "tsc -p tsconfig.app.json --noEmit --noUnusedLocals --noUnusedParameters --pretty false"
+  },
+  "dependencies": {
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "axe-core": "^4.12.0",
+    "jsdom": "^29.1.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  }
+}

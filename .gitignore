@@ -1,0 +1,10 @@
+node_modules/
+.vite/
+playwright-report/
+test-results/
+coverage/
+data/
+*.tsbuildinfo
+*.log
+.env
+.env.local

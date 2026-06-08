@@ -1,0 +1,9 @@
+.next
+dist-server
+node_modules
+npm-debug.log
+.env
+.env.local
+postgres-data
+README-assets
+*.tar

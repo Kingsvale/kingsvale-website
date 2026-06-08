@@ -1,2 +1,220 @@
-# kingsvale-website
-The official Kingsvale group website repository.
+# Kingsvale Luxury Real Estate Website
+
+A responsive luxury real estate homepage and structured admin editor inspired by the provided Kingsvale-style reference: cinematic hero imagery, serif editorial typography, charcoal and ivory palette, restrained taupe accents, polished property cards, and calm premium motion.
+
+## What Is Included
+
+- Responsive homepage with header, hero, feature strip, legacy split, developments, land wanted CTA, and luxury footer.
+- Structured private studio editor at `/251db172b850d056` with server-session auth in secure mode and live preview before publishing.
+- Editable content model for hero, features, developments, about, land wanted, footer, navigation, social links, and images.
+- Image replacement via URL or upload. Secure mode validates image bytes and generates WebP media variants with `sharp`.
+- Public content pages for developments, development details, design and build, vision and process, about, land wanted, contact, privacy, terms, and a security review.
+- `/admin` is intentionally inert and does not expose editing controls.
+- Client-side PBKDF2 passphrase verification and AES-GCM encrypted private editor snapshots remain available for the local Vite prototype.
+- Secure server CMS persistence for published content, draft content, revision history, audit logs, leads and uploaded media under ignored `data/` storage.
+- Signed HttpOnly session cookies, CSRF protection for mutating studio routes, optional TOTP MFA, optional studio IP allowlisting, protected `studio-*` assets, public lead validation, optional signed webhook forwarding, route SEO metadata, robots and sitemap files.
+- Build-time prerendered HTML for all public routes, including each development detail page.
+- Optional local CMS encryption at rest, bounded revision history, CMS backup files and a read-only `/api/ops/health` endpoint for deployment checks.
+- Production readiness preflight that checks secrets hygiene, headers, robots, sitemap, prerendered route output and private chunk exposure.
+- Opinionated guardrails: fixed section order, exactly four feature-strip items, one to six development cards, approved icon choices, and text length limits.
+- Lightweight scroll reveals, hover states, image scale treatments, and `prefers-reduced-motion` support.
+- Unit, component, accessibility, admin workflow, responsive, and Playwright E2E tests.
+
+## Assumptions
+
+- The Vite dev server keeps the local prototype path: published studio changes persist in browser `localStorage` under `kingsvale-site-content-v1`.
+- `npm run serve:secure` is the production-style path: published content, drafts, revisions, uploaded media, audit logs and leads persist under `data/`.
+- For a real multi-user production launch, replace local `data/` persistence with a database/CMS and object storage without changing the typed `SiteContent` schema.
+- Managed production storage is still a deployment choice: this repo now isolates and documents the secure local store, but a real launch should place CMS rows, media, lead records and audit events in managed database/object/logging services.
+- Default photography uses remote optimized image URLs. Local Vite uploads are data URLs; secure-server uploads are decoded and converted to WebP variants in `/media/`.
+- The client passphrase gate is retained for Vite-only use. Secure mode uses a server login page, signed HttpOnly session cookie and CSRF token before loading the studio bundle.
+
+## Setup
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+## Run Locally
+
+```bash
+npm run dev -- --port 5173
+```
+
+Homepage: `http://127.0.0.1:5173/`
+
+Private studio: `http://127.0.0.1:5173/251db172b850d056`
+
+Security review page: `http://127.0.0.1:5173/security-review`
+
+For local static-demo studio access, use the fixture passphrase from the E2E test setup or rotate the PBKDF2 verifier in `src/lib/studioSecurity.ts`.
+
+For the secure production-style server, set:
+
+```bash
+$env:STUDIO_USER="kingsvale"
+$env:STUDIO_PASSWORD="your-rotated-passphrase"
+$env:SESSION_SECRET="a-long-random-session-signing-secret"
+$env:CMS_ENCRYPTION_KEY="a-long-random-cms-encryption-key"
+npm run build
+npm run serve:secure
+```
+
+Secure studio login: `http://127.0.0.1:4173/251db172b850d056`
+
+Optional hardening:
+
+```bash
+$env:STUDIO_TOTP_SECRET="BASE32-TOTP-SECRET"
+$env:STUDIO_ALLOWED_IPS="127.0.0.1,203.0.113.10"
+$env:SECURE_COOKIES="false"
+$env:CMS_MAX_REVISIONS="25"
+$env:CMS_MAX_BACKUPS="30"
+```
+
+Optional lead forwarding:
+
+```bash
+$env:CONTACT_WEBHOOK_URL="https://example.com/contact-webhook"
+$env:NEWSLETTER_WEBHOOK_URL="https://example.com/newsletter-webhook"
+$env:LEAD_WEBHOOK_HMAC_SECRET="a-shared-webhook-signing-secret"
+```
+
+Health check: `http://127.0.0.1:4173/api/ops/health`
+
+## Test
+
+```bash
+npm test
+npm run test:e2e
+npm run lint
+npm run lint:strict
+npm run check:performance
+npm run check:prod-ready
+```
+
+`check:performance` and `check:prod-ready` expect a fresh `npm run build` first because they inspect the generated `dist/` output.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Docker And Portainer
+
+The repo includes a `Dockerfile`, a local `docker-compose.yml`, and a Portainer upload-friendly `docker-compose.portainer.yml`. The container serves the production secure server on internal port `4173` and persists CMS content, uploads, leads, audit logs and backups in the named `kingsvale_data` volume.
+
+The Docker image can build without secrets, but the container entrypoint refuses to start unless `STUDIO_PASSWORD`, `SESSION_SECRET` and `CMS_ENCRYPTION_KEY` are set.
+
+The Dockerfile packages the current `dist/` production build. If you change the site source, rebuild `dist/` before creating the Docker image:
+
+```bash
+npm install
+npm run build
+```
+
+Local smoke test:
+
+```bash
+docker compose build
+docker compose up -d
+docker compose logs -f kingsvale
+```
+
+Required Portainer environment variables:
+
+```bash
+HOST_PORT=8095
+STUDIO_USER=kingsvale
+STUDIO_PASSWORD=replace-with-a-rotated-editor-password
+SESSION_SECRET=replace-with-a-long-random-session-secret
+CMS_ENCRYPTION_KEY=replace-with-a-long-random-cms-key
+SECURE_COOKIES=false
+```
+
+Use `SECURE_COOKIES=false` when opening the site directly over plain HTTP, for example `http://SERVER_IP:8095`. Set it to `true` only when the public site is served over HTTPS through a reverse proxy or tunnel.
+
+Optional variables:
+
+```bash
+STUDIO_TOTP_SECRET=
+STUDIO_ALLOWED_IPS=
+CMS_MAX_REVISIONS=25
+CMS_MAX_BACKUPS=30
+CONTACT_WEBHOOK_URL=
+NEWSLETTER_WEBHOOK_URL=
+LEAD_WEBHOOK_HMAC_SECRET=
+```
+
+Create a `.tar` image for Portainer upload:
+
+```bash
+docker build -t kingsvale-luxury-real-estate:latest .
+docker save -o kingsvale-luxury-real-estate.tar kingsvale-luxury-real-estate:latest
+```
+
+Upload the `.tar` image in Portainer:
+
+1. In Portainer, open the target environment.
+2. Go to `Images`.
+3. Use `Import image` or `Load image`, depending on your Portainer version.
+4. Upload `kingsvale-luxury-real-estate.tar`.
+5. Confirm the image appears as `kingsvale-luxury-real-estate:latest`.
+
+Deploy the uploaded image as a Portainer Stack:
+
+1. In Portainer, go to `Stacks` -> `Add stack`.
+2. Paste the contents of `docker-compose.portainer.yml` into the Web editor.
+3. Add the required environment variables above in the Stack environment section.
+4. Deploy the stack.
+5. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
+6. Open the private studio at `/251db172b850d056`.
+
+Portainer Git deployment:
+
+1. Push this project to a Git repository the Docker host can access.
+2. In Portainer, go to `Stacks` -> `Add stack`.
+3. Choose `Git repository`, enter the repository URL, branch, and set `Compose path` to `docker-compose.yml`.
+4. Add the environment variables above in the Stack environment section.
+5. Deploy the stack.
+6. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
+7. Open the private studio at `/251db172b850d056`.
+
+If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep `SECURE_COOKIES=true` with HTTPS enabled.
+
+## Performance And Accessibility Notes
+
+- Images use responsive `srcset`, width hints, lazy loading outside the hero, async decoding, and high-priority loading for the hero image.
+- Secure image uploads are normalized to WebP variants and served from `/media/` with immutable caching.
+- Motion is CSS and IntersectionObserver based, with no heavy animation library.
+- Layout dimensions use fixed breakpoints, aspect ratios, and constrained grids to reduce layout shift.
+- Components use semantic landmarks, labelled controls, accessible buttons, alt text, keyboard-friendly navigation, and automated axe checks.
+- SEO metadata is updated per route, with Open Graph tags, canonical URL, JSON-LD structured data, robots.txt and sitemap.xml.
+- Public routes are prerendered after `vite build` so crawlers and social previews receive meaningful HTML before hydration.
+- `npm run check:performance` enforces Lighthouse-style bundle/prerender budgets and verifies the private studio chunk is not referenced by public HTML.
+- `npm run check:prod-ready` verifies offline launch hygiene: no leftover SSH key files, `.env` ignored, documented environment controls, hardened static headers, robots/sitemap coverage, prerendered route output, clean SPA fallback shell and no public studio chunk reference.
+- For a full Lighthouse pass, run `npm run build`, then `npm run serve:secure`, and test the secure server URL in Chrome Lighthouse.
+
+## Red-Team Security Notes
+
+- Client-side route hiding is not true access control. Secure mode protects the private route and studio chunk server-side; plain static hosting does not.
+- The studio passphrase is verified with PBKDF2-SHA-256 using a stored verifier and salt. This avoids a plaintext secret in the production app bundle, but the verifier is still available to an attacker who can download the JavaScript.
+- AES-GCM is used for private editor snapshots in local storage. Published public content is not encrypted because the public website must render it without an editor passphrase.
+- `serve:secure` adds signed sessions, CSRF checks, optional TOTP MFA, optional IP allowlisting, rate limiting, server-side validation, audit logs, revision history, encrypted CMS files when configured, backups and server media processing. For production scale, move local `data/` files to managed DB/object storage, use SSO/OIDC/MFA through an identity provider and store secrets in a manager.
+
+## Acceptance Criteria
+
+- Homepage visually follows the attached premium property developer reference.
+- Studio edits cannot change the section structure or break the layout.
+- Hero, features, development cards, imagery, CTAs, footer content, navigation, newsletter copy, and social links are editable.
+- Preview is available before publish.
+- Motion is restrained and honors reduced-motion preferences.
+- Desktop, tablet, and mobile layouts are supported.
+- Tests and production build pass.
+
+## Default Image Sources
+
+- Hero stone-accent home: [Unsplash photo by Justin Wolff](https://unsplash.com/photos/modern-luxury-house-with-stone-accents-at-sunset-7qD-iDyrdHY)
+- Additional editable default imagery is served from Unsplash image URLs and can be replaced in the admin editor.

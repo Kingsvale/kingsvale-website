@@ -1,0 +1,33 @@
+services:
+  kingsvale:
+    image: kingsvale-luxury-real-estate:latest
+    container_name: kingsvale-site
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8095}:4173"
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+      SECURE_COOKIES: "${SECURE_COOKIES:-false}"
+      STUDIO_USER: "${STUDIO_USER:-kingsvale}"
+      STUDIO_PASSWORD: "${STUDIO_PASSWORD:?Set STUDIO_PASSWORD in Portainer}"
+      SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in Portainer}"
+      CMS_ENCRYPTION_KEY: "${CMS_ENCRYPTION_KEY:?Set CMS_ENCRYPTION_KEY in Portainer}"
+      STUDIO_TOTP_SECRET: "${STUDIO_TOTP_SECRET:-}"
+      STUDIO_ALLOWED_IPS: "${STUDIO_ALLOWED_IPS:-}"
+      CMS_MAX_REVISIONS: "${CMS_MAX_REVISIONS:-25}"
+      CMS_MAX_BACKUPS: "${CMS_MAX_BACKUPS:-30}"
+      CONTACT_WEBHOOK_URL: "${CONTACT_WEBHOOK_URL:-}"
+      NEWSLETTER_WEBHOOK_URL: "${NEWSLETTER_WEBHOOK_URL:-}"
+      LEAD_WEBHOOK_HMAC_SECRET: "${LEAD_WEBHOOK_HMAC_SECRET:-}"
+    volumes:
+      - kingsvale_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/api/ops/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  kingsvale_data:
