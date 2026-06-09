@@ -27,9 +27,11 @@ const dataDir = resolve(rootDir, "data");
 const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
 const uploadsDir = resolve(dataDir, "uploads");
+const trackingDir = resolve(dataDir, "tracking-sites");
 const backupDir = resolve(dataDir, "backups");
 const auditDir = dataDir;
 const cmsStoreFile = join(cmsDir, "content.json");
+const trackingStoreFile = join(trackingDir, "sites.json");
 const studioPath = "/251db172b850d056";
 const port = Number(process.env.PORT ?? 4173);
 const studioUser = process.env.STUDIO_USER ?? "kingsvale";
@@ -140,6 +142,7 @@ async function ensureDataDirs() {
     mkdir(cmsDir, { recursive: true }),
     mkdir(leadsDir, { recursive: true }),
     mkdir(uploadsDir, { recursive: true }),
+    mkdir(trackingDir, { recursive: true }),
     mkdir(backupDir, { recursive: true })
   ]);
 }
@@ -264,6 +267,16 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/contact" || url.pathname === "/api/newsletter") {
     await handlePublicLeadRequest(request, response, url.pathname);
+    return;
+  }
+
+  if (url.pathname === "/api/tracking-sites") {
+    await handleTrackingSitesCollection(request, response);
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/tracking-sites/")) {
+    await handleTrackingSiteItem(request, response, url);
     return;
   }
 
@@ -638,6 +651,133 @@ async function handlePublicLeadRequest(request, response, path) {
   sendJson(response, 202, { ok: true, id: record.id });
 }
 
+async function handleTrackingSitesCollection(request, response) {
+  const session = requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  if (request.method === "GET") {
+    const store = await readTrackingStore();
+    sendJson(response, 200, {
+      sites: store.sites,
+      updatedAt: store.updatedAt ?? null
+    });
+    return;
+  }
+
+  if (request.method === "PUT") {
+    if (!requireCsrf(request, response, session)) {
+      return;
+    }
+
+    const payload = await readJsonBody(request, 90_000);
+    const site = payload.site;
+    const validation = validateTrackingSite(site);
+    if (!validation.valid) {
+      sendJson(response, 400, { errors: validation.errors });
+      return;
+    }
+
+    const store = await readTrackingStore();
+    const existingTokenOwner = store.sites.find(
+      (item) => item.token === site.token && item.id !== site.id
+    );
+    if (existingTokenOwner) {
+      sendJson(response, 409, { error: "Tracking link token already exists." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const savedSite = {
+      ...site,
+      createdAt: site.createdAt || now,
+      updatedAt: now,
+      archived: Boolean(site.archived)
+    };
+    store.sites = store.sites.some((item) => item.id === savedSite.id)
+      ? store.sites.map((item) => (item.id === savedSite.id ? savedSite : item))
+      : [savedSite, ...store.sites];
+    store.updatedAt = now;
+    await writeTrackingStore(store);
+    await writeAudit("tracking_site_saved", request, { user: session.user, siteId: savedSite.id });
+    sendJson(response, 200, { ok: true, site: savedSite });
+    return;
+  }
+
+  sendJson(response, 405, { error: "Method not allowed." });
+}
+
+async function handleTrackingSiteItem(request, response, url) {
+  const [, , , idOrToken, action] = url.pathname.split("/");
+  const decodedIdOrToken = decodeURIComponent(idOrToken ?? "");
+
+  if (!action && request.method === "GET") {
+    const store = await readTrackingStore();
+    const site = store.sites.find((item) => item.token === decodedIdOrToken && !item.archived);
+    sendJson(response, site ? 200 : 404, { site: site ?? null });
+    return;
+  }
+
+  const session = requireSession(request, response);
+  if (!session || !requireCsrf(request, response, session)) {
+    return;
+  }
+
+  if (action === "archive" && request.method === "POST") {
+    const store = await readTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    const archivedSite = {
+      ...target,
+      archived: true,
+      updatedAt: new Date().toISOString()
+    };
+    store.sites = store.sites.map((site) => (site.id === archivedSite.id ? archivedSite : site));
+    store.updatedAt = archivedSite.updatedAt;
+    await writeTrackingStore(store);
+    await writeAudit("tracking_site_archived", request, { user: session.user, siteId: archivedSite.id });
+    sendJson(response, 200, { ok: true, site: archivedSite });
+    return;
+  }
+
+  if (action === "sync" && request.method === "POST") {
+    const store = await readTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    const checkedAt = new Date().toISOString();
+    const syncedSite = {
+      ...target,
+      updatedAt: checkedAt,
+      council: {
+        ...target.council,
+        lastCheckedAt: checkedAt,
+        lastSyncStatus: "Connector shell only. Configure a council API to automate updates."
+      }
+    };
+    store.sites = store.sites.map((site) => (site.id === syncedSite.id ? syncedSite : site));
+    store.updatedAt = checkedAt;
+    await writeTrackingStore(store);
+    await writeAudit("tracking_site_sync_checked", request, {
+      user: session.user,
+      siteId: syncedSite.id,
+      council: syncedSite.council.councilName
+    });
+    sendJson(response, 200, { ok: true, site: syncedSite });
+    return;
+  }
+
+  sendJson(response, 405, { error: "Method not allowed." });
+}
+
 async function forwardLead(kind, record) {
   const webhook = kind === "newsletter"
     ? process.env.NEWSLETTER_WEBHOOK_URL
@@ -808,6 +948,24 @@ async function readCmsStore() {
 async function writeCmsStore(store) {
   await mkdir(cmsDir, { recursive: true });
   await writeFile(cmsStoreFile, encodeCmsStore(store));
+}
+
+async function readTrackingStore() {
+  try {
+    const raw = await readFile(trackingStoreFile, "utf8");
+    const parsed = decodeCmsStore(raw);
+    return {
+      sites: Array.isArray(parsed.sites) ? parsed.sites.filter((site) => validateTrackingSite(site).valid) : [],
+      updatedAt: parsed.updatedAt ?? null
+    };
+  } catch {
+    return { sites: [], updatedAt: null };
+  }
+}
+
+async function writeTrackingStore(store) {
+  await mkdir(trackingDir, { recursive: true });
+  await writeFile(trackingStoreFile, encodeCmsStore(store));
 }
 
 async function writeCmsBackup(store, event, user) {
@@ -1010,6 +1168,79 @@ function validateSiteContent(content) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateTrackingSite(site) {
+  const errors = [];
+  if (!site || typeof site !== "object") {
+    return { valid: false, errors: [{ path: "site", message: "Tracking site is required." }] };
+  }
+
+  if (typeof site.id !== "string" || !site.id.trim() || site.id.length > 80) {
+    errors.push({ path: "id", message: "Tracking site id is required." });
+  }
+
+  if (typeof site.token !== "string" || !/^[a-zA-Z0-9_-]{16,40}$/.test(site.token)) {
+    errors.push({ path: "token", message: "Tracking token must be URL-safe and unguessable." });
+  }
+
+  validateText(errors, "title", site.title, "Site title", 72);
+  validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
+  validateText(errors, "statusNote", site.statusNote, "Status note", 320);
+  validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
+  validateOptionalText(errors, "reference", site.reference, "Reference", 64);
+  validateOptionalText(errors, "summary", site.summary, "Summary", 240);
+
+  if (!["planning", "submitted", "in-review", "approved", "construction", "complete", "on-hold"].includes(site.currentStatus)) {
+    errors.push({ path: "currentStatus", message: "Choose an approved status." });
+  }
+
+  if (!Array.isArray(site.milestones) || site.milestones.length < 1 || site.milestones.length > 8) {
+    errors.push({ path: "milestones", message: "Use between one and eight milestones." });
+  } else {
+    site.milestones.forEach((milestone, index) => {
+      validateText(errors, `milestones.${index}.label`, milestone.label, "Milestone label", 72);
+      validateOptionalText(errors, `milestones.${index}.note`, milestone.note ?? "", "Milestone note", 180);
+      if (!["pending", "active", "complete", "blocked"].includes(milestone.state)) {
+        errors.push({ path: `milestones.${index}.state`, message: "Choose an approved milestone state." });
+      }
+    });
+  }
+
+  const council = site.council;
+  if (!council || typeof council !== "object") {
+    errors.push({ path: "council", message: "Council settings are required." });
+  } else {
+    if (!["none", "configured"].includes(council.mode)) {
+      errors.push({ path: "council.mode", message: "Choose a council sync mode." });
+    }
+
+    validateOptionalText(errors, "council.councilName", council.councilName, "Council name", 90);
+    validateOptionalText(
+      errors,
+      "council.applicationReference",
+      council.applicationReference,
+      "Application reference",
+      80
+    );
+
+    if (council.mode === "configured") {
+      validateText(errors, "council.councilName", council.councilName, "Council name", 90);
+      validateText(
+        errors,
+        "council.applicationReference",
+        council.applicationReference,
+        "Application reference",
+        80
+      );
+    }
+
+    if (council.apiBaseUrl && !isSafeHttpUrl(council.apiBaseUrl)) {
+      errors.push({ path: "council.apiBaseUrl", message: "Council API URL must be an HTTP URL." });
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 function validateEditorial(errors, path, content) {
   validateText(errors, `${path}.eyebrow`, content?.eyebrow, "Eyebrow", 32);
   validateText(errors, `${path}.title`, content?.title, "Section title", 78);
@@ -1040,6 +1271,12 @@ function validateText(errors, path, value, label, max) {
   }
 }
 
+function validateOptionalText(errors, path, value, label, max) {
+  if (typeof value === "string" && value.trim().length > max) {
+    errors.push({ path, message: `${label} must be ${max} characters or fewer.` });
+  }
+}
+
 function validateUrl(errors, path, value, label) {
   if (typeof value !== "string" || !isSafeUrl(value)) {
     errors.push({ path, message: `${label} must be a safe URL.` });
@@ -1061,6 +1298,15 @@ function isSafeUrl(value) {
   if (value.startsWith("/") || value.startsWith("#") || value.startsWith("mailto:") || value.startsWith("tel:")) {
     return true;
   }
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function isSafeHttpUrl(value) {
   try {
     const url = new URL(value);
     return url.protocol === "https:" || url.protocol === "http:";

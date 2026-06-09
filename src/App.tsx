@@ -20,6 +20,9 @@ const AdminDecoyPage = lazy(() =>
 const StudioAuthPage = lazy(() =>
   import("./pages/StudioAuthPage").then((module) => ({ default: module.StudioAuthPage }))
 );
+const TrackingPage = lazy(() =>
+  import("./pages/TrackingPage").then((module) => ({ default: module.TrackingPage }))
+);
 
 export function App() {
   const content = useSiteContent();
@@ -42,6 +45,15 @@ export function App() {
     return (
       <RouteBoundary>
         <AdminDecoyPage />
+      </RouteBoundary>
+    );
+  }
+
+  if (route.startsWith("/track/")) {
+    const token = route.split("/").filter(Boolean)[1];
+    return (
+      <RouteBoundary>
+        <TrackingPage content={content} token={token ?? ""} />
       </RouteBoundary>
     );
   }

@@ -19,6 +19,14 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
+  it("exposes Website and Sites studio tabs", () => {
+    render(<AdminPage publishedContent={defaultContent} />);
+
+    expect(screen.getByRole("tab", { name: "Website" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Sites" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Content editor" })).toBeInTheDocument();
+  });
+
   it("previews hero edits and saves published content", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
@@ -57,6 +65,19 @@ describe("AdminPage", () => {
 
     expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
     expect(screen.getByRole("alert", { name: /validation issues/i })).toBeInTheDocument();
+  });
+
+  it("creates a tracking site with a QR-ready public link", async () => {
+    render(<AdminPage publishedContent={defaultContent} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    fireEvent.click(screen.getByRole("button", { name: /create site/i }));
+
+    await waitFor(() => {
+      const link = screen.getByTestId("generated-tracking-link") as HTMLInputElement;
+      expect(link.value).toMatch(/\/track\/[a-zA-Z0-9_-]+/);
+    });
+    expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
   });
 
   it("passes automated accessibility checks for the structured editor", async () => {

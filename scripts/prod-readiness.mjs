@@ -45,7 +45,7 @@ await check(".env is ignored and .env.example documents production controls", as
     "LEAD_WEBHOOK_HMAC_SECRET"
   ];
 
-  assert(/(^|\n)\.env(\n|$)/.test(gitignore), ".env is not ignored.");
+  assert(/(^|\r?\n)\.env(\r?\n|$)/.test(gitignore), ".env is not ignored.");
   for (const key of requiredKeys) {
     assert(envExample.includes(`${key}=`), `.env.example is missing ${key}.`);
   }

@@ -53,6 +53,7 @@ import {
   saveCmsDraft,
   uploadCmsImage
 } from "../lib/cmsApi";
+import { AdminSitesPanel } from "./AdminSitesPanel";
 
 type AdminPageProps = {
   publishedContent: SiteContent;
@@ -67,6 +68,8 @@ type RevisionSummary = {
   user: string;
   title: string;
 };
+
+type AdminRootTab = "website" | "sites";
 
 const HomepagePreview = lazy(() =>
   import("./Homepage").then((module) => ({ default: module.Homepage }))
@@ -95,6 +98,11 @@ const editorSections = [
   { id: "footer", label: "Footer" }
 ] as const;
 
+const adminRootTabs: { id: AdminRootTab; label: string }[] = [
+  { id: "website", label: "Website" },
+  { id: "sites", label: "Sites" }
+];
+
 type EditorSectionId = (typeof editorSections)[number]["id"];
 
 export function AdminPage({
@@ -105,6 +113,7 @@ export function AdminPage({
 }: AdminPageProps) {
   const [draft, setDraft] = useState<SiteContent>(() => cloneContent(publishedContent));
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
+  const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>("website");
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
   const [serverMode, setServerMode] = useState(false);
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
@@ -244,13 +253,27 @@ export function AdminPage({
             Edit one designed section at a time. The layout stays fixed, the
             guardrails stay active, and the preview shows exactly what will publish.
           </p>
+          <div className="admin-root-tabs" role="tablist" aria-label="Studio areas">
+            {adminRootTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeRootTab === tab.id}
+                aria-controls={`admin-root-panel-${tab.id}`}
+                onClick={() => setActiveRootTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="admin-actions">
           <div className="admin-secure-pill">
             <ShieldCheck aria-hidden="true" />
             <span>{serverMode ? "Server CMS session active" : encryptedSnapshotSummary}</span>
           </div>
-          {serverMode && revisions.length > 0 && (
+          {activeRootTab === "website" && serverMode && revisions.length > 0 && (
             <details className="admin-versioning">
               <summary>Recovery</summary>
               <div className="admin-versioning__controls">
@@ -280,23 +303,27 @@ export function AdminPage({
               </div>
             </details>
           )}
-          <a className="admin-open" href="/" target="_blank" rel="noreferrer">
-            <Eye aria-hidden="true" />
-            Open site
-          </a>
-          <button type="button" className="admin-ghost" onClick={resetToDefaults} disabled={busy}>
-            <RotateCcw aria-hidden="true" />
-            Reset
-          </button>
-          <button
-            type="button"
-            className="admin-save"
-            onClick={publish}
-            disabled={!validation.valid || busy}
-          >
-            <Save aria-hidden="true" />
-            {busy ? "Working" : "Publish"}
-          </button>
+          {activeRootTab === "website" && (
+            <>
+              <a className="admin-open" href="/" target="_blank" rel="noreferrer">
+                <Eye aria-hidden="true" />
+                Open site
+              </a>
+              <button type="button" className="admin-ghost" onClick={resetToDefaults} disabled={busy}>
+                <RotateCcw aria-hidden="true" />
+                Reset
+              </button>
+              <button
+                type="button"
+                className="admin-save"
+                onClick={publish}
+                disabled={!validation.valid || busy}
+              >
+                <Save aria-hidden="true" />
+                {busy ? "Working" : "Publish"}
+              </button>
+            </>
+          )}
           {onLogout && (
             <button type="button" className="admin-ghost" onClick={onLogout}>
               <LogOut aria-hidden="true" />
@@ -306,7 +333,8 @@ export function AdminPage({
         </div>
       </header>
 
-      <main className="admin-layout">
+      {activeRootTab === "website" ? (
+      <main className="admin-layout" id="admin-root-panel-website" role="tabpanel">
         <section className="admin-editor" aria-label="Content editor">
           <div className="admin-status" role="status">
             {validation.valid ? <Check aria-hidden="true" /> : <AlertCircle aria-hidden="true" />}
@@ -666,6 +694,11 @@ export function AdminPage({
           </div>
         </aside>
       </main>
+      ) : (
+      <main className="admin-root-main" id="admin-root-panel-sites" role="tabpanel">
+        <AdminSitesPanel />
+      </main>
+      )}
     </div>
   );
 }

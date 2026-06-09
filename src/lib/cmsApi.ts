@@ -1,4 +1,11 @@
 import type { ImageAsset, SiteContent } from "./contentTypes";
+import type { TrackingSite } from "./trackingTypes";
+import {
+  archiveLocalTrackingSite,
+  findLocalTrackingSiteByToken,
+  loadLocalTrackingSites,
+  upsertLocalTrackingSite
+} from "./trackingStorage";
 
 type StudioSession = {
   authenticated: boolean;
@@ -138,6 +145,103 @@ export async function uploadCmsImage(file: File): Promise<ImageAsset | null> {
   }
 }
 
+export async function listTrackingSites(): Promise<TrackingSite[]> {
+  try {
+    const response = await fetch("/api/tracking-sites", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!response.ok) {
+      return loadLocalTrackingSites();
+    }
+
+    const payload = (await response.json()) as { sites: TrackingSite[] };
+    return payload.sites;
+  } catch {
+    return loadLocalTrackingSites();
+  }
+}
+
+export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch("/api/tracking-sites", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: csrfHeaders(),
+      body: JSON.stringify({ site })
+    });
+
+    if (!response.ok) {
+      return upsertLocalTrackingSite(site);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return payload.site;
+  } catch {
+    return upsertLocalTrackingSite(site);
+  }
+}
+
+export async function archiveTrackingSite(id: string): Promise<TrackingSite | null> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/archive`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrfHeaders()
+    });
+
+    if (!response.ok) {
+      return archiveLocalTrackingSite(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return payload.site;
+  } catch {
+    return archiveLocalTrackingSite(id);
+  }
+}
+
+export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSite | null> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/sync`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrfHeaders()
+    });
+
+    if (!response.ok) {
+      return markLocalCouncilSyncAttempt(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return payload.site;
+  } catch {
+    return markLocalCouncilSyncAttempt(id);
+  }
+}
+
+export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
+  try {
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(token)}`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!response.ok) {
+      return findLocalTrackingSiteByToken(token);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite | null };
+    return payload.site;
+  } catch {
+    return findLocalTrackingSiteByToken(token);
+  }
+}
+
 async function ensureCsrfToken() {
   if (csrfToken) {
     return;
@@ -150,4 +254,20 @@ function csrfHeaders() {
     "Content-Type": "application/json",
     "x-csrf-token": csrfToken
   };
+}
+
+function markLocalCouncilSyncAttempt(id: string) {
+  const site = loadLocalTrackingSites().find((item) => item.id === id);
+  if (!site) {
+    return null;
+  }
+
+  return upsertLocalTrackingSite({
+    ...site,
+    council: {
+      ...site.council,
+      lastCheckedAt: new Date().toISOString(),
+      lastSyncStatus: "Connector shell only. Configure a council API to automate updates."
+    }
+  });
 }

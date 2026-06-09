@@ -58,6 +58,28 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByText("Riverstone Mews")).toBeVisible();
 });
 
+test("creates a customer tracking site and opens the generated link", async ({ page }) => {
+  await page.goto(studioPath);
+  await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
+  await page.getByRole("button", { name: "Unlock studio" }).click();
+  await expect(page.getByRole("heading", { name: "Kingsvale private studio" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Sites" }).click();
+  await page.getByRole("button", { name: "Create site" }).click();
+  await page.getByLabel("Site title").fill("Oakdene planning tracker");
+  await page.getByLabel("Site address").fill("12 Meadow Lane");
+  await page.getByRole("button", { name: "Save site" }).click();
+  await expect(page.getByText("Tracking page saved.")).toBeVisible();
+
+  const trackingLink = await page.getByTestId("generated-tracking-link").inputValue();
+  expect(trackingLink).toContain("/track/");
+
+  await page.goto(trackingLink);
+  await expect(page.getByRole("heading", { name: "Oakdene planning tracker" })).toBeVisible();
+  await expect(page.getByText("12 Meadow Lane")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Milestones" })).toBeVisible();
+});
+
 test("mobile navigation is keyboard and touch accessible", async ({ page, isMobile }) => {
   test.skip(!isMobile, "Mobile navigation behavior is covered by the mobile project.");
 
