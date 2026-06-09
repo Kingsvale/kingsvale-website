@@ -11,9 +11,10 @@ export const runtime = "nodejs";
 
 export async function POST(
   request: Request,
-  { params }: { params: { workspaceId: string; taskId: string } }
+  context: { params: Promise<{ workspaceId: string; taskId: string }> }
 ) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

@@ -11,9 +11,10 @@ export const runtime = "nodejs";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { workspaceId: string; taskId: string } }
+  context: { params: Promise<{ workspaceId: string; taskId: string }> }
 ) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -84,12 +85,38 @@ export async function PATCH(
           labels: input.labels?.length ? { create: input.labels } : undefined
         },
         include: {
-          assignee: true,
-          reporter: true,
+          assignee: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              avatarColor: true,
+              imageUrl: true
+            }
+          },
+          reporter: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              avatarColor: true,
+              imageUrl: true
+            }
+          },
           labels: true,
           checklistItems: { orderBy: { position: "asc" } },
           comments: {
-            include: { author: true },
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  avatarColor: true,
+                  imageUrl: true
+                }
+              }
+            },
             orderBy: { createdAt: "asc" }
           }
         }
@@ -140,9 +167,10 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { workspaceId: string; taskId: string } }
+  context: { params: Promise<{ workspaceId: string; taskId: string }> }
 ) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

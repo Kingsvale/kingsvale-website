@@ -11,9 +11,10 @@ export const runtime = "nodejs";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { workspaceId: string; memberId: string } }
+  context: { params: Promise<{ workspaceId: string; memberId: string }> }
 ) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -58,9 +59,10 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { workspaceId: string; memberId: string } }
+  context: { params: Promise<{ workspaceId: string; memberId: string }> }
 ) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

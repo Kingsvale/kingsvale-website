@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { WorkspaceRole, WorkspaceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { attachSessionCookie } from "@/lib/auth";
-import { apiError, readJson } from "@/lib/api";
+import { apiError, isFormRequest, readRequestInput, redirectToPath, redirectWithError, safeNextPath } from "@/lib/api";
 import { defaultBoardCreate } from "@/lib/defaults";
 import { rateLimit } from "@/lib/rate-limit";
 import { normalizeEmail, slugify } from "@/lib/strings";
@@ -12,17 +12,24 @@ import { registerSchema } from "@/lib/validators";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const formRequest = isFormRequest(request);
   try {
     const ip = request.headers.get("x-forwarded-for") ?? "local";
     const limited = rateLimit(`register:${ip}`, 8, 60_000);
     if (!limited.allowed) {
+      if (formRequest) {
+        return redirectWithError(request, "/register", "Too many registration attempts.");
+      }
       return NextResponse.json({ error: "Too many registration attempts." }, { status: 429 });
     }
 
-    const input = registerSchema.parse(await readJson(request));
+    const input = registerSchema.parse(await readRequestInput(request));
     const email = normalizeEmail(input.email);
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
+      if (formRequest) {
+        return redirectWithError(request, "/register", "An account with this email already exists.");
+      }
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
@@ -34,8 +41,7 @@ export async function POST(request: Request) {
       data: {
         email,
         name: input.name,
-        passwordHash,
-        workspaces: undefined
+        passwordHash
       }
     });
 
@@ -65,9 +71,14 @@ export async function POST(request: Request) {
       }
     });
 
-    const response = NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } }, { status: 201 });
+    const response = formRequest
+      ? redirectToPath(request, safeNextPath(request))
+      : NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } }, { status: 201 });
     return attachSessionCookie(response, user);
   } catch (error) {
+    if (formRequest) {
+      return redirectWithError(request, "/register", "Could not create account.");
+    }
     return apiError(error);
   }
 }

@@ -1,4 +1,5 @@
 import { defaultContent } from "../data/defaultContent";
+import { normalizeSiteContent } from "./contentNormalize";
 import type { SiteContent } from "./contentTypes";
 import { validateSiteContent } from "./contentValidation";
 
@@ -21,7 +22,7 @@ export function loadPublishedContent(): SiteContent {
   try {
     const parsed = JSON.parse(rawContent) as SiteContent;
     const validation = validateSiteContent(parsed);
-    return validation.valid ? parsed : cloneContent(defaultContent);
+    return validation.valid ? normalizeSiteContent(parsed) : cloneContent(defaultContent);
   } catch {
     return cloneContent(defaultContent);
   }

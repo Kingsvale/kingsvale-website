@@ -8,3 +8,4 @@ data/
 *.log
 .env
 .env.local
+workspace-task-app/taskforge-workspace.tar

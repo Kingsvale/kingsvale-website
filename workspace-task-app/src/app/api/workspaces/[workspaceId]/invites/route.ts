@@ -11,8 +11,9 @@ import { inviteSchema } from "@/lib/validators";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request, { params }: { params: { workspaceId: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ workspaceId: string }> }) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     environment:
       POSTGRES_DB: taskforge
       POSTGRES_USER: taskforge
@@ -21,11 +23,12 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - "${HOST_PORT:-8092}:3000"
     environment:
       DATABASE_URL: postgresql://taskforge:taskforge@postgres:5432/taskforge?schema=public
       SESSION_SECRET: ${SESSION_SECRET:-replace-this-with-a-random-32-character-secret}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${APP_PUBLIC_URL:-http://localhost:8092}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
       NODE_ENV: production
 
 volumes:

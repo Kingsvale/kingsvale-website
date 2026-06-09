@@ -10,7 +10,8 @@ import { workspaceSchema } from "@/lib/validators";
 
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, { params }: { params: { workspaceId: string } }) {
+export async function GET(_request: Request, context: { params: Promise<{ workspaceId: string }> }) {
+  const params = await context.params;
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -24,8 +25,9 @@ export async function GET(_request: Request, { params }: { params: { workspaceId
   return NextResponse.json({ workspace });
 }
 
-export async function PATCH(request: Request, { params }: { params: { workspaceId: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ workspaceId: string }> }) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

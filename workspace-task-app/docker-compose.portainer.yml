@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: taskforge
+      POSTGRES_USER: taskforge
+      POSTGRES_PASSWORD: taskforge_portainer_db_password
+    volumes:
+      - taskforge_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskforge -d taskforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: taskforge-workspace:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8092:3000"
+    environment:
+      DATABASE_URL: postgresql://taskforge:taskforge_portainer_db_password@postgres:5432/taskforge?schema=public
+      SESSION_SECRET: replace-this-with-a-long-random-32-character-secret
+      NEXT_PUBLIC_APP_URL: http://YOUR_SERVER_IP:8092
+      SECURE_COOKIES: "false"
+      NODE_ENV: production
+
+volumes:
+  taskforge_postgres:

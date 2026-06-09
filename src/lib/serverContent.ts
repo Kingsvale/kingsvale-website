@@ -1,5 +1,6 @@
 import type { SiteContent } from "./contentTypes";
 import { validateSiteContent } from "./contentValidation";
+import { normalizeSiteContent } from "./contentNormalize";
 
 export async function fetchServerContent(): Promise<SiteContent | null> {
   try {
@@ -18,7 +19,7 @@ export async function fetchServerContent(): Promise<SiteContent | null> {
     }
 
     const validation = validateSiteContent(payload.content);
-    return validation.valid ? payload.content : null;
+    return validation.valid ? normalizeSiteContent(payload.content) : null;
   } catch {
     return null;
   }

@@ -95,7 +95,7 @@ export function WorkspaceClient({ user, workspaces: initialWorkspaces, initialWo
     [activeProjectId, workspace.projects]
   );
   const activeBoard = activeProject?.boards[0];
-  const activeLists = activeBoard?.lists ?? [];
+  const activeLists = useMemo(() => activeBoard?.lists ?? [], [activeBoard?.lists]);
   const selectedTask = useMemo(() => activeLists.flatMap((list) => list.tasks).find((task) => task.id === selectedTaskId), [
     activeLists,
     selectedTaskId
@@ -893,10 +893,11 @@ function TaskDrawer({
   }, [task]);
 
   if (!task) return null;
+  const currentTask = task;
 
   async function saveTask() {
     await onPatch(
-      task.id,
+      currentTask.id,
       {
         title: draft.title,
         description: draft.description,
@@ -913,7 +914,7 @@ function TaskDrawer({
   async function addComment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!comment.trim()) return;
-    await onComment(task.id, comment.trim());
+    await onComment(currentTask.id, comment.trim());
     setComment("");
   }
 

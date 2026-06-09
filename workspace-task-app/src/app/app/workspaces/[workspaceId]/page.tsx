@@ -6,11 +6,12 @@ import type { UserLite, WorkspaceData, WorkspaceSummary } from "@/types/workspac
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkspacePage({ params }: { params: { workspaceId: string } }) {
+export default async function WorkspacePage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  const resolvedParams = await params;
   const user = await requireUser();
   const [workspaces, workspace] = await Promise.all([
     getUserWorkspaces(user.id),
-    getWorkspaceForUser(params.workspaceId, user.id)
+    getWorkspaceForUser(resolvedParams.workspaceId, user.id)
   ]);
 
   if (!workspace) {

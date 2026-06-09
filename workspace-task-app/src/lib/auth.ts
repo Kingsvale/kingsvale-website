@@ -6,8 +6,15 @@ import { createSessionToken, SESSION_COOKIE, verifySessionToken } from "@/lib/au
 
 const oneWeek = 60 * 60 * 24 * 7;
 
+function shouldUseSecureCookies() {
+  if (process.env.SECURE_COOKIES === "true") return true;
+  if (process.env.SECURE_COOKIES === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
 export async function getCurrentUser() {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) {
     return null;
   }
@@ -53,7 +60,7 @@ export async function attachSessionCookie(
     name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     sameSite: "lax",
     maxAge: oneWeek,
     path: "/"
@@ -67,7 +74,7 @@ export function clearSessionCookie(response: NextResponse) {
     name: SESSION_COOKIE,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     sameSite: "lax",
     maxAge: 0,
     path: "/"

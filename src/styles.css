@@ -97,6 +97,7 @@ button:disabled {
 }
 
 .site-header__inner {
+  position: relative;
   width: min(100% - 56px, 1320px);
   min-height: 112px;
   margin: 0 auto;
@@ -107,76 +108,16 @@ button:disabled {
 }
 
 .logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
+  display: inline-block;
   color: currentColor;
-  min-width: max-content;
+  width: clamp(238px, 25vw, 386px);
   flex: 0 0 auto;
 }
 
-.logo-mark {
-  position: relative;
-  width: 76px;
-  height: 60px;
-  display: grid;
-  align-items: center;
-  color: var(--warm-stone);
-  font-family: var(--font-logo);
-  font-size: 49px;
-  line-height: 1;
-  overflow: visible;
-}
-
-.logo-mark::after {
-  content: "";
-  position: absolute;
-  left: 39px;
-  top: 11px;
-  width: 1px;
-  height: 41px;
-  background: currentColor;
-  opacity: 0.72;
-  transform: rotate(28deg);
-  transform-origin: center;
-}
-
-.logo-mark__k,
-.logo-mark__v {
-  position: absolute;
+.logo__image {
   display: block;
-}
-
-.logo-mark__k {
-  left: 0;
-  top: 3px;
-}
-
-.logo-mark__v {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  font-size: 40px;
-}
-
-.logo-type {
-  display: grid;
-  gap: 1px;
-  text-transform: uppercase;
-  color: var(--ivory);
-  transform: translateY(1px);
-}
-
-.logo-type span:first-child {
-  font-family: var(--font-logo);
-  font-size: 31px;
-  line-height: 1;
-}
-
-.logo-type span:last-child {
-  font-size: 13px;
-  line-height: 1;
-  text-align: center;
+  width: 100%;
+  height: auto;
 }
 
 .primary-nav {
@@ -631,6 +572,12 @@ button:disabled {
   font-size: 11px;
   font-weight: 700;
   transition: background 180ms ease, transform 180ms ease;
+}
+
+.footer__socials img {
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
 }
 
 .footer__socials a:hover,
@@ -1687,24 +1634,8 @@ button:disabled {
     width: min(100% - 28px, 720px);
   }
 
-  .logo-mark {
-    width: 60px;
-    height: 50px;
-    font-size: 40px;
-  }
-
-  .logo-mark::after {
-    left: 31px;
-    top: 8px;
-    height: 34px;
-  }
-
-  .logo-mark__v {
-    font-size: 32px;
-  }
-
-  .logo-type span:first-child {
-    font-size: 25px;
+  .logo {
+    width: clamp(184px, 56vw, 280px);
   }
 
   .nav-toggle {
@@ -1713,28 +1644,37 @@ button:disabled {
 
   .primary-nav {
     position: absolute;
-    top: 84px;
-    left: 14px;
-    right: 14px;
+    z-index: 30;
+    top: 78px;
+    left: 50%;
+    right: auto;
+    width: min(280px, calc(100vw - 56px));
     display: grid;
-    gap: 0;
-    padding: 12px;
-    background: rgba(34, 33, 29, 0.96);
-    border: 1px solid rgba(247, 243, 235, 0.14);
-    transform: translateY(-8px);
+    gap: 2px;
+    padding: 8px;
+    background: rgba(34, 33, 29, 0.94);
+    border: 1px solid rgba(247, 243, 235, 0.18);
+    border-radius: 6px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(10px);
+    transform: translate(-50%, -8px);
     opacity: 0;
     visibility: hidden;
     transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
   }
 
   .primary-nav[data-open="true"] {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
     visibility: visible;
   }
 
   .primary-nav a {
-    padding: 13px 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
   }
 
   .primary-nav a::after {
@@ -1899,8 +1839,8 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-  .logo-type {
-    display: none;
+  .logo {
+    width: 172px;
   }
 
   .hero h1 {

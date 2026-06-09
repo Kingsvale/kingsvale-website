@@ -7,8 +7,9 @@ import { normalizeEmail } from "@/lib/strings";
 
 export const runtime = "nodejs";
 
-export async function POST(_request: Request, { params }: { params: { token: string } }) {
+export async function POST(_request: Request, context: { params: Promise<{ token: string }> }) {
   try {
+    const params = await context.params;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Please log in before accepting this invite." }, { status: 401 });

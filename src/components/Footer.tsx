@@ -36,8 +36,8 @@ export function Footer({ brandName, brandSuffix, footer }: FooterProps) {
           <p>{footer.description}</p>
           <div className="footer__socials" aria-label="Social links">
             {footer.socialLinks.map((link) => (
-              <a key={link.label} href={link.href} aria-label={link.label}>
-                {link.label.slice(0, 2).toUpperCase()}
+              <a key={link.label} href={getSocialHref(link.label, link.href)} aria-label={getSocialLabel(link.label)}>
+                <img src={getSocialIcon(link.label)} alt="" aria-hidden="true" />
               </a>
             ))}
           </div>
@@ -105,4 +105,23 @@ export function Footer({ brandName, brandSuffix, footer }: FooterProps) {
       </div>
     </footer>
   );
+}
+
+function getSocialLabel(label: string) {
+  return label.toLowerCase() === "linkedin" ? "X" : label;
+}
+
+function getSocialHref(label: string, href: string) {
+  return label.toLowerCase() === "linkedin" ? "https://x.com/" : href;
+}
+
+function getSocialIcon(label: string) {
+  const normalized = getSocialLabel(label).toLowerCase();
+  if (normalized === "facebook") {
+    return "/social/facebook.ico";
+  }
+  if (normalized === "instagram") {
+    return "/social/instagram.ico";
+  }
+  return "/social/x.ico";
 }
