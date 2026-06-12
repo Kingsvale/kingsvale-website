@@ -1,8 +1,14 @@
-import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode, useEffect } from "react";
 import { Homepage } from "./pages/Homepage";
 import { useSiteContent } from "./hooks/useSiteContent";
 import { studioPath } from "./lib/studioRoute";
 import { usePageSeo } from "./lib/seo";
+import {
+  recordAnalyticsVisit,
+  shouldRecordAnalyticsVisit,
+  shouldTrackRoute,
+  type AnalyticsRouteType
+} from "./lib/analytics";
 
 const AboutPage = lazyNamed("AboutPage");
 const ContactPage = lazyNamed("ContactPage");
@@ -28,6 +34,17 @@ export function App() {
   const content = useSiteContent();
   const route = window.location.pathname;
   usePageSeo(content, route);
+  useEffect(() => {
+    if (!shouldTrackRoute(route) || !shouldRecordAnalyticsVisit(route)) {
+      return;
+    }
+
+    void recordAnalyticsVisit({
+      path: route,
+      title: getRouteTitle(route),
+      routeType: getRouteType(route)
+    });
+  }, [route]);
 
   if (route === "/") {
     return <Homepage content={content} />;
@@ -141,6 +158,26 @@ export function App() {
       <NotFoundPage content={content} />
     </RouteBoundary>
   );
+}
+
+function getRouteType(route: string): AnalyticsRouteType {
+  return route.startsWith("/track/") ? "tracking" : "website";
+}
+
+function getRouteTitle(route: string) {
+  if (route === "/") {
+    return "Homepage";
+  }
+  if (route.startsWith("/track/")) {
+    return "Customer tracking page";
+  }
+
+  return route
+    .split("/")
+    .filter(Boolean)
+    .map((part) => part.replaceAll("-", " "))
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" / ") || "Website page";
 }
 
 function RouteBoundary({ children }: { children: ReactNode }) {

@@ -53,6 +53,7 @@ import {
   saveCmsDraft,
   uploadCmsImage
 } from "../lib/cmsApi";
+import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
 
 type AdminPageProps = {
@@ -69,7 +70,7 @@ type RevisionSummary = {
   title: string;
 };
 
-type AdminRootTab = "website" | "sites";
+type AdminRootTab = "website" | "sites" | "analytics";
 
 const HomepagePreview = lazy(() =>
   import("./Homepage").then((module) => ({ default: module.Homepage }))
@@ -100,7 +101,8 @@ const editorSections = [
 
 const adminRootTabs: { id: AdminRootTab; label: string }[] = [
   { id: "website", label: "Website" },
-  { id: "sites", label: "Sites" }
+  { id: "sites", label: "Sites" },
+  { id: "analytics", label: "Analytics" }
 ];
 
 type EditorSectionId = (typeof editorSections)[number]["id"];
@@ -333,7 +335,7 @@ export function AdminPage({
         </div>
       </header>
 
-      {activeRootTab === "website" ? (
+      {activeRootTab === "website" && (
       <main className="admin-layout" id="admin-root-panel-website" role="tabpanel">
         <section className="admin-editor" aria-label="Content editor">
           <div className="admin-status" role="status">
@@ -694,9 +696,15 @@ export function AdminPage({
           </div>
         </aside>
       </main>
-      ) : (
+      )}
+      {activeRootTab === "sites" && (
       <main className="admin-root-main" id="admin-root-panel-sites" role="tabpanel">
         <AdminSitesPanel />
+      </main>
+      )}
+      {activeRootTab === "analytics" && (
+      <main className="admin-root-main" id="admin-root-panel-analytics" role="tabpanel">
+        <AdminAnalyticsPanel />
       </main>
       )}
     </div>

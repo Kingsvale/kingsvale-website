@@ -193,7 +193,7 @@ If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, o
 - Components use semantic landmarks, labelled controls, accessible buttons, alt text, keyboard-friendly navigation, and automated axe checks.
 - SEO metadata is updated per route, with Open Graph tags, canonical URL, JSON-LD structured data, robots.txt and sitemap.xml.
 - Public routes are prerendered after `vite build` so crawlers and social previews receive meaningful HTML before hydration.
-- `npm run check:performance` enforces Lighthouse-style bundle/prerender budgets and verifies the private studio chunk is not referenced by public HTML.
+- `npm run check:performance` enforces Lighthouse-style public bundle/prerender budgets, reports total generated JS, and verifies the private studio chunk is not referenced by public HTML.
 - `npm run check:prod-ready` verifies offline launch hygiene: no leftover SSH key files, `.env` ignored, documented environment controls, hardened static headers, robots/sitemap coverage, prerendered route output, clean SPA fallback shell and no public studio chunk reference.
 - For a full Lighthouse pass, run `npm run build`, then `npm run serve:secure`, and test the secure server URL in Chrome Lighthouse.
 

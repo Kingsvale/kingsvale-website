@@ -7,6 +7,7 @@ import type {
   TrackingStatus
 } from "./trackingTypes";
 import { validateTrackingSite } from "./trackingValidation";
+import { boundedPercent, presetRoundness } from "./qrStyle";
 
 export const trackingStorageKey = "kingsvale-tracking-sites-v1";
 
@@ -103,26 +104,28 @@ export function createTrackingSite(): TrackingSite {
   };
 }
 
+type LegacyQrStyle = Partial<TrackingQrStyle> & {
+  dotStyle?: string;
+  finderStyle?: string;
+  frameStyle?: string;
+};
+
 export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
-  const qrStyle = site.qrStyle ?? {};
+  const qrStyle = (site.qrStyle ?? {}) as LegacyQrStyle;
+  const defaultStyle = defaultQrStyle();
   return {
     ...site,
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
-      ...defaultQrStyle(),
-      ...qrStyle,
-      dotRoundness: typeof qrStyle.dotRoundness === "number"
-        ? qrStyle.dotRoundness
-        : presetRoundness(qrStyle.dotStyle),
-      finderRoundness: typeof qrStyle.finderRoundness === "number"
-        ? qrStyle.finderRoundness
-        : presetRoundness(qrStyle.finderStyle),
-      frameRoundness: typeof qrStyle.frameRoundness === "number"
-        ? qrStyle.frameRoundness
-        : qrStyle.frameStyle === "square" ? 0 : 42,
-      frameCut: typeof qrStyle.frameCut === "number"
-        ? qrStyle.frameCut
-        : qrStyle.frameStyle === "cut-corner" ? 36 : 0
+      foreground: qrStyle.foreground ?? defaultStyle.foreground,
+      background: qrStyle.background ?? defaultStyle.background,
+      accent: qrStyle.accent ?? defaultStyle.accent,
+      dotRoundness: boundedPercent(qrStyle.dotRoundness, presetRoundness(qrStyle.dotStyle)),
+      finderRoundness: boundedPercent(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
+      frameRoundness: boundedPercent(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
+      frameCut: boundedPercent(qrStyle.frameCut, qrStyle.frameStyle === "cut-corner" ? 36 : 0),
+      frameLabel: qrStyle.frameLabel ?? defaultStyle.frameLabel,
+      includeLogo: qrStyle.includeLogo ?? defaultStyle.includeLogo
     },
     council: {
       mode: site.council?.mode ?? "none",
@@ -133,16 +136,6 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
       lastSyncStatus: site.council?.lastSyncStatus ?? "Not configured"
     }
   };
-}
-
-function presetRoundness(value?: string) {
-  if (value === "square") {
-    return 0;
-  }
-  if (value === "circle") {
-    return 100;
-  }
-  return 48;
 }
 
 export function createMilestone(
@@ -173,9 +166,6 @@ export function defaultQrStyle(): TrackingQrStyle {
     foreground: "#22211d",
     background: "#fbf8f2",
     accent: "#ad9576",
-    dotStyle: "rounded",
-    finderStyle: "rounded",
-    frameStyle: "rounded",
     dotRoundness: 48,
     finderRoundness: 24,
     frameRoundness: 42,

@@ -28,10 +28,12 @@ const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
 const uploadsDir = resolve(dataDir, "uploads");
 const trackingDir = resolve(dataDir, "tracking-sites");
+const analyticsDir = resolve(dataDir, "analytics");
 const backupDir = resolve(dataDir, "backups");
 const auditDir = dataDir;
 const cmsStoreFile = join(cmsDir, "content.json");
 const trackingStoreFile = join(trackingDir, "sites.json");
+const analyticsStoreFile = join(analyticsDir, "visits.json");
 const studioPath = "/251db172b850d056";
 const port = Number(process.env.PORT ?? 4173);
 const studioUser = process.env.STUDIO_USER ?? "kingsvale";
@@ -143,6 +145,7 @@ async function ensureDataDirs() {
     mkdir(leadsDir, { recursive: true }),
     mkdir(uploadsDir, { recursive: true }),
     mkdir(trackingDir, { recursive: true }),
+    mkdir(analyticsDir, { recursive: true }),
     mkdir(backupDir, { recursive: true })
   ]);
 }
@@ -267,6 +270,16 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/contact" || url.pathname === "/api/newsletter") {
     await handlePublicLeadRequest(request, response, url.pathname);
+    return;
+  }
+
+  if (url.pathname === "/api/analytics/visit") {
+    await handleAnalyticsVisit(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/analytics/summary") {
+    await handleAnalyticsSummary(request, response);
     return;
   }
 
@@ -778,6 +791,43 @@ async function handleTrackingSiteItem(request, response, url) {
   sendJson(response, 405, { error: "Method not allowed." });
 }
 
+async function handleAnalyticsVisit(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const payload = await readJsonBody(request, 8_000);
+  const visit = normalizeAnalyticsVisit(payload.visit);
+  if (!visit) {
+    sendJson(response, 400, { error: "Invalid analytics visit." });
+    return;
+  }
+
+  const store = await readAnalyticsStore();
+  store.visits = [visit, ...store.visits].slice(0, 5_000);
+  store.updatedAt = new Date().toISOString();
+  await writeAnalyticsStore(store);
+  sendJson(response, 202, { ok: true });
+}
+
+async function handleAnalyticsSummary(request, response) {
+  const session = requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  if (request.method !== "GET") {
+    sendJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const store = await readAnalyticsStore();
+  sendJson(response, 200, {
+    summary: buildAnalyticsSummary(store.visits, store.updatedAt)
+  });
+}
+
 async function forwardLead(kind, record) {
   const webhook = kind === "newsletter"
     ? process.env.NEWSLETTER_WEBHOOK_URL
@@ -969,6 +1019,24 @@ async function readTrackingStore() {
 async function writeTrackingStore(store) {
   await mkdir(trackingDir, { recursive: true });
   await writeFile(trackingStoreFile, encodeCmsStore(store));
+}
+
+async function readAnalyticsStore() {
+  try {
+    const raw = await readFile(analyticsStoreFile, "utf8");
+    const parsed = decodeCmsStore(raw);
+    return {
+      visits: Array.isArray(parsed.visits) ? parsed.visits.filter(isAnalyticsVisit) : [],
+      updatedAt: parsed.updatedAt ?? null
+    };
+  } catch {
+    return { visits: [], updatedAt: null };
+  }
+}
+
+async function writeAnalyticsStore(store) {
+  await mkdir(analyticsDir, { recursive: true });
+  await writeFile(analyticsStoreFile, encodeCmsStore(store));
 }
 
 async function writeCmsBackup(store, event, user) {
@@ -1271,9 +1339,6 @@ function normalizeTrackingSite(site) {
       foreground: qrStyle.foreground ?? "#22211d",
       background: qrStyle.background ?? "#fbf8f2",
       accent: qrStyle.accent ?? "#ad9576",
-      dotStyle: qrStyle.dotStyle ?? "rounded",
-      finderStyle: qrStyle.finderStyle ?? "rounded",
-      frameStyle: qrStyle.frameStyle ?? "rounded",
       dotRoundness: numberOrFallback(qrStyle.dotRoundness, presetRoundness(qrStyle.dotStyle)),
       finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
       frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
@@ -1307,20 +1372,86 @@ function validateQrStyle(errors, qrStyle) {
   if (!isHexColor(qrStyle.accent)) {
     errors.push({ path: "qrStyle.accent", message: "QR accent must be a hex colour." });
   }
-  if (!["square", "rounded", "circle"].includes(qrStyle.dotStyle)) {
-    errors.push({ path: "qrStyle.dotStyle", message: "Choose an approved QR dot style." });
-  }
-  if (!["square", "rounded", "circle"].includes(qrStyle.finderStyle)) {
-    errors.push({ path: "qrStyle.finderStyle", message: "Choose an approved QR finder shape." });
-  }
-  if (!["square", "rounded", "cut-corner"].includes(qrStyle.frameStyle)) {
-    errors.push({ path: "qrStyle.frameStyle", message: "Choose an approved QR frame shape." });
-  }
   validatePercentage(errors, "qrStyle.dotRoundness", qrStyle.dotRoundness, "Dot roundness");
   validatePercentage(errors, "qrStyle.finderRoundness", qrStyle.finderRoundness, "Finder roundness");
   validatePercentage(errors, "qrStyle.frameRoundness", qrStyle.frameRoundness, "Frame roundness");
   validatePercentage(errors, "qrStyle.frameCut", qrStyle.frameCut, "Frame cut");
   validateText(errors, "qrStyle.frameLabel", qrStyle.frameLabel, "QR label", 46);
+}
+
+function normalizeAnalyticsVisit(input) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const path = typeof input.path === "string" ? input.path.trim().slice(0, 160) : "";
+  const routeType = input.routeType === "tracking" ? "tracking" : "website";
+  if (!path || path === "/admin" || path.startsWith(studioPath) || path.startsWith("/api/")) {
+    return null;
+  }
+
+  return {
+    id: `visit-${Date.now()}-${randomBytes(4).toString("hex")}`,
+    path,
+    title: typeof input.title === "string" ? input.title.trim().slice(0, 120) || "Untitled page" : "Untitled page",
+    routeType,
+    visitedAt: new Date().toISOString()
+  };
+}
+
+function buildAnalyticsSummary(visits, updatedAt = null) {
+  const cleanVisits = visits.filter(isAnalyticsVisit).sort((a, b) => b.visitedAt.localeCompare(a.visitedAt));
+  const today = new Date().toISOString().slice(0, 10);
+  const routeMap = new Map();
+
+  for (const visit of cleanVisits) {
+    const key = `${visit.routeType}:${visit.path}`;
+    const current = routeMap.get(key);
+    if (current) {
+      current.visits += 1;
+    } else {
+      routeMap.set(key, {
+        path: visit.path,
+        title: visit.title,
+        routeType: visit.routeType,
+        visits: 1
+      });
+    }
+  }
+
+  return {
+    totalVisits: cleanVisits.length,
+    websiteVisits: cleanVisits.filter((visit) => visit.routeType === "website").length,
+    trackingVisits: cleanVisits.filter((visit) => visit.routeType === "tracking").length,
+    todayVisits: cleanVisits.filter((visit) => visit.visitedAt.startsWith(today)).length,
+    uniqueRoutes: routeMap.size,
+    topRoutes: [...routeMap.values()].sort((a, b) => b.visits - a.visits).slice(0, 6),
+    dailyVisits: buildDailyVisits(cleanVisits),
+    updatedAt
+  };
+}
+
+function buildDailyVisits(visits) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const key = date.toISOString().slice(0, 10);
+    return {
+      date: key,
+      visits: visits.filter((visit) => visit.visitedAt.startsWith(key)).length
+    };
+  });
+}
+
+function isAnalyticsVisit(value) {
+  return (
+    value &&
+    typeof value.id === "string" &&
+    typeof value.path === "string" &&
+    typeof value.title === "string" &&
+    (value.routeType === "website" || value.routeType === "tracking") &&
+    typeof value.visitedAt === "string"
+  );
 }
 
 function validatePercentage(errors, path, value, label) {

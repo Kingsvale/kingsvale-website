@@ -1,8 +1,9 @@
 import type { ImageAsset, SiteContent } from "./contentTypes";
+import { loadLocalAnalyticsVisits } from "./analytics";
+import { buildAnalyticsSummary, type AnalyticsSummary } from "./analyticsSummary";
 import type { TrackingSite } from "./trackingTypes";
 import {
   archiveLocalTrackingSite,
-  findLocalTrackingSiteByToken,
   loadLocalTrackingSites,
   normalizeTrackingSite,
   upsertLocalTrackingSite
@@ -225,21 +226,21 @@ export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSi
   }
 }
 
-export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   try {
-    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(token)}`, {
+    const response = await fetch("/api/analytics/summary", {
       credentials: "same-origin",
       headers: { Accept: "application/json" }
     });
 
     if (!response.ok) {
-      return findLocalTrackingSiteByToken(token);
+      return buildAnalyticsSummary(loadLocalAnalyticsVisits());
     }
 
-    const payload = (await response.json()) as { site: TrackingSite | null };
-    return payload.site ? normalizeTrackingSite(payload.site) : null;
+    const payload = (await response.json()) as { summary: AnalyticsSummary };
+    return payload.summary;
   } catch {
-    return findLocalTrackingSiteByToken(token);
+    return buildAnalyticsSummary(loadLocalAnalyticsVisits());
   }
 }
 

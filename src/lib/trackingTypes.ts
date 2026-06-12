@@ -18,17 +18,10 @@ export type CouncilSyncSettings = {
   lastSyncStatus: string;
 };
 
-export type TrackingQrDotStyle = "square" | "rounded" | "circle";
-export type TrackingQrFinderStyle = "square" | "rounded" | "circle";
-export type TrackingQrFrameStyle = "square" | "rounded" | "cut-corner";
-
 export type TrackingQrStyle = {
   foreground: string;
   background: string;
   accent: string;
-  dotStyle: TrackingQrDotStyle;
-  finderStyle: TrackingQrFinderStyle;
-  frameStyle: TrackingQrFrameStyle;
   dotRoundness: number;
   finderRoundness: number;
   frameRoundness: number;

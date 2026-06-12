@@ -1,9 +1,6 @@
 import type {
   TrackingMilestone,
   TrackingMilestoneState,
-  TrackingQrDotStyle,
-  TrackingQrFinderStyle,
-  TrackingQrFrameStyle,
   TrackingResource,
   TrackingResourceType,
   TrackingSite,
@@ -50,9 +47,6 @@ const trackingStatuses: TrackingStatus[] = [
 ];
 
 const milestoneStates: TrackingMilestoneState[] = ["pending", "active", "complete", "blocked"];
-const qrDotStyles: TrackingQrDotStyle[] = ["square", "rounded", "circle"];
-const qrFinderStyles: TrackingQrFinderStyle[] = ["square", "rounded", "circle"];
-const qrFrameStyles: TrackingQrFrameStyle[] = ["square", "rounded", "cut-corner"];
 const resourceTypes: TrackingResourceType[] = ["image", "document", "link"];
 
 export function validateTrackingSite(site: TrackingSite): TrackingValidationResult {
@@ -170,15 +164,6 @@ function addQrStyleErrors(errors: TrackingValidationError[], site: TrackingSite)
   }
   if (!isHexColor(site.qrStyle.accent)) {
     errors.push({ path: "qrStyle.accent", message: "QR accent must be a hex colour." });
-  }
-  if (!qrDotStyles.includes(site.qrStyle.dotStyle)) {
-    errors.push({ path: "qrStyle.dotStyle", message: "Choose an approved QR dot style." });
-  }
-  if (!qrFinderStyles.includes(site.qrStyle.finderStyle)) {
-    errors.push({ path: "qrStyle.finderStyle", message: "Choose an approved QR finder shape." });
-  }
-  if (!qrFrameStyles.includes(site.qrStyle.frameStyle)) {
-    errors.push({ path: "qrStyle.frameStyle", message: "Choose an approved QR frame shape." });
   }
   addNumberRangeError(errors, "qrStyle.dotRoundness", site.qrStyle.dotRoundness, "Dot roundness");
   addNumberRangeError(

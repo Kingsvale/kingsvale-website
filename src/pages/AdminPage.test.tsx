@@ -19,12 +19,18 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
-  it("exposes Website and Sites studio tabs", () => {
+  it("exposes Website, Sites and Analytics studio tabs", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     expect(screen.getByRole("tab", { name: "Website" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Sites" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Analytics" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Content editor" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Analytics" }));
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Website analytics" })).toBeInTheDocument();
+    });
   });
 
   it("previews hero edits and saves published content", async () => {

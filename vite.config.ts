@@ -23,7 +23,8 @@ export default defineConfig({
             normalizedId.includes("/src/lib/seo") ||
             normalizedId.includes("/src/lib/serverContent") ||
             normalizedId.includes("/src/lib/storage") ||
-            normalizedId.includes("/src/lib/studioRoute")
+            normalizedId.includes("/src/lib/studioRoute") ||
+            normalizedId.endsWith("/src/lib/analytics.ts")
           ) {
             return "public-core";
           }

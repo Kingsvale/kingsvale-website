@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { Download } from "lucide-react";
+import { boundedPercent } from "../lib/qrStyle";
 import type { TrackingQrStyle } from "../lib/trackingTypes";
 
 type TrackingQrCodeProps = {
@@ -49,13 +50,10 @@ function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string) 
   const foreground = safeColor(style.foreground, "#22211d");
   const background = safeColor(style.background, "#fbf8f2");
   const accent = safeColor(style.accent, "#ad9576");
-  const dotRoundness = percent(style.dotRoundness, presetRoundness(style.dotStyle));
-  const finderRoundness = percent(style.finderRoundness, presetRoundness(style.finderStyle));
-  const frameRoundness = percent(
-    style.frameRoundness,
-    style.frameStyle === "square" ? 0 : 42
-  );
-  const frameCut = percent(style.frameCut, style.frameStyle === "cut-corner" ? 36 : 0);
+  const dotRoundness = boundedPercent(style.dotRoundness, 48);
+  const finderRoundness = boundedPercent(style.finderRoundness, 24);
+  const frameRoundness = boundedPercent(style.frameRoundness, 42);
+  const frameCut = boundedPercent(style.frameCut, 0);
   const dotRadius = (moduleSize / 2) * (dotRoundness / 100);
   const finderOrigins = [
     [quiet, quiet],
@@ -171,24 +169,6 @@ function isFinderModule(x: number, y: number, moduleCount: number) {
 
 function safeColor(value: string, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
-}
-
-function percent(value: number | undefined, fallback: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return Math.max(0, Math.min(100, value));
-}
-
-function presetRoundness(value?: string) {
-  if (value === "square") {
-    return 0;
-  }
-  if (value === "circle") {
-    return 100;
-  }
-  return 48;
 }
 
 function escapeText(value: string) {

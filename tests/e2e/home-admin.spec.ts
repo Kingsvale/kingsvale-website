@@ -60,6 +60,10 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText(/Published. The public site is updated/)).toBeVisible();
 
+  await page.getByRole("tab", { name: "Analytics" }).click();
+  await expect(page.getByRole("region", { name: "Website analytics" })).toBeVisible();
+  await expect(page.getByText("Total visits")).toBeVisible();
+
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Crafted homes for modern country living." })

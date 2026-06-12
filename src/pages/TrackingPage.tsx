@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
-import { fetchTrackingSiteByToken } from "../lib/cmsApi";
+import { fetchTrackingSiteByToken } from "../lib/publicTrackingApi";
 import { trackingStatusClass } from "../lib/trackingStorage";
 import {
   trackingMilestoneLabels,

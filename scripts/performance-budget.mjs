@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const distDir = resolve("dist");
@@ -7,22 +7,25 @@ const assetsDir = join(distDir, "assets");
 
 const budgets = {
   largestJavaScriptGzip: 72_000,
-  totalJavaScriptGzip: 98_000,
+  totalPublicJavaScriptGzip: 98_000,
   totalCssGzip: 24_000,
   prerenderedRoutes: 12
 };
 
 const assetFiles = await listFiles(assetsDir);
 const jsFiles = assetFiles.filter((file) => file.endsWith(".js"));
+const publicJsFiles = jsFiles.filter((file) => !isPrivateJavaScriptChunk(file));
 const cssFiles = assetFiles.filter((file) => file.endsWith(".css"));
 
 const jsSizes = await Promise.all(jsFiles.map((file) => gzipSize(file)));
+const publicJsSizes = await Promise.all(publicJsFiles.map((file) => gzipSize(file)));
 const cssSizes = await Promise.all(cssFiles.map((file) => gzipSize(file)));
 const routeHtmlCount = (await listFiles(distDir)).filter((file) => file.endsWith("index.html")).length;
 const indexHtml = await readFile(join(distDir, "index.html"), "utf8");
 
 const report = {
   largestJavaScriptGzip: Math.max(0, ...jsSizes),
+  totalPublicJavaScriptGzip: sum(publicJsSizes),
   totalJavaScriptGzip: sum(jsSizes),
   totalCssGzip: sum(cssSizes),
   prerenderedRoutes: routeHtmlCount,
@@ -33,8 +36,10 @@ const failures = [];
 if (report.largestJavaScriptGzip > budgets.largestJavaScriptGzip) {
   failures.push(`Largest JS gzip ${report.largestJavaScriptGzip} exceeds ${budgets.largestJavaScriptGzip} bytes.`);
 }
-if (report.totalJavaScriptGzip > budgets.totalJavaScriptGzip) {
-  failures.push(`Total JS gzip ${report.totalJavaScriptGzip} exceeds ${budgets.totalJavaScriptGzip} bytes.`);
+if (report.totalPublicJavaScriptGzip > budgets.totalPublicJavaScriptGzip) {
+  failures.push(
+    `Public JS gzip ${report.totalPublicJavaScriptGzip} exceeds ${budgets.totalPublicJavaScriptGzip} bytes.`
+  );
 }
 if (report.totalCssGzip > budgets.totalCssGzip) {
   failures.push(`Total CSS gzip ${report.totalCssGzip} exceeds ${budgets.totalCssGzip} bytes.`);
@@ -76,4 +81,8 @@ async function gzipSize(file) {
 
 function sum(values) {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function isPrivateJavaScriptChunk(file) {
+  return /^studio-[\w-]+\.js$/.test(basename(file));
 }

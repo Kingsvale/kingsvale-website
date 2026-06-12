@@ -1494,6 +1494,141 @@ button:disabled {
   cursor: pointer;
 }
 
+.analytics-admin {
+  display: grid;
+  gap: 18px;
+}
+
+.analytics-admin__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.analytics-metric {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.analytics-metric span,
+.analytics-admin__subtle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.analytics-metric strong {
+  color: var(--ink);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.analytics-admin__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.analytics-admin__grid .admin-panel:first-child {
+  grid-column: 1 / -1;
+}
+
+.analytics-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 190px;
+  align-items: end;
+}
+
+.analytics-bars__item {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  min-height: 170px;
+  text-align: center;
+}
+
+.analytics-bars__item span {
+  color: #365e7e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.analytics-bars__item div {
+  display: flex;
+  align-items: end;
+  min-height: 120px;
+  padding: 0 8px;
+  border: 1px solid rgba(70, 59, 48, 0.12);
+  background: rgba(237, 244, 248, 0.7);
+}
+
+.analytics-bars__item i {
+  display: block;
+  width: 100%;
+  background: #365e7e;
+}
+
+.analytics-bars__item small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.analytics-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(70, 59, 48, 0.12);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.analytics-row > svg {
+  width: 18px;
+  height: 18px;
+  color: #365e7e;
+}
+
+.analytics-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.analytics-row strong,
+.analytics-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-row strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.analytics-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.analytics-row b {
+  color: #365e7e;
+  font-size: 18px;
+}
+
 .milestone-editor .card-controls {
   align-items: center;
 }
@@ -2312,6 +2447,8 @@ button:disabled {
   }
 
   .sites-admin__layout,
+  .analytics-admin__metrics,
+  .analytics-admin__grid,
   .tracking-hero,
   .tracking-grid,
   .tracking-resources__grid {

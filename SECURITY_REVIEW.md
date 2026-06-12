@@ -22,7 +22,7 @@ This review covers the React/Vite implementation, generated private studio route
 - `npm run serve:secure` protects the private studio route and `studio-*` asset chunk.
 - The secure server adds rate limiting, audit logging, server-side lead validation, local lead storage, optional signed contact/newsletter webhook forwarding, and `/api/ops/health`.
 - Studio/editor code is split into a dedicated protected `studio-*` asset chunk in the secure server path.
-- `npm run build` prerenders public route HTML. `npm run check:performance` enforces bundle/prerender budgets and checks that the studio chunk is not referenced from public HTML.
+- `npm run build` prerenders public route HTML. `npm run check:performance` enforces public bundle/prerender budgets, reports total generated JS, and checks that the studio chunk is not referenced from public HTML.
 - `npm run check:prod-ready` checks offline launch hygiene: key-file absence, `.env` ignore coverage, documented server env controls, static security headers, robots/sitemap coverage, prerendered route output and private chunk exposure.
 
 ## Red-Team Findings
