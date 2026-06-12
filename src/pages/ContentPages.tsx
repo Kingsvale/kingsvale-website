@@ -5,11 +5,7 @@ import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { ResponsiveImage } from "../components/ResponsiveImage";
 import { Reveal } from "../components/Reveal";
-<<<<<<< HEAD
 import type { Development, FeatureItem, ImageAsset, SiteContent } from "../lib/contentTypes";
-=======
-import type { Development, ImageAsset, SiteContent } from "../lib/contentTypes";
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 import { postJson, type SubmitState } from "../lib/formSubmit";
 import { studioPath } from "../lib/studioRoute";
 
@@ -17,27 +13,6 @@ type ContentPageProps = {
   content: SiteContent;
 };
 
-<<<<<<< HEAD
-=======
-const pageImages = {
-  design: {
-    src: "https://images.unsplash.com/photo-1600607688969-a5bfcd646154",
-    alt: "A warm contemporary living room designed for luxury family life",
-    focalPoint: "50% 52%"
-  },
-  process: {
-    src: "https://images.unsplash.com/photo-1503387762-592deb58ef4e",
-    alt: "Architectural plans and design tools on a work table",
-    focalPoint: "50% 50%"
-  },
-  contact: {
-    src: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c",
-    alt: "An elegant living space with warm architectural materials",
-    focalPoint: "50% 50%"
-  }
-} satisfies Record<string, ImageAsset>;
-
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 export function DevelopmentsIndexPage({ content }: ContentPageProps) {
   return (
     <PublicShell content={content}>
@@ -162,7 +137,6 @@ export function DevelopmentDetailPage({
 }
 
 export function DesignBuildPage({ content }: ContentPageProps) {
-<<<<<<< HEAD
   const page = content.pages.designBuild;
   return (
     <PublicShell content={content}>
@@ -180,36 +154,12 @@ export function DesignBuildPage({ content }: ContentPageProps) {
       <EditorialCallout
         title={page.calloutTitle}
         body={page.calloutBody}
-=======
-  return (
-    <PublicShell content={content}>
-      <InnerHero
-        eyebrow="Design & build services"
-        title="A complete route from land and concept to finished home."
-        body="For private clients and landowners, Kingsvale brings planning intelligence, architectural discipline, procurement control and site delivery under one calm, accountable process."
-        image={pageImages.design}
-      />
-      <ProcessGrid
-        eyebrow="What we manage"
-        title="Built for clients who want clarity at every stage."
-        items={[
-          ["Feasibility", "Site appraisal, planning constraints, budget ranges and route-to-consent advice."],
-          ["Design", "Architectural direction, specification strategy, material palette and internal planning."],
-          ["Procurement", "Tender packs, supplier coordination, programme planning and value engineering."],
-          ["Delivery", "Site management, quality control, handover preparation and aftercare."]
-        ]}
-      />
-      <EditorialCallout
-        title="Quietly controlled. Carefully detailed."
-        body="The best luxury homes feel effortless because the difficult decisions have been resolved early. Our role is to protect the design intent while keeping cost, programme and quality visible."
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       />
     </PublicShell>
   );
 }
 
 export function VisionProcessPage({ content }: ContentPageProps) {
-<<<<<<< HEAD
   const page = content.pages.visionProcess;
   return (
     <PublicShell content={content}>
@@ -227,29 +177,6 @@ export function VisionProcessPage({ content }: ContentPageProps) {
       <EditorialCallout
         title={page.calloutTitle}
         body={page.calloutBody}
-=======
-  return (
-    <PublicShell content={content}>
-      <InnerHero
-        eyebrow="Our vision & process"
-        title="Timeless homes, measured decisions and lasting value."
-        body="We work deliberately: understanding the land, refining the brief, testing details and delivering homes that feel established, efficient and beautifully composed."
-        image={pageImages.process}
-      />
-      <ProcessGrid
-        eyebrow="Our rhythm"
-        title="A disciplined process for exceptional outcomes."
-        items={[
-          ["Listen", "We establish the commercial, lifestyle and planning priorities before design begins."],
-          ["Shape", "We align massing, materials, layouts and landscape into a coherent proposition."],
-          ["Refine", "We test cost, performance, buildability and buyer experience in detail."],
-          ["Deliver", "We build with accountable site control and a long-term aftercare mindset."]
-        ]}
-      />
-      <EditorialCallout
-        title="Luxury without noise."
-        body="Kingsvale's visual language is restrained because confidence does not need volume. Proportion, materiality, light and durability do the work."
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       />
     </PublicShell>
   );
@@ -302,17 +229,10 @@ export function LandWantedPage({ content }: ContentPageProps) {
         eyebrow="Sites we consider"
         title="Land with potential deserves a clear, discreet conversation."
         items={[
-<<<<<<< HEAD
           { id: "greenfield", icon: "leaf", title: "Greenfield and edge-of-settlement", description: "Sites with a credible planning route and strong residential demand." },
           { id: "brownfield", icon: "home", title: "Brownfield", description: "Underused commercial, former agricultural or redundant residential parcels." },
           { id: "joint-ventures", icon: "users", title: "Joint ventures", description: "Partnership structures for landowners who want aligned long-term upside." },
           { id: "subject-to-planning", icon: "map", title: "Subject-to-planning", description: "Structured agreements that respect risk, timing and planning complexity." }
-=======
-          ["Greenfield and edge-of-settlement", "Sites with a credible planning route and strong residential demand."],
-          ["Brownfield", "Underused commercial, former agricultural or redundant residential parcels."],
-          ["Joint ventures", "Partnership structures for landowners who want aligned long-term upside."],
-          ["Subject-to-planning", "Structured agreements that respect risk, timing and planning complexity."]
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
         ]}
       />
       <LandContactStrip />
@@ -321,10 +241,7 @@ export function LandWantedPage({ content }: ContentPageProps) {
 }
 
 export function ContactPage({ content }: ContentPageProps) {
-<<<<<<< HEAD
   const page = content.pages.contact;
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -349,7 +266,6 @@ export function ContactPage({ content }: ContentPageProps) {
   return (
     <PublicShell content={content}>
       <InnerHero
-<<<<<<< HEAD
         eyebrow={page.eyebrow}
         title={page.title}
         body={page.body}
@@ -358,16 +274,6 @@ export function ContactPage({ content }: ContentPageProps) {
       <section className="contact-panel" id="contact">
         <div className="contact-panel__card">
           <h2>{page.sectionTitle || "Speak to our team"}</h2>
-=======
-        eyebrow="Contact us"
-        title="Start a conversation with Kingsvale."
-        body="Whether you are exploring a new home, a private build or land with development potential, we would be pleased to hear from you."
-        image={pageImages.contact}
-      />
-      <section className="contact-panel" id="contact">
-        <div className="contact-panel__card">
-          <h2>Speak to our team</h2>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           <a href={`tel:${content.footer.phone.replace(/\s/g, "")}`}>
             <Phone aria-hidden="true" />
             {content.footer.phone}
@@ -501,21 +407,17 @@ export function SecurityReviewPage({ content }: ContentPageProps) {
         eyebrow="Security review"
         title="Red-team notes for the current secure implementation."
         body="This page documents what has been hardened, what remains prototype-only, and what should move to managed services before production scale."
-<<<<<<< HEAD
         image={content.pages.visionProcess.image}
-=======
-        image={pageImages.process}
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       />
       <section className="content-band">
         <div className="security-grid">
           <SecurityCard
             title="Implemented controls"
             items={[
-              "Editor moved from /admin to a generated 16-character route.",
-              "Secure mode uses a server login page, signed HttpOnly session cookie and CSRF checks.",
-              "Optional TOTP MFA and studio IP allowlisting can be enabled through server environment variables.",
-              "The secure server protects the studio route and studio asset chunk.",
+              "Editor moved from /admin to the dedicated /studio workspace.",
+              "Secure mode uses passphrase login with a short-lived bearer token for protected CMS requests.",
+              "Optional TOTP MFA can be enabled through server environment variables.",
+              "Studio routes and public tracking pages render without localhost-only gates.",
               "Published content, drafts and revision history persist in server CMS storage.",
               "Local CMS files and backups can be encrypted at rest when a CMS encryption key is configured.",
               "Server uploads are decoded, dimension-limited and converted to WebP media variants.",
@@ -529,7 +431,7 @@ export function SecurityReviewPage({ content }: ContentPageProps) {
               "Published content is intentionally public and cannot be meaningfully encrypted client-side.",
               "The local Vite passphrase verifier is still visible in bundled JavaScript.",
               "Secure mode uses local file persistence rather than managed database and object storage.",
-              "MFA, IP allowlisting, webhook signatures and CMS encryption depend on production environment configuration.",
+              "MFA, webhook signatures and CMS encryption depend on production environment configuration.",
               "Image processing validates decode and dimensions but is not a full malware scanning system."
             ]}
           />
@@ -612,11 +514,7 @@ function ProcessGrid({
 }: {
   eyebrow: string;
   title: string;
-<<<<<<< HEAD
   items: FeatureItem[];
-=======
-  items: [string, string][];
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 }) {
   return (
     <section className="content-band">
@@ -625,19 +523,11 @@ function ProcessGrid({
         <h2>{title}</h2>
       </div>
       <div className="process-grid">
-<<<<<<< HEAD
         {items.map((item, index) => (
           <Reveal className="process-card" delay={index * 70} key={item.id}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             <h3>{item.title}</h3>
             <p>{item.description}</p>
-=======
-        {items.map(([itemTitle, body], index) => (
-          <Reveal className="process-card" delay={index * 70} key={itemTitle}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <h3>{itemTitle}</h3>
-            <p>{body}</p>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           </Reveal>
         ))}
       </div>

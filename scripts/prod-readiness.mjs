@@ -36,10 +36,11 @@ await check(".env is ignored and .env.example documents production controls", as
   const requiredKeys = [
     "STUDIO_USER",
     "STUDIO_PASSWORD",
-    "SESSION_SECRET",
+    "STUDIO_AUTH_TOKEN_SECRET",
     "CMS_ENCRYPTION_KEY",
     "STUDIO_TOTP_SECRET",
-    "STUDIO_ALLOWED_IPS",
+    "ROYAL_MAIL_TRACKING_API_URL",
+    "ROYAL_MAIL_TRACKING_API_KEY",
     "CONTACT_WEBHOOK_URL",
     "NEWSLETTER_WEBHOOK_URL",
     "LEAD_WEBHOOK_HMAC_SECRET"
@@ -67,7 +68,7 @@ await check("static host security headers are documented", async () => {
 await check("robots.txt blocks known studio routes", async () => {
   const robots = await readRequired("public/robots.txt");
   assert(robots.includes("Disallow: /admin"), "robots.txt does not block /admin.");
-  assert(robots.includes("Disallow: /251db172b850d056"), "robots.txt does not block the private studio route.");
+  assert(robots.includes("Disallow: /studio"), "robots.txt does not block the studio route.");
 });
 
 await check("public sitemap includes content and legal routes", async () => {

@@ -1,13 +1,5 @@
 import {
   Archive,
-<<<<<<< HEAD
-  Copy,
-  ExternalLink,
-  Folder,
-  Link,
-  Palette,
-  Plus,
-=======
   Building2,
   Clock,
   Copy,
@@ -16,7 +8,6 @@ import {
   Palette,
   Plus,
   RefreshCw,
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   Save,
   Search,
   Trash2
@@ -25,28 +16,16 @@ import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
-<<<<<<< HEAD
-=======
   checkTrackingCouncilStatus,
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   listTrackingSites,
   saveTrackingSite
 } from "../lib/cmsApi";
 import {
   createTrackingResource,
-<<<<<<< HEAD
-  createTrackingSite,
-  detectLocalAuthority,
-  normalizeMapEmbedInput,
-  normalizeReference
-} from "../lib/trackingStorage";
-import {
-  trackingResourceLabels,
-  type TrackingResourceType,
-  type TrackingSite,
-=======
   createMilestone,
   createTrackingSite,
+  mailingStatusClass,
+  priorityClass,
   trackingStatusClass
 } from "../lib/trackingStorage";
 import {
@@ -57,11 +36,13 @@ import {
   trackingMilestoneLabels,
   trackingResourceLabels,
   trackingStatusLabels,
+  contactPriorityLabels,
+  mailingStatusLabels,
+  type ContactPriority,
   type TrackingMilestoneState,
   type TrackingResourceType,
   type TrackingSite,
   type TrackingStatus
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 } from "../lib/trackingTypes";
 import {
   trackingFieldLimits,
@@ -69,24 +50,19 @@ import {
   type TrackingValidationError
 } from "../lib/trackingValidation";
 
-<<<<<<< HEAD
-=======
 const trackingStatuses = Object.keys(trackingStatusLabels) as TrackingStatus[];
 const milestoneStates = Object.keys(trackingMilestoneLabels) as TrackingMilestoneState[];
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
+const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 
 export function AdminSitesPanel() {
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<ContactPriority | "all">("all");
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
-<<<<<<< HEAD
-  const [status, setStatus] = useState("Create QR-ready land interest map pages.");
-=======
   const [status, setStatus] = useState("Create customer tracking pages and share their QR-ready links.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 
   useEffect(() => {
     let active = true;
@@ -114,6 +90,9 @@ export function AdminSitesPanel() {
       if (!showArchived && site.archived) {
         return false;
       }
+      if (priorityFilter !== "all" && site.contactPriority !== priorityFilter) {
+        return false;
+      }
 
       if (!normalizedQuery) {
         return true;
@@ -122,20 +101,15 @@ export function AdminSitesPanel() {
       return [
         site.title,
         site.customerName,
+        site.ownerContactName,
         site.siteAddress,
         site.reference,
-<<<<<<< HEAD
-        site.localAuthority
+        trackingStatusLabels[site.currentStatus],
+        contactPriorityLabels[site.contactPriority],
+        mailingStatusLabels[site.mailingStatus]
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [query, showArchived, sites]);
-  const groupedSites = useMemo(() => groupSitesByAuthority(visibleSites), [visibleSites]);
-=======
-        trackingStatusLabels[site.currentStatus]
-      ].some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
-  }, [query, showArchived, sites]);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+  }, [priorityFilter, query, showArchived, sites]);
 
   const validation = useMemo(
     () => (draft ? validateTrackingSite(draft) : { valid: true, errors: [] }),
@@ -150,15 +124,9 @@ export function AdminSitesPanel() {
       const site = await saveTrackingSite(createTrackingSite());
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-<<<<<<< HEAD
-      setStatus("Map page created. Add the plot map link, then save.");
-    } catch {
-      setStatus("Map page could not be created.");
-=======
       setStatus("Tracking page created. Edit the details, then save.");
     } catch {
       setStatus("Tracking page could not be created.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     } finally {
       setBusy(false);
     }
@@ -171,16 +139,7 @@ export function AdminSitesPanel() {
 
     const result = validateTrackingSite(draft);
     if (!result.valid) {
-<<<<<<< HEAD
-      setStatus("Resolve the map page guardrails before saving.");
-      return;
-    }
-
-    if (sites.some((site) => site.id !== draft.id && site.reference === draft.reference)) {
-      setStatus("Reference already exists. Choose a unique KV reference.");
-=======
       setStatus("Resolve the tracking page guardrails before saving.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       return;
     }
 
@@ -189,15 +148,9 @@ export function AdminSitesPanel() {
       const saved = await saveTrackingSite(draft);
       setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
       setDraft(saved);
-<<<<<<< HEAD
-      setStatus("Map page saved.");
-    } catch {
-      setStatus("Map page could not be saved.");
-=======
       setStatus("Tracking page saved.");
     } catch {
       setStatus("Tracking page could not be saved.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     } finally {
       setBusy(false);
     }
@@ -212,11 +165,7 @@ export function AdminSitesPanel() {
     try {
       const archived = await archiveTrackingSite(draft.id);
       if (!archived) {
-<<<<<<< HEAD
-        setStatus("Map page could not be archived.");
-=======
         setStatus("Tracking page could not be archived.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
         return;
       }
 
@@ -225,11 +174,6 @@ export function AdminSitesPanel() {
       );
       const next = sites.find((site) => site.id !== archived.id && !site.archived) ?? null;
       setDraft(next);
-<<<<<<< HEAD
-      setStatus("Map page archived. Its public link is now unavailable.");
-    } catch {
-      setStatus("Map page could not be archived.");
-=======
       setStatus("Tracking page archived. Its public link is now unavailable.");
     } catch {
       setStatus("Tracking page could not be archived.");
@@ -256,7 +200,6 @@ export function AdminSitesPanel() {
       setStatus(synced.council.lastSyncStatus);
     } catch {
       setStatus("Council connector check failed.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     } finally {
       setBusy(false);
     }
@@ -269,18 +212,12 @@ export function AdminSitesPanel() {
 
     try {
       await navigator.clipboard.writeText(publicLink);
-<<<<<<< HEAD
-      setStatus("Map page link copied.");
-=======
       setStatus("Tracking link copied.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     } catch {
       setStatus("Copy failed. Select the link field and copy it manually.");
     }
   }
 
-<<<<<<< HEAD
-=======
   function handleTemplateChange(templateId: string) {
     const template = trackingStatusTemplates.find((item) => item.id === templateId);
     if (!template) {
@@ -291,7 +228,6 @@ export function AdminSitesPanel() {
     setStatus(`${template.label} template applied. Review details, then save.`);
   }
 
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   function updateDraft(recipe: (site: TrackingSite) => void) {
     setDraft((current) => {
       if (!current) {
@@ -304,11 +240,7 @@ export function AdminSitesPanel() {
   }
 
   return (
-<<<<<<< HEAD
-    <section className="sites-admin" aria-label="Land interest map pages">
-=======
     <section className="sites-admin" aria-label="Customer tracking sites">
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       <div className="sites-admin__toolbar">
         <div className="admin-status sites-admin__status" role="status">
           <Link aria-hidden="true" />
@@ -321,19 +253,11 @@ export function AdminSitesPanel() {
       </div>
 
       <div className="sites-admin__layout">
-<<<<<<< HEAD
-        <aside className="sites-admin__list" aria-label="Map page list">
-          <div className="sites-admin__search">
-            <Search aria-hidden="true" />
-            <label className="sr-only" htmlFor="tracking-search">
-              Search map pages
-=======
         <aside className="sites-admin__list" aria-label="Tracking page list">
           <div className="sites-admin__search">
             <Search aria-hidden="true" />
             <label className="sr-only" htmlFor="tracking-search">
               Search tracking pages
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
             </label>
             <input
               id="tracking-search"
@@ -350,34 +274,33 @@ export function AdminSitesPanel() {
             />
             <span>Show archived</span>
           </label>
+          <label className="admin-field sites-admin__filter" htmlFor="sites-priority-filter">
+            <span className="admin-field__label">Priority</span>
+            <select
+              id="sites-priority-filter"
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value as ContactPriority | "all")}
+            >
+              <option value="all">All priorities</option>
+              {contactPriorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {contactPriorityLabels[priority]}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="sites-admin__rows">
             {visibleSites.length === 0 ? (
-<<<<<<< HEAD
-              <div className="sites-admin__empty">No map pages yet.</div>
-            ) : (
-              groupedSites.flatMap(([authority, authoritySites]) => [
-                <div className="site-group-heading" key={`${authority}-heading`}>
-                  <Folder aria-hidden="true" />
-                  <span>{authority}</span>
-                  <span>{authoritySites.length}</span>
-                </div>,
-                ...authoritySites.map((site) => (
-=======
               <div className="sites-admin__empty">No tracking pages yet.</div>
             ) : (
               visibleSites.map((site) => (
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                 <button
                   key={site.id}
                   type="button"
                   className={draft?.id === site.id ? "site-row site-row--active" : "site-row"}
                   onClick={() => {
                     setDraft(structuredClone(site));
-<<<<<<< HEAD
-                    setStatus(site.archived ? "Archived map page selected." : "Map page selected.");
-=======
                     setStatus(site.archived ? "Archived tracking page selected." : "Tracking page selected.");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                   }}
                 >
                   <span className="site-row__title">{site.title}</span>
@@ -385,18 +308,19 @@ export function AdminSitesPanel() {
                     {site.siteAddress}
                     {site.reference ? ` · ${site.reference}` : ""}
                   </span>
-<<<<<<< HEAD
-                  {site.mapEmbedUrl && <span className="site-row__meta">Map embed configured</span>}
-                </button>
-                ))
-              ])
-=======
                   <span className={`tracking-status ${trackingStatusClass(site.currentStatus)}`}>
                     {trackingStatusLabels[site.currentStatus]}
                   </span>
+                  <span className="site-row__badges">
+                    <span className={`priority-badge ${priorityClass(site.contactPriority)}`}>
+                      {contactPriorityLabels[site.contactPriority]}
+                    </span>
+                    <span className={`mailing-status ${mailingStatusClass(site.mailingStatus)}`}>
+                      {mailingStatusLabels[site.mailingStatus]}
+                    </span>
+                  </span>
                 </button>
               ))
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
             )}
           </div>
         </aside>
@@ -405,22 +329,13 @@ export function AdminSitesPanel() {
           {!draft ? (
             <div className="admin-panel sites-admin__blank">
               <h2>Sites</h2>
-<<<<<<< HEAD
-              <p>Create a QR-ready map page for a land interest letter.</p>
-=======
               <p>Create a customer tracking page to generate a QR-ready link.</p>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
             </div>
           ) : (
             <>
               {!validation.valid && (
-<<<<<<< HEAD
-                <div className="admin-errors" role="alert" aria-label="Map page validation issues">
-                  <h2>Map page guardrails</h2>
-=======
                 <div className="admin-errors" role="alert" aria-label="Tracking validation issues">
                   <h2>Tracking guardrails</h2>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                   <ul>
                     {validation.errors.slice(0, 8).map((error) => (
                       <li key={`${error.path}-${error.message}`}>{error.message}</li>
@@ -435,21 +350,17 @@ export function AdminSitesPanel() {
                     <h2 id="site-editor-title">{draft.title}</h2>
                     <p>Updated {new Date(draft.updatedAt).toLocaleString()}</p>
                   </div>
-<<<<<<< HEAD
-=======
                   <span className={`tracking-status ${trackingStatusClass(draft.currentStatus)}`}>
                     {trackingStatusLabels[draft.currentStatus]}
                   </span>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+                  <span className={`priority-badge ${priorityClass(draft.contactPriority)}`}>
+                    {contactPriorityLabels[draft.contactPriority]}
+                  </span>
                 </div>
 
                 <div className="tracking-link-box">
                   <div>
-<<<<<<< HEAD
-                    <span>Public map page link</span>
-=======
                     <span>Public tracking link</span>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                     <input
                       data-testid="generated-tracking-link"
                       value={publicLink}
@@ -467,20 +378,12 @@ export function AdminSitesPanel() {
                   </a>
                 </div>
 
-<<<<<<< HEAD
-                <details className="qr-designer qr-designer--folded">
-                  <summary className="admin-section-heading">
-                    <h3><Palette aria-hidden="true" /> QR Code Design</h3>
-                    <span>Open controls</span>
+                <details className="qr-designer qr-designer--folded" open>
+                  <summary className="qr-designer__summary">
+                    <span><Palette aria-hidden="true" /> QR code design</span>
+                    <small>Colours, module shape, frame shape and download</small>
                   </summary>
                   <div className="qr-designer__controls">
-=======
-                <div className="qr-designer">
-                  <div className="qr-designer__controls">
-                    <div className="admin-section-heading">
-                      <h3><Palette aria-hidden="true" /> QR design</h3>
-                    </div>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                     <div className="admin-grid admin-grid--two">
                       <ColorInput
                         label="Foreground"
@@ -553,11 +456,7 @@ export function AdminSitesPanel() {
                     </label>
                   </div>
                   <TrackingQrCode value={publicLink} style={draft.qrStyle} title={draft.title} />
-<<<<<<< HEAD
                 </details>
-=======
-                </div>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 
                 <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
@@ -575,30 +474,37 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateDraft((site) => { site.customerName = value; })}
                   />
                 </div>
+                <div className="admin-grid admin-grid--two">
+                  <TrackingTextInput
+                    label="Owner/contact name"
+                    value={draft.ownerContactName}
+                    maxLength={trackingFieldLimits.ownerContactName}
+                    error={errorsByPath.ownerContactName}
+                    onChange={(value) => updateDraft((site) => { site.ownerContactName = value; })}
+                  />
+                  <label className="admin-field" htmlFor="contact-priority">
+                    <span className="admin-field__label">Contact priority</span>
+                    <select
+                      id="contact-priority"
+                      value={draft.contactPriority}
+                      onChange={(event) =>
+                        updateDraft((site) => { site.contactPriority = event.target.value as ContactPriority; })
+                      }
+                    >
+                      {contactPriorities.map((priority) => (
+                        <option key={priority} value={priority}>
+                          {contactPriorityLabels[priority]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <TrackingTextInput
                   label="Site address"
                   value={draft.siteAddress}
                   maxLength={trackingFieldLimits.siteAddress}
                   error={errorsByPath.siteAddress}
-<<<<<<< HEAD
-                  onChange={(value) =>
-                    updateDraft((site) => {
-                      site.siteAddress = value;
-                      if (!site.localAuthority || site.localAuthority === "Uncategorised") {
-                        site.localAuthority = detectLocalAuthority(value) || "Uncategorised";
-                      }
-                    })
-                  }
-                />
-                <TrackingTextInput
-                  label="Council or local authority"
-                  value={draft.localAuthority}
-                  maxLength={trackingFieldLimits.localAuthority}
-                  error={errorsByPath.localAuthority}
-                  onChange={(value) => updateDraft((site) => { site.localAuthority = value; })}
-=======
                   onChange={(value) => updateDraft((site) => { site.siteAddress = value; })}
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                 />
                 <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
@@ -606,18 +512,6 @@ export function AdminSitesPanel() {
                     value={draft.reference}
                     maxLength={trackingFieldLimits.reference}
                     error={errorsByPath.reference}
-<<<<<<< HEAD
-                    onChange={(value) => updateDraft((site) => { site.reference = normalizeReference(value); })}
-                  />
-                  <TrackingTextInput
-                    label="Map page note"
-                    value={draft.statusNote}
-                    maxLength={trackingFieldLimits.statusNote}
-                    error={errorsByPath.statusNote}
-                    onChange={(value) => updateDraft((site) => { site.statusNote = value; })}
-                  />
-                </div>
-=======
                     onChange={(value) => updateDraft((site) => { site.reference = value; })}
                   />
                   <label className="admin-field" htmlFor="tracking-status">
@@ -652,7 +546,6 @@ export function AdminSitesPanel() {
                     ))}
                   </select>
                 </label>
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                 <TrackingTextarea
                   label="Summary"
                   value={draft.summary}
@@ -661,35 +554,6 @@ export function AdminSitesPanel() {
                   onChange={(value) => updateDraft((site) => { site.summary = value; })}
                 />
                 <TrackingTextarea
-<<<<<<< HEAD
-                  label="Google My Maps embed URL or iframe"
-                  value={draft.mapEmbedUrl}
-                  maxLength={trackingFieldLimits.mapEmbedUrl}
-                  error={errorsByPath.mapEmbedUrl}
-                  helper="Paste the Google My Maps embed URL, or paste the full iframe code and Studio will extract the source URL."
-                  onChange={(value) =>
-                    updateDraft((site) => { site.mapEmbedUrl = normalizeMapEmbedInput(value); })
-                  }
-                />
-                <TrackingTextInput
-                  label="Searchland URL"
-                  type="url"
-                  value={draft.searchlandUrl}
-                  maxLength={trackingFieldLimits.searchlandUrl}
-                  error={errorsByPath.searchlandUrl}
-                  onChange={(value) => updateDraft((site) => { site.searchlandUrl = value; })}
-                />
-                <TrackingTextarea
-                  label="Private notes"
-                  value={draft.privateNotes}
-                  maxLength={trackingFieldLimits.privateNotes}
-                  error={errorsByPath.privateNotes}
-                  helper="Internal only. These notes are not shown on the public QR page."
-                  onChange={(value) => updateDraft((site) => { site.privateNotes = value; })}
-                />
-              </section>
-
-=======
                   label="Status note"
                   value={draft.statusNote}
                   maxLength={trackingFieldLimits.statusNote}
@@ -790,7 +654,6 @@ export function AdminSitesPanel() {
                 </div>
               </section>
 
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
               <section className="admin-panel" aria-labelledby="tracking-resources-title">
                 <div className="admin-section-heading">
                   <h2 id="tracking-resources-title">Customer resources</h2>
@@ -811,11 +674,7 @@ export function AdminSitesPanel() {
                 </div>
                 {draft.resources.length === 0 ? (
                   <p className="admin-panel__note">
-<<<<<<< HEAD
-                    Add optional supporting images, title documents, drawings or useful links for recipients.
-=======
                     Add images, planning documents, drawings, schedules or useful links for customers.
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
                   </p>
                 ) : (
                   <div className="admin-stack">
@@ -889,8 +748,6 @@ export function AdminSitesPanel() {
                 )}
               </section>
 
-<<<<<<< HEAD
-=======
               <section className="admin-panel" aria-labelledby="council-shell-title">
                 <div className="site-editor__heading">
                   <div>
@@ -951,7 +808,6 @@ export function AdminSitesPanel() {
                 </div>
               </section>
 
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
               <div className="sites-admin__actions">
                 <button
                   type="button"
@@ -1077,22 +933,13 @@ function TrackingTextarea({
   value,
   maxLength,
   onChange,
-<<<<<<< HEAD
-  error,
-  helper
-=======
   error
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 }: {
   label: string;
   value: string;
   maxLength: number;
   onChange: (value: string) => void;
   error?: string;
-<<<<<<< HEAD
-  helper?: string;
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 }) {
   const id = toId(label);
   return (
@@ -1109,10 +956,6 @@ function TrackingTextarea({
         aria-invalid={Boolean(error)}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)}
       />
-<<<<<<< HEAD
-      {helper && <span className="admin-field__helper">{helper}</span>}
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       {error && <span className="admin-field__error">{error}</span>}
     </label>
   );
@@ -1130,27 +973,6 @@ function sortSites(sites: TrackingSite[]) {
   return [...sites].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-<<<<<<< HEAD
-function groupSitesByAuthority(sites: TrackingSite[]) {
-  const groups = new Map<string, TrackingSite[]>();
-  for (const site of sites) {
-    const authority = site.localAuthority?.trim() || "Uncategorised";
-    groups.set(authority, [...(groups.get(authority) ?? []), site]);
-  }
-
-  return [...groups.entries()].sort(([left], [right]) => {
-    if (left === "Uncategorised") {
-      return 1;
-    }
-    if (right === "Uncategorised") {
-      return -1;
-    }
-    return left.localeCompare(right);
-  });
-}
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function toTrackingErrorMap(errors: TrackingValidationError[]) {
   return errors.reduce<Record<string, string>>((map, error) => {
     map[error.path] = error.message;

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { businessAddress, defaultContent } from "../data/defaultContent";
-=======
-import { businessAddress } from "../data/defaultContent";
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 import type { NavLink, SiteContent } from "./contentTypes";
 
 const oldAddresses = new Set([
@@ -10,7 +6,6 @@ const oldAddresses = new Set([
 ]);
 
 export function normalizeSiteContent(content: SiteContent): SiteContent {
-<<<<<<< HEAD
   const normalized = {
     ...structuredClone(defaultContent),
     ...structuredClone(content),
@@ -23,9 +18,6 @@ export function normalizeSiteContent(content: SiteContent): SiteContent {
       ...(content as Partial<SiteContent>).seo
     }
   } as SiteContent;
-=======
-  const normalized = structuredClone(content);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 
   if (oldAddresses.has(normalized.footer.address)) {
     normalized.footer.address = businessAddress;

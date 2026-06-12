@@ -21,14 +21,9 @@ export function loadPublishedContent(): SiteContent {
 
   try {
     const parsed = JSON.parse(rawContent) as SiteContent;
-<<<<<<< HEAD
     const normalized = normalizeSiteContent(parsed);
     const validation = validateSiteContent(normalized);
     return validation.valid ? normalized : cloneContent(defaultContent);
-=======
-    const validation = validateSiteContent(parsed);
-    return validation.valid ? normalizeSiteContent(parsed) : cloneContent(defaultContent);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   } catch {
     return cloneContent(defaultContent);
   }

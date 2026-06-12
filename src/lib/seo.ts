@@ -18,7 +18,6 @@ export function usePageSeo(content: SiteContent, route: string) {
     setMeta("property", "og:type", development ? "article" : "website");
     setMeta("property", "og:url", canonical);
     setMeta("property", "og:image", absolutize(metadata.image));
-<<<<<<< HEAD
     setMeta("property", "og:image:alt", metadata.imageAlt);
     setMeta("property", "og:site_name", `${content.brandName} ${content.brandSuffix}`);
     setMeta("name", "twitter:card", "summary_large_image");
@@ -26,11 +25,6 @@ export function usePageSeo(content: SiteContent, route: string) {
     setMeta("name", "twitter:description", metadata.description);
     setMeta("name", "twitter:image", absolutize(metadata.image));
     setMeta("name", "twitter:image:alt", metadata.imageAlt);
-=======
-    setMeta("name", "twitter:card", "summary_large_image");
-    setMeta("name", "twitter:title", metadata.title);
-    setMeta("name", "twitter:description", metadata.description);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     setLink("canonical", canonical);
     setStructuredData(buildStructuredData(content, development, canonical));
   }, [content, route]);
@@ -41,17 +35,12 @@ export function getRouteMetadata(content: SiteContent, route: string, developmen
     return {
       title: `${development.title} | ${development.location} | ${content.brandName} ${content.brandSuffix}`,
       description: development.heroBody || development.description,
-<<<<<<< HEAD
       image: development.image.src,
       imageAlt: development.image.alt
-=======
-      image: development.image.src
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     };
   }
 
   const brand = `${content.brandName} ${content.brandSuffix}`;
-<<<<<<< HEAD
   const routes: Record<string, { title: string; description: string; image: string; imageAlt: string }> = {
     "/": {
       title: content.seo.home.title || `${brand} | Luxury homes and exceptional communities`,
@@ -94,55 +83,14 @@ export function getRouteMetadata(content: SiteContent, route: string, developmen
       description: content.pages.contact.seo.description || content.pages.contact.body,
       image: content.pages.contact.seo.image.src || content.pages.contact.image.src,
       imageAlt: content.pages.contact.seo.image.alt || content.pages.contact.image.alt
-=======
-  const routes: Record<string, { title: string; description: string; image: string }> = {
-    "/": {
-      title: `${brand} | Luxury homes and exceptional communities`,
-      description: content.hero.subtitle,
-      image: content.hero.image.src
-    },
-    "/developments": {
-      title: `Developments | ${brand}`,
-      description: content.developmentsIntro.title,
-      image: content.developments[0]?.image.src ?? content.hero.image.src
-    },
-    "/design-build": {
-      title: `Design and Build Services | ${brand}`,
-      description: "Tailored design, planning and construction services for refined British homes.",
-      image: content.about.image.src
-    },
-    "/vision-process": {
-      title: `Vision and Process | ${brand}`,
-      description: "A calm, carefully managed process from land appraisal to handover.",
-      image: content.about.image.src
-    },
-    "/about": {
-      title: `About Us | ${brand}`,
-      description: content.about.body,
-      image: content.about.image.src
-    },
-    "/land-wanted": {
-      title: `Land Wanted | ${brand}`,
-      description: content.landWanted.body,
-      image: content.landWanted.image.src
-    },
-    "/contact": {
-      title: `Contact | ${brand}`,
-      description: "Contact Kingsvale Homes about developments, land opportunities and design-led residential projects.",
-      image: content.hero.image.src
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     }
   };
 
   return routes[route] ?? {
     title: `${brand}`,
     description: "Kingsvale Homes creates exceptional communities and luxury homes across distinctive British locations.",
-<<<<<<< HEAD
     image: content.hero.image.src,
     imageAlt: content.hero.image.alt
-=======
-    image: content.hero.image.src
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   };
 }
 

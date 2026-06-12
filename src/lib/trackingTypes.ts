@@ -32,6 +32,18 @@ export type TrackingQrStyle = {
 
 export type TrackingResourceType = "image" | "document" | "link";
 
+export type ContactPriority = "high" | "medium" | "low" | "do-not-contact" | "unknown";
+
+export type MailingStatus =
+  | "not-mailed"
+  | "ready-to-mail"
+  | "mailed"
+  | "delivered"
+  | "responded"
+  | "no-response"
+  | "second-letter-needed"
+  | "do-not-contact";
+
 export type TrackingResource = {
   id: string;
   type: TrackingResourceType;
@@ -55,23 +67,25 @@ export type TrackingSite = {
   customerName: string;
   siteAddress: string;
   reference: string;
+  ownerContactName: string;
+  contactPriority: ContactPriority;
   summary: string;
-<<<<<<< HEAD
-  mapEmbedUrl: string;
-  searchlandUrl: string;
-  privateNotes: string;
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   currentStatus: TrackingStatus;
   statusNote: string;
   milestones: TrackingMilestone[];
   resources: TrackingResource[];
   qrStyle: TrackingQrStyle;
   council: CouncilSyncSettings;
-<<<<<<< HEAD
-  localAuthority: string;
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+  mailingStatus: MailingStatus;
+  firstMailedAt: string;
+  lastMailedAt: string;
+  royalMailTrackingNumber: string;
+  trackingStatus: string;
+  trackingLastCheckedAt: string | null;
+  remailReminderDays: number;
+  remailReminderDate: string;
+  mailingNotes: string;
+  mailingLastUpdatedAt: string;
   createdAt: string;
   updatedAt: string;
   archived: boolean;
@@ -98,4 +112,23 @@ export const trackingResourceLabels: Record<TrackingResourceType, string> = {
   image: "Image",
   document: "Document",
   link: "Link"
+};
+
+export const contactPriorityLabels: Record<ContactPriority, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  "do-not-contact": "Do not contact",
+  unknown: "Unknown"
+};
+
+export const mailingStatusLabels: Record<MailingStatus, string> = {
+  "not-mailed": "Not mailed",
+  "ready-to-mail": "Ready to mail",
+  mailed: "Mailed",
+  delivered: "Delivered",
+  responded: "Responded",
+  "no-response": "No response",
+  "second-letter-needed": "Second letter needed",
+  "do-not-contact": "Do not contact"
 };

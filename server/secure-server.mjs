@@ -34,26 +34,19 @@ const auditDir = dataDir;
 const cmsStoreFile = join(cmsDir, "content.json");
 const trackingStoreFile = join(trackingDir, "sites.json");
 const analyticsStoreFile = join(analyticsDir, "visits.json");
-<<<<<<< HEAD
 const studioPath = "/studio";
-=======
-const studioPath = "/251db172b850d056";
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 const port = Number(process.env.PORT ?? 4173);
 const studioUser = process.env.STUDIO_USER ?? "kingsvale";
 const studioPassword = process.env.STUDIO_PASSWORD;
 const studioMfaSecret = process.env.STUDIO_TOTP_SECRET?.trim() ?? "";
-const allowedStudioIps = new Set(parseCsv(process.env.STUDIO_ALLOWED_IPS).map(normalizeIp));
-const sessionSecret = process.env.SESSION_SECRET ?? randomBytes(32).toString("hex");
+const authTokenSecret = process.env.STUDIO_AUTH_TOKEN_SECRET ?? randomBytes(32).toString("hex");
 const cmsEncryptionKey = process.env.CMS_ENCRYPTION_KEY ?? "";
 const leadWebhookSecret = process.env.LEAD_WEBHOOK_HMAC_SECRET ?? "";
+const royalMailTrackingApiUrl = process.env.ROYAL_MAIL_TRACKING_API_URL ?? "";
+const royalMailTrackingApiKey = process.env.ROYAL_MAIL_TRACKING_API_KEY ?? "";
 const maxCmsRevisions = clampNumber(process.env.CMS_MAX_REVISIONS, 25, 5, 100);
 const maxCmsBackups = clampNumber(process.env.CMS_MAX_BACKUPS, 30, 5, 120);
-const secureCookies = process.env.SECURE_COOKIES
-  ? process.env.SECURE_COOKIES === "true"
-  : process.env.NODE_ENV === "production";
 const requestBuckets = new Map();
-const sessions = new Map();
 
 const mimeTypes = {
   ".avif": "image/avif",
@@ -71,11 +64,7 @@ const mimeTypes = {
 
 const securityHeaders = {
   "Content-Security-Policy":
-<<<<<<< HEAD
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; frame-src https://www.google.com https://*.google.com https://earth.google.com; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
-=======
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -105,12 +94,6 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (isRestrictedStudioSurface(url.pathname) && !isAllowedStudioIp(request)) {
-      await writeAudit("studio_ip_blocked", request, { path: url.pathname });
-      sendJson(response, 403, { error: "Studio access is not available from this network." });
-      return;
-    }
-
     if (url.pathname.startsWith("/api/")) {
       await handleApiRequest(request, response, url);
       return;
@@ -119,21 +102,6 @@ const server = createServer(async (request, response) => {
     if (url.pathname.startsWith("/media/")) {
       await serveMedia(url.pathname, response);
       return;
-    }
-
-    if (isStudioResource(url.pathname)) {
-      const session = getSession(request);
-      if (!session) {
-        if (url.pathname === studioPath && request.method === "GET") {
-          sendStudioLogin(response);
-          await writeAudit("studio_login_page", request, { path: url.pathname });
-          return;
-        }
-
-        sendJson(response, 401, { error: "Authentication required." });
-        await writeAudit("studio_auth_required", request, { path: url.pathname });
-        return;
-      }
     }
 
     await serveStatic(url.pathname, response);
@@ -162,27 +130,6 @@ function applySecurityHeaders(response) {
   for (const [header, value] of Object.entries(securityHeaders)) {
     response.setHeader(header, value);
   }
-}
-
-function isStudioResource(pathname) {
-  return pathname === studioPath || pathname.startsWith("/assets/studio-");
-}
-
-function isRestrictedStudioSurface(pathname) {
-  return (
-    isStudioResource(pathname) ||
-    pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/cms/") ||
-    pathname.startsWith("/api/uploads/")
-  );
-}
-
-function isAllowedStudioIp(request) {
-  if (allowedStudioIps.size === 0) {
-    return true;
-  }
-
-  return allowedStudioIps.has(normalizeIp(request.socket.remoteAddress ?? ""));
 }
 
 function allowRequest(clientId) {
@@ -221,8 +168,7 @@ async function handleApiRequest(request, response, url) {
       auth: {
         passwordConfigured: Boolean(studioPassword),
         mfaConfigured: Boolean(studioMfaSecret),
-        ipAllowlistConfigured: allowedStudioIps.size > 0,
-        cookieMode: secureCookies ? "secure" : "local"
+        tokenMode: "bearer"
       }
     });
     return;
@@ -243,7 +189,6 @@ async function handleApiRequest(request, response, url) {
     sendJson(response, 200, {
       authenticated: true,
       user: { name: session.user, role: "editor" },
-      csrfToken: session.csrfToken,
       expiresAt: new Date(session.expiresAt).toISOString()
     });
     return;
@@ -251,12 +196,10 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/auth/logout") {
     const session = requireSession(request, response);
-    if (!session || !requireCsrf(request, response, session)) {
+    if (!session) {
       return;
     }
 
-    sessions.delete(session.id);
-    response.setHeader("Set-Cookie", clearSessionCookie());
     await writeAudit("logout", request, { user: session.user });
     sendJson(response, 200, { ok: true });
     return;
@@ -296,14 +239,6 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
-<<<<<<< HEAD
-  if (url.pathname.startsWith("/api/tracking-sites/by-reference/")) {
-    await handleTrackingSiteReferenceLookup(request, response, url);
-    return;
-  }
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   if (url.pathname.startsWith("/api/tracking-sites/")) {
     await handleTrackingSiteItem(request, response, url);
     return;
@@ -326,10 +261,6 @@ async function handleApiRequest(request, response, url) {
     }
 
     if (request.method === "PUT") {
-      if (!requireCsrf(request, response, session)) {
-        return;
-      }
-
       const payload = await readJsonBody(request, 450_000);
       const validation = validateSiteContent(payload.content);
       if (!validation.valid) {
@@ -352,7 +283,7 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/cms/publish") {
     const session = requireSession(request, response);
-    if (!session || !requireCsrf(request, response, session)) {
+    if (!session) {
       return;
     }
 
@@ -418,7 +349,7 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname.startsWith("/api/cms/revisions/") && url.pathname.endsWith("/restore")) {
     const session = requireSession(request, response);
-    if (!session || !requireCsrf(request, response, session)) {
+    if (!session) {
       return;
     }
 
@@ -452,7 +383,7 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/uploads/images") {
     const session = requireSession(request, response);
-    if (!session || !requireCsrf(request, response, session)) {
+    if (!session) {
       return;
     }
 
@@ -491,14 +422,14 @@ async function handleLogin(request, response) {
   }
 
   const session = createSession(username);
-  sessions.set(session.id, session);
-  response.setHeader("Set-Cookie", buildSessionCookie(session.id));
   await writeAudit("login_success", request, { user: username });
 
   if (request.headers["content-type"]?.includes("application/json")) {
     sendJson(response, 200, {
       ok: true,
-      csrfToken: session.csrfToken,
+      authenticated: true,
+      user: { name: session.user, role: "editor" },
+      authToken: session.authToken,
       expiresAt: new Date(session.expiresAt).toISOString()
     });
     return;
@@ -509,33 +440,38 @@ async function handleLogin(request, response) {
 }
 
 function createSession(user) {
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 8;
   return {
-    id: randomBytes(24).toString("hex"),
-    csrfToken: randomBytes(24).toString("hex"),
     user,
-    expiresAt: Date.now() + 1000 * 60 * 60 * 8
+    expiresAt,
+    authToken: createAuthToken(user, expiresAt)
   };
 }
 
 function getSession(request) {
-  const cookies = parseCookies(request.headers.cookie ?? "");
-  const rawCookie = cookies.kv_session;
-  if (!rawCookie) {
+  const header = request.headers.authorization ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+  if (!token) {
     return null;
   }
 
-  const [id, signature] = rawCookie.split(".");
-  if (!id || !signature || !verifySignature(id, signature)) {
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature || !verifySignature(encodedPayload, signature)) {
     return null;
   }
 
-  const session = sessions.get(id);
-  if (!session || session.expiresAt <= Date.now()) {
-    sessions.delete(id);
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    if (!payload.user || typeof payload.exp !== "number" || payload.exp <= Date.now()) {
+      return null;
+    }
+    return {
+      user: String(payload.user),
+      expiresAt: payload.exp
+    };
+  } catch {
     return null;
   }
-
-  return session;
 }
 
 function requireSession(request, response) {
@@ -547,44 +483,19 @@ function requireSession(request, response) {
   return session;
 }
 
-function requireCsrf(request, response, session) {
-  const token = request.headers["x-csrf-token"];
-  if (token !== session.csrfToken) {
-    sendJson(response, 403, { error: "Invalid CSRF token." });
-    return false;
-  }
-  return true;
-}
-
-function buildSessionCookie(sessionId) {
-  const signed = `${sessionId}.${sign(sessionId)}`;
-  const secure = secureCookies ? "; Secure" : "";
-  return `kv_session=${signed}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800${secure}`;
-}
-
-function clearSessionCookie() {
-  const secure = secureCookies ? "; Secure" : "";
-  return `kv_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`;
+function createAuthToken(user, expiresAt) {
+  const payload = Buffer.from(JSON.stringify({ user, exp: expiresAt }), "utf8").toString("base64url");
+  return `${payload}.${sign(payload)}`;
 }
 
 function sign(value) {
-  return createHmac("sha256", sessionSecret).update(value).digest("base64url");
+  return createHmac("sha256", authTokenSecret).update(value).digest("base64url");
 }
 
 function verifySignature(value, signature) {
   const expected = Buffer.from(sign(value));
   const actual = Buffer.from(signature);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-function parseCookies(cookieHeader) {
-  return cookieHeader.split(";").reduce((cookies, pair) => {
-    const [key, ...rest] = pair.trim().split("=");
-    if (key) {
-      cookies[key] = decodeURIComponent(rest.join("="));
-    }
-    return cookies;
-  }, {});
 }
 
 function timingSafeEqualText(a, b) {
@@ -696,30 +607,15 @@ async function handleTrackingSitesCollection(request, response) {
   }
 
   if (request.method === "PUT") {
-    if (!requireCsrf(request, response, session)) {
-      return;
-    }
-
     const payload = await readJsonBody(request, 90_000);
-<<<<<<< HEAD
     const site = normalizeTrackingSite(payload.site ?? {});
-    const store = await readTrackingStore();
-    if (!site.reference) {
-      site.reference = `KV${String(maxTrackingReference(store.sites) + 1).padStart(4, "0")}`;
-    }
-=======
-    const site = payload.site;
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const validation = validateTrackingSite(site);
     if (!validation.valid) {
       sendJson(response, 400, { errors: validation.errors });
       return;
     }
 
-<<<<<<< HEAD
-=======
     const store = await readTrackingStore();
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const existingTokenOwner = store.sites.find(
       (item) => item.token === site.token && item.id !== site.id
     );
@@ -728,17 +624,6 @@ async function handleTrackingSitesCollection(request, response) {
       return;
     }
 
-<<<<<<< HEAD
-    const existingReferenceOwner = store.sites.find(
-      (item) => item.reference === site.reference && item.id !== site.id
-    );
-    if (existingReferenceOwner) {
-      sendJson(response, 409, { error: "Site reference already exists." });
-      return;
-    }
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const now = new Date().toISOString();
     const savedSite = {
       ...site,
@@ -766,16 +651,12 @@ async function handleTrackingSiteItem(request, response, url) {
   if (!action && request.method === "GET") {
     const store = await readTrackingStore();
     const site = store.sites.find((item) => item.token === decodedIdOrToken && !item.archived);
-<<<<<<< HEAD
     sendJson(response, site ? 200 : 404, { site: site ? publicTrackingSite(site) : null });
-=======
-    sendJson(response, site ? 200 : 404, { site: site ?? null });
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     return;
   }
 
   const session = requireSession(request, response);
-  if (!session || !requireCsrf(request, response, session)) {
+  if (!session) {
     return;
   }
 
@@ -830,45 +711,38 @@ async function handleTrackingSiteItem(request, response, url) {
     return;
   }
 
+  if (action === "postal-sync" && request.method === "POST") {
+    const store = await readTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    const checkedAt = new Date().toISOString();
+    const trackingStatus = await lookupRoyalMailTracking(target.royalMailTrackingNumber);
+    const syncedSite = {
+      ...target,
+      trackingStatus,
+      trackingLastCheckedAt: checkedAt,
+      mailingLastUpdatedAt: checkedAt,
+      updatedAt: checkedAt
+    };
+    store.sites = store.sites.map((site) => (site.id === syncedSite.id ? syncedSite : site));
+    store.updatedAt = checkedAt;
+    await writeTrackingStore(store);
+    await writeAudit("postal_tracking_checked", request, {
+      user: session.user,
+      siteId: syncedSite.id,
+      configured: Boolean(royalMailTrackingApiUrl && royalMailTrackingApiKey)
+    });
+    sendJson(response, 200, { ok: true, site: syncedSite });
+    return;
+  }
+
   sendJson(response, 405, { error: "Method not allowed." });
 }
 
-<<<<<<< HEAD
-async function handleTrackingSiteReferenceLookup(request, response, url) {
-  const session = requireSession(request, response);
-  if (!session) {
-    return;
-  }
-
-  if (request.method !== "GET") {
-    sendJson(response, 405, { error: "Method not allowed." });
-    return;
-  }
-
-  const reference = normalizeReference(decodeURIComponent(url.pathname.split("/").pop() ?? ""));
-  if (!/^KV\d{4,}$/.test(reference)) {
-    sendJson(response, 400, { error: "Reference must use the KV0001 format." });
-    return;
-  }
-
-  const store = await readTrackingStore();
-  const site = store.sites.find((item) => item.reference === reference);
-  if (!site) {
-    sendJson(response, 404, { error: "Site reference not found." });
-    return;
-  }
-
-  sendJson(response, 200, {
-    site: {
-      ...site,
-      publicUrl: `/track/${site.token}`,
-      phoneNumber: ""
-    }
-  });
-}
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 async function handleAnalyticsVisit(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Method not allowed." });
@@ -1082,24 +956,9 @@ async function readTrackingStore() {
   try {
     const raw = await readFile(trackingStoreFile, "utf8");
     const parsed = decodeCmsStore(raw);
-<<<<<<< HEAD
-    const rawSites = Array.isArray(parsed.sites) ? parsed.sites : [];
-    let nextReferenceNumber = maxTrackingReference(rawSites) + 1;
-    const sites = rawSites
-      .map((rawSite) => {
-        const site = normalizeTrackingSite(rawSite);
-        if (!site.reference) {
-          site.reference = `KV${String(nextReferenceNumber).padStart(4, "0")}`;
-          nextReferenceNumber += 1;
-        }
-        return site;
-      })
-      .filter((site) => validateTrackingSite(site).valid);
-=======
     const sites = Array.isArray(parsed.sites)
       ? parsed.sites.map(normalizeTrackingSite).filter((site) => validateTrackingSite(site).valid)
       : [];
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     return {
       sites,
       updatedAt: parsed.updatedAt ?? null
@@ -1347,32 +1206,16 @@ function validateTrackingSite(site) {
   }
 
   validateText(errors, "title", site.title, "Site title", 72);
-<<<<<<< HEAD
-    validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
-    validateText(errors, "statusNote", site.statusNote, "Status note", 320);
-    validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
-  validateText(errors, "reference", site.reference, "Reference", 64);
-  if (site.reference && !/^KV\d{4,}$/.test(site.reference)) {
-    errors.push({ path: "reference", message: "Reference must use the KV0001 format." });
-  }
-  validateOptionalText(errors, "summary", site.summary, "Summary", 240);
-  validateOptionalText(errors, "mapEmbedUrl", site.mapEmbedUrl, "Map embed URL", 1200);
-  validateOptionalText(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", 900);
-  validateOptionalText(errors, "privateNotes", site.privateNotes, "Private notes", 2000);
-  validateOptionalText(errors, "localAuthority", site.localAuthority, "Local authority", 90);
-  if (site.mapEmbedUrl && !isSafeMapEmbedUrl(site.mapEmbedUrl)) {
-    errors.push({ path: "mapEmbedUrl", message: "Map embed must be a safe Google map URL." });
-  }
-  if (site.searchlandUrl && !isSafeHttpUrl(site.searchlandUrl)) {
-    errors.push({ path: "searchlandUrl", message: "Searchland URL must be an HTTP URL." });
-  }
-=======
   validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
   validateText(errors, "statusNote", site.statusNote, "Status note", 320);
   validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
+  validateOptionalText(errors, "ownerContactName", site.ownerContactName, "Owner/contact name", 100);
   validateOptionalText(errors, "reference", site.reference, "Reference", 64);
   validateOptionalText(errors, "summary", site.summary, "Summary", 240);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+
+  if (!["high", "medium", "low", "do-not-contact", "unknown"].includes(site.contactPriority)) {
+    errors.push({ path: "contactPriority", message: "Choose an approved contact priority." });
+  }
 
   if (!["planning", "submitted", "in-review", "approved", "construction", "complete", "on-hold"].includes(site.currentStatus)) {
     errors.push({ path: "currentStatus", message: "Choose an approved status." });
@@ -1440,21 +1283,53 @@ function validateTrackingSite(site) {
     }
   }
 
+  validateMailing(errors, site);
+
   return { valid: errors.length === 0, errors };
+}
+
+function validateMailing(errors, site) {
+  if (![
+    "not-mailed",
+    "ready-to-mail",
+    "mailed",
+    "delivered",
+    "responded",
+    "no-response",
+    "second-letter-needed",
+    "do-not-contact"
+  ].includes(site.mailingStatus)) {
+    errors.push({ path: "mailingStatus", message: "Choose an approved mailing status." });
+  }
+
+  validateOptionalText(errors, "royalMailTrackingNumber", site.royalMailTrackingNumber, "Royal Mail tracking number", 40);
+  validateOptionalText(errors, "trackingStatus", site.trackingStatus, "Tracking status", 140);
+  validateOptionalText(errors, "mailingNotes", site.mailingNotes, "Mailing notes", 1200);
+
+  if (!Number.isFinite(site.remailReminderDays) || site.remailReminderDays < 1 || site.remailReminderDays > 120) {
+    errors.push({ path: "remailReminderDays", message: "Reminder days must be between 1 and 120." });
+  }
+
+  for (const [path, value] of [
+    ["firstMailedAt", site.firstMailedAt],
+    ["lastMailedAt", site.lastMailedAt],
+    ["remailReminderDate", site.remailReminderDate]
+  ]) {
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      errors.push({ path, message: "Use a valid date." });
+    }
+  }
 }
 
 function normalizeTrackingSite(site) {
   const qrStyle = site.qrStyle ?? {};
   const council = site.council ?? {};
+  const firstMailedAt = site.firstMailedAt ?? "";
+  const remailReminderDays = boundedReminderDays(site.remailReminderDays);
   return {
     ...site,
-<<<<<<< HEAD
-    reference: normalizeReference(site.reference ?? ""),
-    mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
-    searchlandUrl: site.searchlandUrl ?? "",
-    privateNotes: site.privateNotes ?? "",
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+    ownerContactName: site.ownerContactName ?? "",
+    contactPriority: normalizeContactPriority(site.contactPriority),
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? "#22211d",
@@ -1464,11 +1339,7 @@ function normalizeTrackingSite(site) {
       finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
       frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
       frameCut: numberOrFallback(qrStyle.frameCut, qrStyle.frameStyle === "cut-corner" ? 36 : 0),
-<<<<<<< HEAD
-      frameLabel: qrStyle.frameLabel ?? "Scan to view the plot",
-=======
       frameLabel: qrStyle.frameLabel ?? "Scan for project updates",
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       includeLogo: qrStyle.includeLogo ?? true
     },
     council: {
@@ -1478,13 +1349,119 @@ function normalizeTrackingSite(site) {
       apiBaseUrl: council.apiBaseUrl ?? "",
       lastCheckedAt: council.lastCheckedAt ?? null,
       lastSyncStatus: council.lastSyncStatus ?? "Not configured"
-<<<<<<< HEAD
     },
-    localAuthority: site.localAuthority || detectLocalAuthority(site.siteAddress) || "Uncategorised"
-=======
-    }
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+    mailingStatus: normalizeMailingStatus(site.mailingStatus),
+    firstMailedAt,
+    lastMailedAt: site.lastMailedAt ?? "",
+    royalMailTrackingNumber: site.royalMailTrackingNumber ?? "",
+    trackingStatus: site.trackingStatus ?? "Tracking unavailable",
+    trackingLastCheckedAt: site.trackingLastCheckedAt ?? null,
+    remailReminderDays,
+    remailReminderDate: site.remailReminderDate || suggestRemailReminderDate(firstMailedAt, remailReminderDays),
+    mailingNotes: site.mailingNotes ?? "",
+    mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
+}
+
+function publicTrackingSite(site) {
+  const {
+    ownerContactName,
+    contactPriority,
+    mailingStatus,
+    firstMailedAt,
+    lastMailedAt,
+    royalMailTrackingNumber,
+    trackingStatus,
+    trackingLastCheckedAt,
+    remailReminderDays,
+    remailReminderDate,
+    mailingNotes,
+    mailingLastUpdatedAt,
+    ...publicSite
+  } = site;
+  void ownerContactName;
+  void contactPriority;
+  void mailingStatus;
+  void firstMailedAt;
+  void lastMailedAt;
+  void royalMailTrackingNumber;
+  void trackingStatus;
+  void trackingLastCheckedAt;
+  void remailReminderDays;
+  void remailReminderDate;
+  void mailingNotes;
+  void mailingLastUpdatedAt;
+  return publicSite;
+}
+
+async function lookupRoyalMailTracking(trackingNumber) {
+  if (!trackingNumber?.trim()) {
+    return "No Royal Mail tracking number";
+  }
+
+  if (!royalMailTrackingApiUrl || !royalMailTrackingApiKey) {
+    return "Tracking API not configured";
+  }
+
+  try {
+    const url = new URL(royalMailTrackingApiUrl);
+    url.searchParams.set("trackingNumber", trackingNumber.trim());
+    // Configure ROYAL_MAIL_TRACKING_API_URL and ROYAL_MAIL_TRACKING_API_KEY in the runtime environment.
+    // The endpoint should return JSON with a human-readable status field or summary field.
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${royalMailTrackingApiKey}`
+      }
+    });
+
+    if (!response.ok) {
+      return "Tracking unavailable";
+    }
+
+    const payload = await response.json();
+    const status = payload.status ?? payload.summary ?? payload.trackingStatus;
+    return typeof status === "string" && status.trim() ? status.trim().slice(0, 140) : "Tracking checked";
+  } catch {
+    return "Tracking unavailable";
+  }
+}
+
+function normalizeContactPriority(value) {
+  return ["high", "medium", "low", "do-not-contact", "unknown"].includes(value) ? value : "unknown";
+}
+
+function normalizeMailingStatus(value) {
+  return [
+    "not-mailed",
+    "ready-to-mail",
+    "mailed",
+    "delivered",
+    "responded",
+    "no-response",
+    "second-letter-needed",
+    "do-not-contact"
+  ].includes(value)
+    ? value
+    : "not-mailed";
+}
+
+function boundedReminderDays(value) {
+  return Number.isFinite(value) ? Math.min(120, Math.max(1, Math.trunc(value))) : 14;
+}
+
+function suggestRemailReminderDate(firstMailedAt, reminderDays = 14) {
+  if (!firstMailedAt) {
+    return "";
+  }
+
+  const date = new Date(`${firstMailedAt}T12:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  date.setDate(date.getDate() + boundedReminderDays(reminderDays));
+  return date.toISOString().slice(0, 10);
 }
 
 function validateQrStyle(errors, qrStyle) {
@@ -1702,104 +1679,6 @@ function isSafeImageSource(value) {
   }
 }
 
-<<<<<<< HEAD
-function isSafeMapEmbedUrl(value) {
-  try {
-    const url = new URL(value);
-    return (
-      (url.protocol === "https:" || url.protocol === "http:") &&
-      (
-        url.hostname === "google.com" ||
-        url.hostname === "www.google.com" ||
-        url.hostname.endsWith(".google.com") ||
-        url.hostname === "earth.google.com" ||
-        url.hostname.endsWith(".googleusercontent.com")
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-function normalizeMapEmbedInput(value) {
-  const trimmed = String(value ?? "").trim();
-  const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
-  return preferSatelliteMap(decodeHtmlAttribute(iframeSrc ?? trimmed));
-}
-
-function decodeHtmlAttribute(value) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&quot;", "\"")
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">");
-}
-
-function normalizeReference(value) {
-  const normalized = String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
-  const numeric = normalized.match(/^KV0*(\d+)$/)?.[1];
-  return numeric ? `KV${numeric.padStart(4, "0")}` : normalized;
-}
-
-function maxTrackingReference(sites) {
-  return sites.reduce((highest, site) => {
-    const match = normalizeReference(site.reference).match(/^KV(\d{4,})$/);
-    return match ? Math.max(highest, Number(match[1])) : highest;
-  }, 0);
-}
-
-function detectLocalAuthority(address = "") {
-  const text = String(address).toLowerCase();
-  const authorities = [
-    "Wokingham",
-    "Bracknell Forest",
-    "Reading",
-    "West Berkshire",
-    "Windsor and Maidenhead",
-    "Surrey Heath",
-    "Guildford",
-    "Hart",
-    "Basingstoke and Deane",
-    "Winchester",
-    "London"
-  ];
-  const match = authorities.find((authority) => text.includes(authority.toLowerCase()));
-  return match ? `${match} Council` : "";
-}
-
-function preferSatelliteMap(value) {
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const url = new URL(value);
-    if (url.hostname === "www.google.com" && url.pathname.includes("/maps/d/embed")) {
-      // Google My Maps has no consistently documented embed flag that forces satellite
-      // for every shared map. This query parameter is the closest safe hint.
-      url.searchParams.set("basemap", "satellite");
-      return url.toString();
-    }
-  } catch {
-    return value;
-  }
-
-  return value;
-}
-
-function publicTrackingSite(site) {
-  const {
-    privateNotes,
-    searchlandUrl,
-    council,
-    ...publicSite
-  } = site;
-  return publicSite;
-}
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function isEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -1810,14 +1689,6 @@ function isShortText(value, min, max) {
 
 function toSlug(value) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60);
-}
-
-function parseCsv(value = "") {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
-}
-
-function normalizeIp(value) {
-  return value.replace(/^::ffff:/, "").replace(/^\[|\]$/g, "");
 }
 
 function clampNumber(value, fallback, min, max) {
@@ -1901,43 +1772,6 @@ function resolveStaticPath(pathname) {
 function sendJson(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(body));
-}
-
-function sendStudioLogin(response) {
-  response.writeHead(200, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "no-store"
-  });
-  response.end(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kingsvale Studio Access</title>
-  <style>
-    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#22211d;color:#f4efe6;font-family:Arial,sans-serif}
-    main{width:min(440px,calc(100vw - 32px));padding:40px;border:1px solid rgba(198,169,125,.35);background:#2a2925}
-    h1{font-family:Georgia,serif;font-size:34px;font-weight:400;margin:0 0 12px}
-    p{color:#d9d0c2;line-height:1.55}
-    label{display:grid;gap:8px;margin:18px 0}
-    input{padding:14px;background:#f4efe6;border:0;color:#22211d}
-    button{width:100%;padding:15px;border:0;background:#d8c5a8;color:#22211d;text-transform:uppercase;font-weight:700}
-  </style>
-</head>
-<body>
-  <main>
-    <p>Private studio</p>
-    <h1>Authorised editing only.</h1>
-    <p>Sign in to open the Kingsvale content studio. Sessions use an HttpOnly cookie and server-side asset protection.</p>
-    <form method="post" action="/api/auth/login">
-      <label>Username<input name="username" autocomplete="username" required /></label>
-      <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
-      ${studioMfaSecret ? '<label>Authenticator code<input name="mfaCode" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required /></label>' : ""}
-      <button type="submit">Enter studio</button>
-    </form>
-  </main>
-</body>
-</html>`);
 }
 
 async function writeAudit(event, request, details) {

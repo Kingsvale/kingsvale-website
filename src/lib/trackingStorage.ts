@@ -1,4 +1,6 @@
 import type {
+  ContactPriority,
+  MailingStatus,
   TrackingMilestoneState,
   TrackingQrStyle,
   TrackingResource,
@@ -39,27 +41,13 @@ export function saveLocalTrackingSites(sites: TrackingSite[]) {
 }
 
 export function upsertLocalTrackingSite(site: TrackingSite): TrackingSite {
-<<<<<<< HEAD
-  const sites = loadLocalTrackingSites();
-  const nextSite = normalizeTrackingSite({
-    ...site,
-    reference: normalizeReference(site.reference || nextTrackingReference(sites)),
-    updatedAt: new Date().toISOString()
-  });
-  const validation = validateTrackingSite(nextSite);
-=======
   const validation = validateTrackingSite(site);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   if (!validation.valid) {
     throw new Error("Tracking site is invalid and cannot be saved.");
   }
 
-<<<<<<< HEAD
-  ensureUniqueReference(nextSite, sites);
-=======
   const sites = loadLocalTrackingSites();
   const nextSite = { ...site, updatedAt: new Date().toISOString() };
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   const nextSites = sites.some((item) => item.id === site.id)
     ? sites.map((item) => (item.id === site.id ? nextSite : item))
     : [nextSite, ...sites];
@@ -85,24 +73,6 @@ export function findLocalTrackingSiteByToken(token: string): TrackingSite | null
 
 export function createTrackingSite(): TrackingSite {
   const now = new Date().toISOString();
-<<<<<<< HEAD
-  const reference = nextTrackingReference(loadLocalTrackingSites());
-  return {
-    id: `tracking-${Date.now()}-${randomPart(4)}`,
-    token: generateTrackingToken(),
-    title: "New land interest map",
-    customerName: "",
-    siteAddress: "Site address",
-    reference,
-    summary: "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
-    mapEmbedUrl: "",
-    searchlandUrl: "",
-    privateNotes: "",
-    currentStatus: "planning",
-    statusNote: "Kingsvale is reviewing this land interest opportunity.",
-    milestones: [
-      createMilestone("Land interest area prepared", "active")
-=======
   return {
     id: `tracking-${Date.now()}-${randomPart(4)}`,
     token: generateTrackingToken(),
@@ -110,6 +80,8 @@ export function createTrackingSite(): TrackingSite {
     customerName: "",
     siteAddress: "Site address",
     reference: "",
+    ownerContactName: "",
+    contactPriority: "unknown",
     summary: "Track the planning and construction progress for this Kingsvale project.",
     currentStatus: "planning",
     statusNote: "Initial details are being prepared by the Kingsvale team.",
@@ -119,7 +91,6 @@ export function createTrackingSite(): TrackingSite {
       createMilestone("Council review", "pending"),
       createMilestone("Decision issued", "pending"),
       createMilestone("Construction progress", "pending")
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     ],
     resources: [],
     qrStyle: defaultQrStyle(),
@@ -131,10 +102,16 @@ export function createTrackingSite(): TrackingSite {
       lastCheckedAt: null,
       lastSyncStatus: "Not configured"
     },
-<<<<<<< HEAD
-    localAuthority: "Uncategorised",
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+    mailingStatus: "not-mailed",
+    firstMailedAt: "",
+    lastMailedAt: "",
+    royalMailTrackingNumber: "",
+    trackingStatus: "Tracking unavailable",
+    trackingLastCheckedAt: null,
+    remailReminderDays: 14,
+    remailReminderDate: "",
+    mailingNotes: "",
+    mailingLastUpdatedAt: now,
     createdAt: now,
     updatedAt: now,
     archived: false
@@ -150,15 +127,12 @@ type LegacyQrStyle = Partial<TrackingQrStyle> & {
 export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
   const qrStyle = (site.qrStyle ?? {}) as LegacyQrStyle;
   const defaultStyle = defaultQrStyle();
+  const firstMailedAt = site.firstMailedAt ?? "";
+  const remailReminderDays = boundedReminderDays(site.remailReminderDays);
   return {
     ...site,
-<<<<<<< HEAD
-    reference: normalizeReference(site.reference ?? ""),
-    mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
-    searchlandUrl: site.searchlandUrl ?? "",
-    privateNotes: site.privateNotes ?? "",
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+    ownerContactName: site.ownerContactName ?? "",
+    contactPriority: normalizeContactPriority(site.contactPriority),
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? defaultStyle.foreground,
@@ -178,12 +152,17 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
       apiBaseUrl: site.council?.apiBaseUrl ?? "",
       lastCheckedAt: site.council?.lastCheckedAt ?? null,
       lastSyncStatus: site.council?.lastSyncStatus ?? "Not configured"
-<<<<<<< HEAD
     },
-    localAuthority: site.localAuthority || detectLocalAuthority(site.siteAddress) || "Uncategorised"
-=======
-    }
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+    mailingStatus: normalizeMailingStatus(site.mailingStatus),
+    firstMailedAt,
+    lastMailedAt: site.lastMailedAt ?? "",
+    royalMailTrackingNumber: site.royalMailTrackingNumber ?? "",
+    trackingStatus: site.trackingStatus ?? "Tracking unavailable",
+    trackingLastCheckedAt: site.trackingLastCheckedAt ?? null,
+    remailReminderDays,
+    remailReminderDate: site.remailReminderDate || suggestRemailReminderDate(firstMailedAt, remailReminderDays),
+    mailingNotes: site.mailingNotes ?? "",
+    mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
 }
 
@@ -219,93 +198,44 @@ export function defaultQrStyle(): TrackingQrStyle {
     finderRoundness: 24,
     frameRoundness: 42,
     frameCut: 0,
-<<<<<<< HEAD
-    frameLabel: "Scan to view the plot",
-=======
     frameLabel: "Scan for project updates",
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     includeLogo: true
   };
 }
 
-<<<<<<< HEAD
-export function normalizeMapEmbedInput(value: string) {
-  const trimmed = value.trim();
-  const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
-  return preferSatelliteMap(decodeHtmlAttribute(iframeSrc ?? trimmed));
+export function trackingStatusClass(status: TrackingStatus) {
+  return `tracking-status--${status.replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-export function normalizeReference(value: string) {
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, "");
-  const numeric = normalized.match(/^KV0*(\d+)$/)?.[1];
-  return numeric ? `KV${numeric.padStart(4, "0")}` : normalized;
+export function mailingStatusClass(status: MailingStatus) {
+  return `mailing-status--${status.replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-export function nextTrackingReference(sites: TrackingSite[]) {
-  const max = sites.reduce((highest, site) => {
-    const match = normalizeReference(site.reference).match(/^KV(\d{4,})$/);
-    return match ? Math.max(highest, Number(match[1])) : highest;
-  }, 0);
-
-  return `KV${String(max + 1).padStart(4, "0")}`;
+export function priorityClass(priority: ContactPriority) {
+  return `priority--${priority.replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-export function detectLocalAuthority(address: string) {
-  const text = address.toLowerCase();
-  const knownAuthorities = [
-    "Wokingham",
-    "Bracknell Forest",
-    "Reading",
-    "West Berkshire",
-    "Windsor and Maidenhead",
-    "Surrey Heath",
-    "Guildford",
-    "Hart",
-    "Basingstoke and Deane",
-    "Winchester",
-    "London"
-  ];
-  const match = knownAuthorities.find((authority) => text.includes(authority.toLowerCase()));
-  return match ? `${match} Council` : "";
-}
-
-function ensureUniqueReference(site: TrackingSite, sites: TrackingSite[]) {
-  if (!site.reference) {
-    return;
-  }
-
-  const duplicate = sites.some(
-    (item) => item.id !== site.id && normalizeReference(item.reference) === site.reference
-  );
-  if (duplicate) {
-    throw new Error("A site with this reference already exists.");
-  }
-}
-
-function preferSatelliteMap(value: string) {
-  if (!value) {
+export function suggestRemailReminderDate(firstMailedAt: string, reminderDays = 14) {
+  if (!firstMailedAt) {
     return "";
   }
 
-  try {
-    const url = new URL(value);
-    if (url.hostname === "www.google.com" && url.pathname.includes("/maps/d/embed")) {
-      // Google My Maps embeds do not consistently honour a documented satellite-default option
-      // across accounts and shared-map settings. `basemap=satellite` is the closest safe hint.
-      url.searchParams.set("basemap", "satellite");
-      return url.toString();
-    }
-  } catch {
-    return value;
+  const date = new Date(`${firstMailedAt}T12:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return "";
   }
 
-  return value;
+  date.setDate(date.getDate() + boundedReminderDays(reminderDays));
+  return date.toISOString().slice(0, 10);
 }
 
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
-export function trackingStatusClass(status: TrackingStatus) {
-  return `tracking-status--${status.replace(/[^a-z0-9]+/g, "-")}`;
+export function isRemailReminderOverdue(site: TrackingSite, now = new Date()) {
+  if (!site.remailReminderDate || site.mailingStatus === "responded" || site.mailingStatus === "do-not-contact") {
+    return false;
+  }
+
+  const reminder = new Date(`${site.remailReminderDate}T23:59:59`);
+  return !Number.isNaN(reminder.getTime()) && reminder < now;
 }
 
 export function generateTrackingToken() {
@@ -325,15 +255,28 @@ export function generateTrackingToken() {
 function randomPart(length: number) {
   return Math.random().toString(36).slice(2, 2 + length);
 }
-<<<<<<< HEAD
 
-function decodeHtmlAttribute(value: string) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&quot;", "\"")
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">");
+function normalizeContactPriority(value: ContactPriority | undefined): ContactPriority {
+  return ["high", "medium", "low", "do-not-contact", "unknown"].includes(value ?? "")
+    ? value as ContactPriority
+    : "unknown";
 }
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+
+function normalizeMailingStatus(value: MailingStatus | undefined): MailingStatus {
+  return [
+    "not-mailed",
+    "ready-to-mail",
+    "mailed",
+    "delivered",
+    "responded",
+    "no-response",
+    "second-letter-needed",
+    "do-not-contact"
+  ].includes(value ?? "")
+    ? value as MailingStatus
+    : "not-mailed";
+}
+
+function boundedReminderDays(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.min(120, Math.max(1, Math.trunc(value))) : 14;
+}

@@ -31,10 +31,7 @@ import type {
   IconKey,
   ImageAsset,
   NavLink,
-<<<<<<< HEAD
   SeoContent,
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   SiteContent
 } from "../lib/contentTypes";
 import {
@@ -58,6 +55,7 @@ import {
   uploadCmsImage
 } from "../lib/cmsApi";
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
+import { AdminMailingPanel } from "./AdminMailingPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
 
 type AdminPageProps = {
@@ -74,10 +72,30 @@ type RevisionSummary = {
   title: string;
 };
 
-type AdminRootTab = "website" | "sites" | "analytics";
+type AdminRootTab = "website" | "sites" | "mailing" | "analytics";
+type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
+type PreviewDevice = "desktop" | "tablet" | "mobile";
 
 const HomepagePreview = lazy(() =>
   import("./Homepage").then((module) => ({ default: module.Homepage }))
+);
+const DesignBuildPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.DesignBuildPage }))
+);
+const LandWantedPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.LandWantedPage }))
+);
+const VisionProcessPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.VisionProcessPage }))
+);
+const AboutPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.AboutPage }))
+);
+const DevelopmentsPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.DevelopmentsIndexPage }))
+);
+const ContactPreview = lazy(() =>
+  import("./ContentPages").then((module) => ({ default: module.ContactPage }))
 );
 
 type FieldProps = {
@@ -97,7 +115,6 @@ const editorSections = [
   { id: "hero", label: "Hero" },
   { id: "brand", label: "Brand" },
   { id: "features", label: "Features" },
-<<<<<<< HEAD
   { id: "design", label: "Design & Build" },
   { id: "vision", label: "Vision & Process" },
   { id: "legacy", label: "About" },
@@ -105,18 +122,24 @@ const editorSections = [
   { id: "land", label: "Land" },
   { id: "contact", label: "Contact" },
   { id: "seo", label: "SEO" },
-=======
-  { id: "legacy", label: "Legacy" },
-  { id: "developments", label: "Developments" },
-  { id: "land", label: "Land" },
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   { id: "footer", label: "Footer" }
 ] as const;
 
 const adminRootTabs: { id: AdminRootTab; label: string }[] = [
   { id: "website", label: "Website" },
   { id: "sites", label: "Sites" },
+  { id: "mailing", label: "Mailing" },
   { id: "analytics", label: "Analytics" }
+];
+
+const previewRoutes: { value: PreviewRoute; label: string }[] = [
+  { value: "/", label: "Homepage" },
+  { value: "/design-build", label: "Design & Build Services" },
+  { value: "/land-wanted", label: "Land Wanted" },
+  { value: "/vision-process", label: "Our Vision & Process" },
+  { value: "/about", label: "About Us" },
+  { value: "/developments", label: "Our Developments" },
+  { value: "/contact", label: "Contact Us" }
 ];
 
 type EditorSectionId = (typeof editorSections)[number]["id"];
@@ -131,6 +154,9 @@ export function AdminPage({
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
   const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>("website");
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
+  const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
+  const [previewKey, setPreviewKey] = useState(0);
   const [serverMode, setServerMode] = useState(false);
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState("");
@@ -138,6 +164,7 @@ export function AdminPage({
   const validation = useMemo(() => validateSiteContent(draft), [draft]);
   const errorsByPath = useMemo(() => toErrorMap(validation.errors), [validation.errors]);
   const activePanelLabel = editorSections.find((section) => section.id === activePanel)?.label ?? "Hero";
+  const previewRouteLabel = previewRoutes.find((route) => route.value === previewRoute)?.label ?? "selected page";
 
   useEffect(() => {
     let active = true;
@@ -494,7 +521,6 @@ export function AdminPage({
           </EditorPanel>
           )}
 
-<<<<<<< HEAD
           {activePanel === "design" && (
           <StaticPageEditor
             title="Design & Build Services page"
@@ -516,11 +542,6 @@ export function AdminPage({
           {activePanel === "legacy" && (
           <EditorialEditor
             title="About Us page"
-=======
-          {activePanel === "legacy" && (
-          <EditorialEditor
-            title="Legacy section"
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
             id="editor-panel-legacy"
             content={draft.about}
             path="about"
@@ -626,7 +647,6 @@ export function AdminPage({
           />
           )}
 
-<<<<<<< HEAD
           {activePanel === "contact" && (
           <StaticPageEditor
             title="Contact page"
@@ -677,8 +697,6 @@ export function AdminPage({
           </EditorPanel>
           )}
 
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           {activePanel === "footer" && (
           <EditorPanel title="Footer" id="editor-panel-footer">
             <Textarea
@@ -775,14 +793,47 @@ export function AdminPage({
           )}
         </section>
 
-        <aside className="admin-preview" aria-label="Live homepage preview">
+        <aside className={`admin-preview admin-preview--${previewDevice}`} aria-label={`Live ${previewRouteLabel} preview`}>
           <div className="admin-preview__bar">
-            <Eye aria-hidden="true" />
-            <span>Live preview before publishing</span>
+            <div>
+              <Eye aria-hidden="true" />
+              <span>Live preview</span>
+            </div>
+            <label className="sr-only" htmlFor="preview-route">Preview page</label>
+            <select
+              id="preview-route"
+              value={previewRoute}
+              onChange={(event) => setPreviewRoute(event.target.value as PreviewRoute)}
+            >
+              {previewRoutes.map((route) => (
+                <option key={route.value} value={route.value}>
+                  {route.label}
+                </option>
+              ))}
+            </select>
+            <div className="admin-preview__devices" aria-label="Preview device" role="group">
+              {(["desktop", "tablet", "mobile"] as const).map((device) => (
+                <button
+                  key={device}
+                  type="button"
+                  aria-pressed={previewDevice === device}
+                  onClick={() => setPreviewDevice(device)}
+                >
+                  {device}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="admin-preview__refresh" onClick={() => setPreviewKey((key) => key + 1)}>
+              Refresh
+            </button>
+            <a className="admin-preview__open" href={previewRoute} target="_blank" rel="noreferrer">
+              Open
+            </a>
           </div>
-          <div className="admin-preview__viewport">
+          <div className="admin-preview__url">{previewRoute}</div>
+          <div className="admin-preview__viewport" key={`${previewRoute}-${previewDevice}-${previewKey}`}>
             <Suspense fallback={<div className="route-loading" />}>
-              <HomepagePreview content={draft} preview />
+              <PreviewContent route={previewRoute} content={draft} />
             </Suspense>
           </div>
         </aside>
@@ -793,6 +844,11 @@ export function AdminPage({
         <AdminSitesPanel />
       </main>
       )}
+      {activeRootTab === "mailing" && (
+      <main className="admin-root-main" id="admin-root-panel-mailing" role="tabpanel">
+        <AdminMailingPanel />
+      </main>
+      )}
       {activeRootTab === "analytics" && (
       <main className="admin-root-main" id="admin-root-panel-analytics" role="tabpanel">
         <AdminAnalyticsPanel />
@@ -800,6 +856,28 @@ export function AdminPage({
       )}
     </div>
   );
+}
+
+function PreviewContent({ route, content }: { route: PreviewRoute; content: SiteContent }) {
+  if (route === "/") {
+    return <HomepagePreview content={content} preview />;
+  }
+  if (route === "/design-build") {
+    return <DesignBuildPreview content={content} />;
+  }
+  if (route === "/land-wanted") {
+    return <LandWantedPreview content={content} />;
+  }
+  if (route === "/vision-process") {
+    return <VisionProcessPreview content={content} />;
+  }
+  if (route === "/about") {
+    return <AboutPreview content={content} />;
+  }
+  if (route === "/developments") {
+    return <DevelopmentsPreview content={content} />;
+  }
+  return <ContactPreview content={content} />;
 }
 
 function EditorPanel({
@@ -1024,7 +1102,6 @@ function FeatureEditor({
   );
 }
 
-<<<<<<< HEAD
 function StaticPageEditor({
   title,
   id,
@@ -1153,8 +1230,6 @@ function SeoEditor({
   );
 }
 
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function EditorialEditor({
   title,
   id,

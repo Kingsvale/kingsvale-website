@@ -13,12 +13,10 @@ export function Developments({ intro, developments }: DevelopmentsProps) {
     <section className="developments" id="developments" aria-labelledby="developments-title">
       <div className="section-heading">
         <p className="eyebrow">{intro.eyebrow}</p>
-        <div className="section-heading__row">
-          <h2 id="developments-title">{intro.title}</h2>
-          <ButtonLink href={intro.viewAllHref} variant="dark" className="section-heading__link">
-            {intro.viewAllLabel}
-          </ButtonLink>
-        </div>
+        <h2 id="developments-title">{intro.title}</h2>
+        <ButtonLink href={intro.viewAllHref} variant="dark" className="section-heading__link">
+          {intro.viewAllLabel}
+        </ButtonLink>
       </div>
       <div className="development-grid">
         {developments.map((development, index) => (

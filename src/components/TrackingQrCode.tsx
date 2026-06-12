@@ -75,11 +75,7 @@ function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string) 
   const finders = finderOrigins.map(([x, y]) =>
     finderShape(x, y, moduleSize, finderRoundness, foreground, background, accent)
   );
-<<<<<<< HEAD
-  const label = escapeText(style.frameLabel || "Scan to view the plot");
-=======
   const label = escapeText(style.frameLabel || "Scan for project updates");
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   const brand = escapeText(title.slice(0, 28));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${totalHeight}" role="img" aria-label="${escapeAttribute(label)}" data-qr-svg="true">

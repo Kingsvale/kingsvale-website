@@ -1,4 +1,6 @@
 import type {
+  ContactPriority,
+  MailingStatus,
   TrackingMilestone,
   TrackingMilestoneState,
   TrackingResource,
@@ -21,17 +23,14 @@ export const trackingFieldLimits = {
   token: 40,
   title: 72,
   customerName: 80,
+  ownerContactName: 100,
   siteAddress: 160,
   reference: 64,
   summary: 240,
   statusNote: 320,
-<<<<<<< HEAD
-  mapEmbedUrl: 1200,
-  searchlandUrl: 900,
-  privateNotes: 2000,
-  localAuthority: 90,
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
+  royalMailTrackingNumber: 40,
+  trackingStatus: 140,
+  mailingNotes: 1200,
   councilName: 90,
   applicationReference: 80,
   apiBaseUrl: 180,
@@ -55,6 +54,17 @@ const trackingStatuses: TrackingStatus[] = [
 
 const milestoneStates: TrackingMilestoneState[] = ["pending", "active", "complete", "blocked"];
 const resourceTypes: TrackingResourceType[] = ["image", "document", "link"];
+const contactPriorities: ContactPriority[] = ["high", "medium", "low", "do-not-contact", "unknown"];
+const mailingStatuses: MailingStatus[] = [
+  "not-mailed",
+  "ready-to-mail",
+  "mailed",
+  "delivered",
+  "responded",
+  "no-response",
+  "second-letter-needed",
+  "do-not-contact"
+];
 
 export function validateTrackingSite(site: TrackingSite): TrackingValidationResult {
   const errors: TrackingValidationError[] = [];
@@ -79,20 +89,18 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     "Site address",
     trackingFieldLimits.siteAddress
   );
-<<<<<<< HEAD
-  addRequiredTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
-  if (site.reference && !/^KV\d{4,}$/.test(site.reference)) {
-    errors.push({ path: "reference", message: "Reference must use the KV0001 format." });
+  addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
+  addOptionalTextError(
+    errors,
+    "ownerContactName",
+    site.ownerContactName,
+    "Owner/contact name",
+    trackingFieldLimits.ownerContactName
+  );
+  if (!contactPriorities.includes(site.contactPriority)) {
+    errors.push({ path: "contactPriority", message: "Choose an approved contact priority." });
   }
   addOptionalTextError(errors, "summary", site.summary, "Summary", trackingFieldLimits.summary);
-  addOptionalTextError(errors, "mapEmbedUrl", site.mapEmbedUrl, "Map embed URL", trackingFieldLimits.mapEmbedUrl);
-  addOptionalTextError(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", trackingFieldLimits.searchlandUrl);
-  addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private notes", trackingFieldLimits.privateNotes);
-  addOptionalTextError(errors, "localAuthority", site.localAuthority, "Local authority", trackingFieldLimits.localAuthority);
-=======
-  addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
-  addOptionalTextError(errors, "summary", site.summary, "Summary", trackingFieldLimits.summary);
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   addRequiredTextError(
     errors,
     "statusNote",
@@ -163,24 +171,54 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     errors.push({ path: "council.apiBaseUrl", message: "Council API URL must be an HTTP URL." });
   }
 
-<<<<<<< HEAD
-  if (site.mapEmbedUrl && !isValidMapEmbedUrl(site.mapEmbedUrl)) {
-    errors.push({
-      path: "mapEmbedUrl",
-      message: "Map embed must be a safe Google Maps, Google My Maps or Google Earth URL."
-    });
-  }
+  addMailingErrors(errors, site);
 
-  if (site.searchlandUrl && !isValidHttpUrl(site.searchlandUrl)) {
-    errors.push({ path: "searchlandUrl", message: "Searchland URL must be an HTTP URL." });
-  }
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   return {
     valid: errors.length === 0,
     errors
   };
+}
+
+function addMailingErrors(errors: TrackingValidationError[], site: TrackingSite) {
+  if (!mailingStatuses.includes(site.mailingStatus)) {
+    errors.push({ path: "mailingStatus", message: "Choose an approved mailing status." });
+  }
+
+  addOptionalTextError(
+    errors,
+    "royalMailTrackingNumber",
+    site.royalMailTrackingNumber,
+    "Royal Mail tracking number",
+    trackingFieldLimits.royalMailTrackingNumber
+  );
+  addOptionalTextError(
+    errors,
+    "trackingStatus",
+    site.trackingStatus,
+    "Tracking status",
+    trackingFieldLimits.trackingStatus
+  );
+  addOptionalTextError(
+    errors,
+    "mailingNotes",
+    site.mailingNotes,
+    "Mailing notes",
+    trackingFieldLimits.mailingNotes
+  );
+
+  if (!Number.isFinite(site.remailReminderDays) || site.remailReminderDays < 1 || site.remailReminderDays > 120) {
+    errors.push({ path: "remailReminderDays", message: "Reminder days must be between 1 and 120." });
+  }
+
+  for (const [path, value] of [
+    ["firstMailedAt", site.firstMailedAt],
+    ["lastMailedAt", site.lastMailedAt],
+    ["remailReminderDate", site.remailReminderDate]
+  ]) {
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      errors.push({ path, message: "Use a valid date." });
+    }
+  }
 }
 
 function addQrStyleErrors(errors: TrackingValidationError[], site: TrackingSite) {
@@ -351,27 +389,6 @@ function isValidResourceUrl(value: string) {
   return isValidHttpUrl(value);
 }
 
-<<<<<<< HEAD
-function isValidMapEmbedUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    return (
-      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
-      (
-        parsed.hostname === "www.google.com" ||
-        parsed.hostname === "google.com" ||
-        parsed.hostname.endsWith(".google.com") ||
-        parsed.hostname === "earth.google.com" ||
-        parsed.hostname.endsWith(".googleusercontent.com")
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-=======
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function isHexColor(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value);
 }

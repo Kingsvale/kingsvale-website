@@ -169,11 +169,7 @@ function getRouteTitle(route: string) {
     return "Homepage";
   }
   if (route.startsWith("/track/")) {
-<<<<<<< HEAD
-    return "Land interest map page";
-=======
     return "Customer tracking page";
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   }
 
   return route

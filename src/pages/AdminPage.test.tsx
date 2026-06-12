@@ -19,13 +19,19 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
-  it("exposes Website, Sites and Analytics studio tabs", async () => {
+  it("exposes Website, Sites, Mailing and Analytics studio tabs", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     expect(screen.getByRole("tab", { name: "Website" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Sites" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Mailing" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Analytics" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Content editor" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Mailing" }));
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Postal contact workflow" })).toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole("tab", { name: "Analytics" }));
     await waitFor(() => {
@@ -98,34 +104,12 @@ describe("AdminPage", () => {
     expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
   });
 
-<<<<<<< HEAD
-  it("configures a plot map page and supports recipient resources", async () => {
-=======
   it("applies status templates and supports customer resources", async () => {
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     render(<AdminPage publishedContent={defaultContent} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
     fireEvent.click(screen.getByRole("button", { name: /create site/i }));
 
-<<<<<<< HEAD
-    const embedFieldName = /Google My Maps embed URL or iframe/;
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(embedFieldName)).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByLabelText(embedFieldName), {
-      target: { value: '<iframe src="https://www.google.com/maps/d/embed?mid=abc123"></iframe>' }
-    });
-    expect(screen.getByLabelText(embedFieldName)).toHaveValue(
-      "https://www.google.com/maps/d/embed?mid=abc123&basemap=satellite"
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /add resource/i }));
-    fireEvent.change(screen.getByLabelText(/Resource 1 title/), {
-      target: { value: "Title plan" }
-=======
     await waitFor(() => {
       expect(screen.getByLabelText("Apply status template")).toBeInTheDocument();
     });
@@ -139,7 +123,6 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /add resource/i }));
     fireEvent.change(screen.getByLabelText(/Resource 1 title/), {
       target: { value: "Planning pack" }
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     });
     fireEvent.change(screen.getByLabelText(/Resource 1 URL/), {
       target: { value: "https://example.com/planning-pack.pdf" }

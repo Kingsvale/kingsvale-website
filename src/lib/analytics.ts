@@ -20,7 +20,7 @@ const duplicateWindowMs = 2_000;
 export function shouldTrackRoute(path: string) {
   return (
     path !== "/admin" &&
-    !path.startsWith("/251db172b850d056") &&
+    !path.startsWith("/studio") &&
     !path.startsWith("/api/") &&
     !path.startsWith("/assets/")
   );

@@ -23,15 +23,14 @@ test("public routes render without horizontal overflow", async ({ page }) => {
   }
 });
 
-test("logo mark and type sit inside the header lockup on desktop", async ({ page, isMobile }) => {
-  test.skip(isMobile, "Logo lockup type is intentionally simplified on the mobile breakpoint.");
+test("logo image sits inside the header lockup on desktop", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Logo sizing is covered by the mobile navigation smoke test.");
 
   await page.goto("/");
   const lockup = await page.evaluate(() => {
     const logo = document.querySelector(".logo")?.getBoundingClientRect();
-    const mark = document.querySelector(".logo-mark")?.getBoundingClientRect();
-    const type = document.querySelector(".logo-type")?.getBoundingClientRect();
-    if (!logo || !mark || !type) {
+    const image = document.querySelector(".logo__image")?.getBoundingClientRect();
+    if (!logo || !image) {
       return null;
     }
 
@@ -42,18 +41,16 @@ test("logo mark and type sit inside the header lockup on desktop", async ({ page
       child.bottom <= parent.bottom + 1;
 
     return {
-      markInside: within(mark, logo),
-      typeInside: within(type, logo),
-      markWidth: mark.width,
-      typeWidth: type.width
+      imageInside: within(image, logo),
+      imageWidth: image.width,
+      imageHeight: image.height
     };
   });
 
   expect(lockup).not.toBeNull();
-  expect(lockup?.markInside).toBe(true);
-  expect(lockup?.typeInside).toBe(true);
-  expect(lockup?.markWidth).toBeGreaterThan(52);
-  expect(lockup?.typeWidth).toBeGreaterThan(90);
+  expect(lockup?.imageInside).toBe(true);
+  expect(lockup?.imageWidth).toBeGreaterThan(180);
+  expect(lockup?.imageHeight).toBeGreaterThan(40);
 });
 
 test("public homepage does not preload the private studio chunk", async ({ page }) => {

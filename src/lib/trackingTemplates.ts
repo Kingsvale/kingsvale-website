@@ -2,10 +2,7 @@ import { createMilestone } from "./trackingStorage";
 import type { TrackingSite, TrackingStatus } from "./trackingTypes";
 
 export type TrackingTemplateId =
-<<<<<<< HEAD
-=======
   | "planning-application"
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   | "construction"
   | "snagging-handover";
 
@@ -23,8 +20,6 @@ export type TrackingStatusTemplate = {
 
 export const trackingStatusTemplates: TrackingStatusTemplate[] = [
   {
-<<<<<<< HEAD
-=======
     id: "planning-application",
     label: "Planning application",
     status: "submitted",
@@ -39,7 +34,6 @@ export const trackingStatusTemplates: TrackingStatusTemplate[] = [
     ]
   },
   {
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     id: "construction",
     label: "Construction",
     status: "construction",

@@ -18,14 +18,9 @@ export async function fetchServerContent(): Promise<SiteContent | null> {
       return null;
     }
 
-<<<<<<< HEAD
     const normalized = normalizeSiteContent(payload.content);
     const validation = validateSiteContent(normalized);
     return validation.valid ? normalized : null;
-=======
-    const validation = validateSiteContent(payload.content);
-    return validation.valid ? normalizeSiteContent(payload.content) : null;
->>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   } catch {
     return null;
   }

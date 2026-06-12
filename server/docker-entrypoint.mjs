@@ -1,4 +1,4 @@
-const requiredKeys = ["STUDIO_PASSWORD", "SESSION_SECRET", "CMS_ENCRYPTION_KEY"];
+const requiredKeys = ["STUDIO_PASSWORD", "STUDIO_AUTH_TOKEN_SECRET", "CMS_ENCRYPTION_KEY"];
 const missing = requiredKeys.filter((key) => !process.env[key]);
 
 if (missing.length > 0) {

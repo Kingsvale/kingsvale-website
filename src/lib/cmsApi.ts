@@ -12,7 +12,7 @@ import {
 type StudioSession = {
   authenticated: boolean;
   user: { name: string; role: string };
-  csrfToken: string;
+  authToken?: string;
   expiresAt: string;
 };
 
@@ -23,44 +23,76 @@ type RevisionSummary = {
   title: string;
 };
 
-let csrfToken = "";
+const authTokenStorageKey = "kingsvale-studio-auth-token-v1";
 
-export async function getServerSession() {
+let authToken = "";
+authToken = readStoredAuthToken();
+
+export async function loginServerSession(passphrase: string, username = "kingsvale") {
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
       credentials: "same-origin",
-      headers: { Accept: "application/json" }
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ username, password: passphrase })
     });
 
     if (!response.ok) {
-      csrfToken = "";
+      clearStoredAuthToken();
       return null;
     }
 
     const session = (await response.json()) as StudioSession;
-    csrfToken = session.csrfToken;
+    if (session.authToken) {
+      storeAuthToken(session.authToken, session.expiresAt);
+    }
     return session;
   } catch {
-    csrfToken = "";
+    clearStoredAuthToken();
+    return null;
+  }
+}
+
+export async function getServerSession() {
+  if (!authToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch("/api/auth/me", {
+      credentials: "same-origin",
+      headers: authHeaders({ Accept: "application/json" })
+    });
+
+    if (!response.ok) {
+      clearStoredAuthToken();
+      return null;
+    }
+
+    const session = (await response.json()) as StudioSession;
+    return session;
+  } catch {
+    clearStoredAuthToken();
     return null;
   }
 }
 
 export async function logoutServerSession() {
-  await ensureCsrfToken();
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: csrfHeaders()
-  });
-  csrfToken = "";
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders()
+    });
+  } finally {
+    clearStoredAuthToken();
+  }
 }
 
 export async function fetchCmsDraft() {
-  await ensureCsrfToken();
   const response = await fetch("/api/cms/draft", {
     credentials: "same-origin",
-    headers: { Accept: "application/json" }
+    headers: authHeaders({ Accept: "application/json" })
   });
   if (!response.ok) {
     throw new Error("CMS draft could not be loaded.");
@@ -73,11 +105,10 @@ export async function fetchCmsDraft() {
 }
 
 export async function saveCmsDraft(content: SiteContent) {
-  await ensureCsrfToken();
   const response = await fetch("/api/cms/draft", {
     method: "PUT",
     credentials: "same-origin",
-    headers: csrfHeaders(),
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ content })
   });
   if (!response.ok) {
@@ -86,11 +117,10 @@ export async function saveCmsDraft(content: SiteContent) {
 }
 
 export async function publishCmsContent(content: SiteContent) {
-  await ensureCsrfToken();
   const response = await fetch("/api/cms/publish", {
     method: "POST",
     credentials: "same-origin",
-    headers: csrfHeaders(),
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ content })
   });
   if (!response.ok) {
@@ -99,10 +129,9 @@ export async function publishCmsContent(content: SiteContent) {
 }
 
 export async function listCmsRevisions() {
-  await ensureCsrfToken();
   const response = await fetch("/api/cms/revisions", {
     credentials: "same-origin",
-    headers: { Accept: "application/json" }
+    headers: authHeaders({ Accept: "application/json" })
   });
   if (!response.ok) {
     return [] as RevisionSummary[];
@@ -112,11 +141,10 @@ export async function listCmsRevisions() {
 }
 
 export async function restoreCmsRevision(id: string) {
-  await ensureCsrfToken();
   const response = await fetch(`/api/cms/revisions/${encodeURIComponent(id)}/restore`, {
     method: "POST",
     credentials: "same-origin",
-    headers: csrfHeaders()
+    headers: authHeaders()
   });
   if (!response.ok) {
     throw new Error("Revision could not be restored.");
@@ -126,13 +154,12 @@ export async function restoreCmsRevision(id: string) {
 
 export async function uploadCmsImage(file: File): Promise<ImageAsset | null> {
   try {
-    await ensureCsrfToken();
     const formData = new FormData();
     formData.set("image", file);
     const response = await fetch("/api/uploads/images", {
       method: "POST",
       credentials: "same-origin",
-      headers: { "x-csrf-token": csrfToken },
+      headers: authHeaders(),
       body: formData
     });
 
@@ -151,7 +178,7 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
   try {
     const response = await fetch("/api/tracking-sites", {
       credentials: "same-origin",
-      headers: { Accept: "application/json" }
+      headers: authHeaders({ Accept: "application/json" })
     });
 
     if (!response.ok) {
@@ -167,11 +194,10 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
 
 export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
   try {
-    await ensureCsrfToken();
     const response = await fetch("/api/tracking-sites", {
       method: "PUT",
       credentials: "same-origin",
-      headers: csrfHeaders(),
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ site })
     });
 
@@ -188,11 +214,10 @@ export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite
 
 export async function archiveTrackingSite(id: string): Promise<TrackingSite | null> {
   try {
-    await ensureCsrfToken();
     const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/archive`, {
       method: "POST",
       credentials: "same-origin",
-      headers: csrfHeaders()
+      headers: authHeaders()
     });
 
     if (!response.ok) {
@@ -208,11 +233,10 @@ export async function archiveTrackingSite(id: string): Promise<TrackingSite | nu
 
 export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSite | null> {
   try {
-    await ensureCsrfToken();
     const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/sync`, {
       method: "POST",
       credentials: "same-origin",
-      headers: csrfHeaders()
+      headers: authHeaders()
     });
 
     if (!response.ok) {
@@ -223,6 +247,25 @@ export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSi
     return normalizeTrackingSite(payload.site);
   } catch {
     return markLocalCouncilSyncAttempt(id);
+  }
+}
+
+export async function checkMailingTrackingStatus(id: string): Promise<TrackingSite | null> {
+  try {
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/postal-sync`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders()
+    });
+
+    if (!response.ok) {
+      return markLocalPostalSyncAttempt(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    return markLocalPostalSyncAttempt(id);
   }
 }
 
@@ -244,18 +287,45 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   }
 }
 
-async function ensureCsrfToken() {
-  if (csrfToken) {
-    return;
-  }
-  await getServerSession();
+function authHeaders(headers: Record<string, string> = {}) {
+  return authToken
+    ? { ...headers, Authorization: `Bearer ${authToken}` }
+    : headers;
 }
 
-function csrfHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "x-csrf-token": csrfToken
-  };
+function readStoredAuthToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(authTokenStorageKey) ?? "null") as {
+      token?: string;
+      expiresAt?: string;
+    } | null;
+    if (!stored?.token || !stored.expiresAt || new Date(stored.expiresAt).getTime() <= Date.now()) {
+      clearStoredAuthToken();
+      return "";
+    }
+    return stored.token;
+  } catch {
+    clearStoredAuthToken();
+    return "";
+  }
+}
+
+function storeAuthToken(token: string, expiresAt: string) {
+  authToken = token;
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(authTokenStorageKey, JSON.stringify({ token, expiresAt }));
+  }
+}
+
+function clearStoredAuthToken() {
+  authToken = "";
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(authTokenStorageKey);
+  }
 }
 
 function markLocalCouncilSyncAttempt(id: string) {
@@ -271,5 +341,19 @@ function markLocalCouncilSyncAttempt(id: string) {
       lastCheckedAt: new Date().toISOString(),
       lastSyncStatus: "Connector shell only. Configure a council API to automate updates."
     }
+  });
+}
+
+function markLocalPostalSyncAttempt(id: string) {
+  const site = loadLocalTrackingSites().find((item) => item.id === id);
+  if (!site) {
+    return null;
+  }
+
+  return upsertLocalTrackingSite({
+    ...site,
+    trackingStatus: site.royalMailTrackingNumber ? "Tracking API not configured" : "No Royal Mail tracking number",
+    trackingLastCheckedAt: new Date().toISOString(),
+    mailingLastUpdatedAt: new Date().toISOString()
   });
 }

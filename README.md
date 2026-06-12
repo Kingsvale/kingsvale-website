@@ -5,14 +5,14 @@ A responsive luxury real estate homepage and structured admin editor inspired by
 ## What Is Included
 
 - Responsive homepage with header, hero, feature strip, legacy split, developments, land wanted CTA, and luxury footer.
-- Structured private studio editor at `/251db172b850d056` with server-session auth in secure mode and live preview before publishing.
+- Structured Studio editor at `/studio` with passphrase auth, bearer-token API protection in secure mode, and live preview before publishing.
 - Editable content model for hero, features, developments, about, land wanted, footer, navigation, social links, and images.
 - Image replacement via URL or upload. Secure mode validates image bytes and generates WebP media variants with `sharp`.
 - Public content pages for developments, development details, design and build, vision and process, about, land wanted, contact, privacy, terms, and a security review.
 - `/admin` is intentionally inert and does not expose editing controls.
 - Client-side PBKDF2 passphrase verification and AES-GCM encrypted private editor snapshots remain available for the local Vite prototype.
 - Secure server CMS persistence for published content, draft content, revision history, audit logs, leads and uploaded media under ignored `data/` storage.
-- Signed HttpOnly session cookies, CSRF protection for mutating studio routes, optional TOTP MFA, optional studio IP allowlisting, protected `studio-*` assets, public lead validation, optional signed webhook forwarding, route SEO metadata, robots and sitemap files.
+- Short-lived Studio bearer tokens for secure CMS mutations, optional TOTP MFA, public lead validation, optional signed webhook forwarding, route SEO metadata, robots and sitemap files.
 - Build-time prerendered HTML for all public routes, including each development detail page.
 - Optional local CMS encryption at rest, bounded revision history, CMS backup files and a read-only `/api/ops/health` endpoint for deployment checks.
 - Production readiness preflight that checks secrets hygiene, headers, robots, sitemap, prerendered route output and private chunk exposure.
@@ -27,7 +27,7 @@ A responsive luxury real estate homepage and structured admin editor inspired by
 - For a real multi-user production launch, replace local `data/` persistence with a database/CMS and object storage without changing the typed `SiteContent` schema.
 - Managed production storage is still a deployment choice: this repo now isolates and documents the secure local store, but a real launch should place CMS rows, media, lead records and audit events in managed database/object/logging services.
 - Default photography uses remote optimized image URLs. Local Vite uploads are data URLs; secure-server uploads are decoded and converted to WebP variants in `/media/`.
-- The client passphrase gate is retained for Vite-only use. Secure mode uses a server login page, signed HttpOnly session cookie and CSRF token before loading the studio bundle.
+- The client passphrase gate is retained for Vite-only use. Secure mode verifies the same passphrase server-side and returns a short-lived bearer token for CMS, tracking, analytics and upload APIs.
 
 ## Setup
 
@@ -44,7 +44,7 @@ npm run dev -- --port 5173
 
 Homepage: `http://127.0.0.1:5173/`
 
-Private studio: `http://127.0.0.1:5173/251db172b850d056`
+Studio: `http://127.0.0.1:5173/studio`
 
 Security review page: `http://127.0.0.1:5173/security-review`
 
@@ -55,22 +55,27 @@ For the secure production-style server, set:
 ```bash
 $env:STUDIO_USER="kingsvale"
 $env:STUDIO_PASSWORD="your-rotated-passphrase"
-$env:SESSION_SECRET="a-long-random-session-signing-secret"
+$env:STUDIO_AUTH_TOKEN_SECRET="a-long-random-auth-token-secret"
 $env:CMS_ENCRYPTION_KEY="a-long-random-cms-encryption-key"
 npm run build
 npm run serve:secure
 ```
 
-Secure studio login: `http://127.0.0.1:4173/251db172b850d056`
+Secure studio login: `http://127.0.0.1:4173/studio`
 
 Optional hardening:
 
 ```bash
 $env:STUDIO_TOTP_SECRET="BASE32-TOTP-SECRET"
-$env:STUDIO_ALLOWED_IPS="127.0.0.1,203.0.113.10"
-$env:SECURE_COOKIES="false"
 $env:CMS_MAX_REVISIONS="25"
 $env:CMS_MAX_BACKUPS="30"
+```
+
+Optional Royal Mail or third-party tracking lookup:
+
+```bash
+$env:ROYAL_MAIL_TRACKING_API_URL="https://tracking-provider.example/lookup"
+$env:ROYAL_MAIL_TRACKING_API_KEY="provider-api-key"
 ```
 
 Optional lead forwarding:
@@ -106,7 +111,7 @@ npm run build
 
 The repo includes a `Dockerfile`, a local `docker-compose.yml`, and a Portainer upload-friendly `docker-compose.portainer.yml`. The container serves the production secure server on internal port `4173` and persists CMS content, uploads, leads, audit logs and backups in the named `kingsvale_data` volume.
 
-The Docker image can build without secrets, but the container entrypoint refuses to start unless `STUDIO_PASSWORD`, `SESSION_SECRET` and `CMS_ENCRYPTION_KEY` are set.
+The Docker image can build without secrets, but the container entrypoint refuses to start unless `STUDIO_PASSWORD`, `STUDIO_AUTH_TOKEN_SECRET` and `CMS_ENCRYPTION_KEY` are set.
 
 The Dockerfile packages the current `dist/` production build. If you change the site source, rebuild `dist/` before creating the Docker image:
 
@@ -129,20 +134,18 @@ Required Portainer environment variables:
 HOST_PORT=8095
 STUDIO_USER=kingsvale
 STUDIO_PASSWORD=replace-with-a-rotated-editor-password
-SESSION_SECRET=replace-with-a-long-random-session-secret
+STUDIO_AUTH_TOKEN_SECRET=replace-with-a-long-random-auth-token-secret
 CMS_ENCRYPTION_KEY=replace-with-a-long-random-cms-key
-SECURE_COOKIES=false
 ```
-
-Use `SECURE_COOKIES=false` when opening the site directly over plain HTTP, for example `http://SERVER_IP:8095`. Set it to `true` only when the public site is served over HTTPS through a reverse proxy or tunnel.
 
 Optional variables:
 
 ```bash
 STUDIO_TOTP_SECRET=
-STUDIO_ALLOWED_IPS=
 CMS_MAX_REVISIONS=25
 CMS_MAX_BACKUPS=30
+ROYAL_MAIL_TRACKING_API_URL=
+ROYAL_MAIL_TRACKING_API_KEY=
 CONTACT_WEBHOOK_URL=
 NEWSLETTER_WEBHOOK_URL=
 LEAD_WEBHOOK_HMAC_SECRET=
@@ -170,7 +173,7 @@ Deploy the uploaded image as a Portainer Stack:
 3. Add the required environment variables above in the Stack environment section.
 4. Deploy the stack.
 5. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
-6. Open the private studio at `/251db172b850d056`.
+6. Open Studio at `/studio`.
 
 Portainer Git deployment:
 
@@ -180,9 +183,9 @@ Portainer Git deployment:
 4. Add the environment variables above in the Stack environment section.
 5. Deploy the stack.
 6. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
-7. Open the private studio at `/251db172b850d056`.
+7. Open Studio at `/studio`.
 
-If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep `SECURE_COOKIES=true` with HTTPS enabled.
+If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep HTTPS enabled.
 
 ## Performance And Accessibility Notes
 
@@ -202,7 +205,7 @@ If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, o
 - Client-side route hiding is not true access control. Secure mode protects the private route and studio chunk server-side; plain static hosting does not.
 - The studio passphrase is verified with PBKDF2-SHA-256 using a stored verifier and salt. This avoids a plaintext secret in the production app bundle, but the verifier is still available to an attacker who can download the JavaScript.
 - AES-GCM is used for private editor snapshots in local storage. Published public content is not encrypted because the public website must render it without an editor passphrase.
-- `serve:secure` adds signed sessions, CSRF checks, optional TOTP MFA, optional IP allowlisting, rate limiting, server-side validation, audit logs, revision history, encrypted CMS files when configured, backups and server media processing. For production scale, move local `data/` files to managed DB/object storage, use SSO/OIDC/MFA through an identity provider and store secrets in a manager.
+- `serve:secure` adds bearer-token CMS protection, optional TOTP MFA, rate limiting, server-side validation, audit logs, revision history, encrypted CMS files when configured, backups and server media processing. For production scale, move local `data/` files to managed DB/object storage, use SSO/OIDC/MFA through an identity provider and store secrets in a manager.
 
 ## Acceptance Criteria
 

@@ -1,7 +1,7 @@
 import { Lock, ShieldCheck } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import type { SiteContent } from "../lib/contentTypes";
-import { getServerSession, logoutServerSession } from "../lib/cmsApi";
+import { getServerSession, loginServerSession, logoutServerSession } from "../lib/cmsApi";
 import {
   clearStudioSession,
   createStudioSession,
@@ -48,14 +48,16 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
     const verified = await verifyStudioPassphrase(passphrase);
     if (!verified) {
       setBusy(false);
-      setError("Access was not granted. Check the studio passphrase.");
+      setError("Invalid credentials");
       return;
     }
 
+    const serverSession = await loginServerSession(passphrase);
     createStudioSession();
     setSessionSecret(passphrase);
     setPassphrase("");
     setAuthenticated(true);
+    setServerAuthenticated(Boolean(serverSession?.authenticated));
     setBusy(false);
   }
 
@@ -86,12 +88,9 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
         <div className="auth-card__icon">
           <Lock aria-hidden="true" />
         </div>
-        <p className="eyebrow">Private studio</p>
-        <h1 id="studio-auth-title">Authorised editing only.</h1>
-        <p>
-          The editor sits behind a generated route and passphrase gate. Public
-          content remains available without exposing editing controls.
-        </p>
+        <p className="eyebrow">Kingsvale studio</p>
+        <h1 id="studio-auth-title">Sign in to manage the site.</h1>
+        <p>Use your studio passphrase to edit website content, tracking pages, analytics and mailing workflows.</p>
         <form onSubmit={handleSubmit}>
           <label className="admin-field" htmlFor="studio-passphrase">
             <span className="admin-field__label">Studio passphrase</span>
@@ -106,7 +105,7 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
           {error && <p className="admin-field__error" role="alert">{error}</p>}
           <button type="submit" className="admin-save" disabled={busy}>
             <ShieldCheck aria-hidden="true" />
-            {busy ? "Verifying" : "Unlock studio"}
+            {busy ? "Checking credentials" : "Unlock studio"}
           </button>
         </form>
       </section>
@@ -123,10 +122,7 @@ export function AdminDecoyPage() {
         </div>
         <p className="eyebrow">Restricted</p>
         <h1 id="admin-decoy-title">No editor lives here.</h1>
-        <p>
-          This public route is intentionally inert. Editing uses a generated
-          private path, session gate and cryptographic verifier.
-        </p>
+        <p>This public route is intentionally inert. Editing uses the Kingsvale Studio sign-in page.</p>
         <a className="admin-open" href="/">
           Return to homepage
         </a>

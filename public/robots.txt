@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /251db172b850d056
+Disallow: /studio
 
 Sitemap: https://www.kingsvalehomes.co.uk/sitemap.xml
