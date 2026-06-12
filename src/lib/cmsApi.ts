@@ -1,0 +1,275 @@
+import type { ImageAsset, SiteContent } from "./contentTypes";
+import { loadLocalAnalyticsVisits } from "./analytics";
+import { buildAnalyticsSummary, type AnalyticsSummary } from "./analyticsSummary";
+import type { TrackingSite } from "./trackingTypes";
+import {
+  archiveLocalTrackingSite,
+  loadLocalTrackingSites,
+  normalizeTrackingSite,
+  upsertLocalTrackingSite
+} from "./trackingStorage";
+
+type StudioSession = {
+  authenticated: boolean;
+  user: { name: string; role: string };
+  csrfToken: string;
+  expiresAt: string;
+};
+
+type RevisionSummary = {
+  id: string;
+  createdAt: string;
+  user: string;
+  title: string;
+};
+
+let csrfToken = "";
+
+export async function getServerSession() {
+  try {
+    const response = await fetch("/api/auth/me", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!response.ok) {
+      csrfToken = "";
+      return null;
+    }
+
+    const session = (await response.json()) as StudioSession;
+    csrfToken = session.csrfToken;
+    return session;
+  } catch {
+    csrfToken = "";
+    return null;
+  }
+}
+
+export async function logoutServerSession() {
+  await ensureCsrfToken();
+  await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: csrfHeaders()
+  });
+  csrfToken = "";
+}
+
+export async function fetchCmsDraft() {
+  await ensureCsrfToken();
+  const response = await fetch("/api/cms/draft", {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error("CMS draft could not be loaded.");
+  }
+  return (await response.json()) as {
+    draft: SiteContent | null;
+    published: SiteContent | null;
+    updatedAt: string | null;
+  };
+}
+
+export async function saveCmsDraft(content: SiteContent) {
+  await ensureCsrfToken();
+  const response = await fetch("/api/cms/draft", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: csrfHeaders(),
+    body: JSON.stringify({ content })
+  });
+  if (!response.ok) {
+    throw new Error("CMS draft could not be saved.");
+  }
+}
+
+export async function publishCmsContent(content: SiteContent) {
+  await ensureCsrfToken();
+  const response = await fetch("/api/cms/publish", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: csrfHeaders(),
+    body: JSON.stringify({ content })
+  });
+  if (!response.ok) {
+    throw new Error("CMS content could not be published.");
+  }
+}
+
+export async function listCmsRevisions() {
+  await ensureCsrfToken();
+  const response = await fetch("/api/cms/revisions", {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    return [] as RevisionSummary[];
+  }
+  const payload = (await response.json()) as { revisions: RevisionSummary[] };
+  return payload.revisions;
+}
+
+export async function restoreCmsRevision(id: string) {
+  await ensureCsrfToken();
+  const response = await fetch(`/api/cms/revisions/${encodeURIComponent(id)}/restore`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: csrfHeaders()
+  });
+  if (!response.ok) {
+    throw new Error("Revision could not be restored.");
+  }
+  return (await response.json()) as { content: SiteContent };
+}
+
+export async function uploadCmsImage(file: File): Promise<ImageAsset | null> {
+  try {
+    await ensureCsrfToken();
+    const formData = new FormData();
+    formData.set("image", file);
+    const response = await fetch("/api/uploads/images", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "x-csrf-token": csrfToken },
+      body: formData
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { image: ImageAsset };
+    return payload.image;
+  } catch {
+    return null;
+  }
+}
+
+export async function listTrackingSites(): Promise<TrackingSite[]> {
+  try {
+    const response = await fetch("/api/tracking-sites", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!response.ok) {
+      return loadLocalTrackingSites();
+    }
+
+    const payload = (await response.json()) as { sites: TrackingSite[] };
+    return payload.sites.map(normalizeTrackingSite);
+  } catch {
+    return loadLocalTrackingSites();
+  }
+}
+
+export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch("/api/tracking-sites", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: csrfHeaders(),
+      body: JSON.stringify({ site })
+    });
+
+    if (!response.ok) {
+      return upsertLocalTrackingSite(site);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    return upsertLocalTrackingSite(site);
+  }
+}
+
+export async function archiveTrackingSite(id: string): Promise<TrackingSite | null> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/archive`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrfHeaders()
+    });
+
+    if (!response.ok) {
+      return archiveLocalTrackingSite(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    return archiveLocalTrackingSite(id);
+  }
+}
+
+export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSite | null> {
+  try {
+    await ensureCsrfToken();
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/sync`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrfHeaders()
+    });
+
+    if (!response.ok) {
+      return markLocalCouncilSyncAttempt(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite };
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    return markLocalCouncilSyncAttempt(id);
+  }
+}
+
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
+  try {
+    const response = await fetch("/api/analytics/summary", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+
+    if (!response.ok) {
+      return buildAnalyticsSummary(loadLocalAnalyticsVisits());
+    }
+
+    const payload = (await response.json()) as { summary: AnalyticsSummary };
+    return payload.summary;
+  } catch {
+    return buildAnalyticsSummary(loadLocalAnalyticsVisits());
+  }
+}
+
+async function ensureCsrfToken() {
+  if (csrfToken) {
+    return;
+  }
+  await getServerSession();
+}
+
+function csrfHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "x-csrf-token": csrfToken
+  };
+}
+
+function markLocalCouncilSyncAttempt(id: string) {
+  const site = loadLocalTrackingSites().find((item) => item.id === id);
+  if (!site) {
+    return null;
+  }
+
+  return upsertLocalTrackingSite({
+    ...site,
+    council: {
+      ...site.council,
+      lastCheckedAt: new Date().toISOString(),
+      lastSyncStatus: "Connector shell only. Configure a council API to automate updates."
+    }
+  });
+}
