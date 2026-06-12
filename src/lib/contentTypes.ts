@@ -12,12 +12,15 @@ export type ImageAsset = {
   focalPoint?: string;
 };
 
+<<<<<<< HEAD
 export type SeoContent = {
   title: string;
   description: string;
   image: ImageAsset;
 };
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 export type NavLink = {
   label: string;
   href: string;
@@ -74,6 +77,7 @@ export type LandWantedContent = {
   image: ImageAsset;
 };
 
+<<<<<<< HEAD
 export type StaticPageContent = {
   eyebrow: string;
   title: string;
@@ -87,6 +91,8 @@ export type StaticPageContent = {
   seo: SeoContent;
 };
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 export type FooterContent = {
   description: string;
   phone: string;
@@ -114,6 +120,7 @@ export type SiteContent = {
     viewAllHref: string;
   };
   developments: Development[];
+<<<<<<< HEAD
   pages: {
     designBuild: StaticPageContent;
     visionProcess: StaticPageContent;
@@ -126,5 +133,8 @@ export type SiteContent = {
     about: SeoContent;
     landWanted: SeoContent;
   };
+=======
+  landWanted: LandWantedContent;
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   footer: FooterContent;
 };

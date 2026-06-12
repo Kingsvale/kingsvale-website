@@ -39,6 +39,7 @@ export function saveLocalTrackingSites(sites: TrackingSite[]) {
 }
 
 export function upsertLocalTrackingSite(site: TrackingSite): TrackingSite {
+<<<<<<< HEAD
   const sites = loadLocalTrackingSites();
   const nextSite = normalizeTrackingSite({
     ...site,
@@ -46,11 +47,19 @@ export function upsertLocalTrackingSite(site: TrackingSite): TrackingSite {
     updatedAt: new Date().toISOString()
   });
   const validation = validateTrackingSite(nextSite);
+=======
+  const validation = validateTrackingSite(site);
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   if (!validation.valid) {
     throw new Error("Tracking site is invalid and cannot be saved.");
   }
 
+<<<<<<< HEAD
   ensureUniqueReference(nextSite, sites);
+=======
+  const sites = loadLocalTrackingSites();
+  const nextSite = { ...site, updatedAt: new Date().toISOString() };
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   const nextSites = sites.some((item) => item.id === site.id)
     ? sites.map((item) => (item.id === site.id ? nextSite : item))
     : [nextSite, ...sites];
@@ -76,6 +85,7 @@ export function findLocalTrackingSiteByToken(token: string): TrackingSite | null
 
 export function createTrackingSite(): TrackingSite {
   const now = new Date().toISOString();
+<<<<<<< HEAD
   const reference = nextTrackingReference(loadLocalTrackingSites());
   return {
     id: `tracking-${Date.now()}-${randomPart(4)}`,
@@ -92,6 +102,24 @@ export function createTrackingSite(): TrackingSite {
     statusNote: "Kingsvale is reviewing this land interest opportunity.",
     milestones: [
       createMilestone("Land interest area prepared", "active")
+=======
+  return {
+    id: `tracking-${Date.now()}-${randomPart(4)}`,
+    token: generateTrackingToken(),
+    title: "New customer tracking page",
+    customerName: "",
+    siteAddress: "Site address",
+    reference: "",
+    summary: "Track the planning and construction progress for this Kingsvale project.",
+    currentStatus: "planning",
+    statusNote: "Initial details are being prepared by the Kingsvale team.",
+    milestones: [
+      createMilestone("Planning details prepared", "active"),
+      createMilestone("Application submitted", "pending"),
+      createMilestone("Council review", "pending"),
+      createMilestone("Decision issued", "pending"),
+      createMilestone("Construction progress", "pending")
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     ],
     resources: [],
     qrStyle: defaultQrStyle(),
@@ -103,7 +131,10 @@ export function createTrackingSite(): TrackingSite {
       lastCheckedAt: null,
       lastSyncStatus: "Not configured"
     },
+<<<<<<< HEAD
     localAuthority: "Uncategorised",
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     createdAt: now,
     updatedAt: now,
     archived: false
@@ -121,10 +152,13 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
   const defaultStyle = defaultQrStyle();
   return {
     ...site,
+<<<<<<< HEAD
     reference: normalizeReference(site.reference ?? ""),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     searchlandUrl: site.searchlandUrl ?? "",
     privateNotes: site.privateNotes ?? "",
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? defaultStyle.foreground,
@@ -144,8 +178,12 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
       apiBaseUrl: site.council?.apiBaseUrl ?? "",
       lastCheckedAt: site.council?.lastCheckedAt ?? null,
       lastSyncStatus: site.council?.lastSyncStatus ?? "Not configured"
+<<<<<<< HEAD
     },
     localAuthority: site.localAuthority || detectLocalAuthority(site.siteAddress) || "Uncategorised"
+=======
+    }
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   };
 }
 
@@ -181,11 +219,16 @@ export function defaultQrStyle(): TrackingQrStyle {
     finderRoundness: 24,
     frameRoundness: 42,
     frameCut: 0,
+<<<<<<< HEAD
     frameLabel: "Scan to view the plot",
+=======
+    frameLabel: "Scan for project updates",
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     includeLogo: true
   };
 }
 
+<<<<<<< HEAD
 export function normalizeMapEmbedInput(value: string) {
   const trimmed = value.trim();
   const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
@@ -259,6 +302,8 @@ function preferSatelliteMap(value: string) {
   return value;
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 export function trackingStatusClass(status: TrackingStatus) {
   return `tracking-status--${status.replace(/[^a-z0-9]+/g, "-")}`;
 }
@@ -280,6 +325,7 @@ export function generateTrackingToken() {
 function randomPart(length: number) {
   return Math.random().toString(36).slice(2, 2 + length);
 }
+<<<<<<< HEAD
 
 function decodeHtmlAttribute(value: string) {
   return value
@@ -289,3 +335,5 @@ function decodeHtmlAttribute(value: string) {
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">");
 }
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d

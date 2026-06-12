@@ -56,16 +56,22 @@ export type TrackingSite = {
   siteAddress: string;
   reference: string;
   summary: string;
+<<<<<<< HEAD
   mapEmbedUrl: string;
   searchlandUrl: string;
   privateNotes: string;
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   currentStatus: TrackingStatus;
   statusNote: string;
   milestones: TrackingMilestone[];
   resources: TrackingResource[];
   qrStyle: TrackingQrStyle;
   council: CouncilSyncSettings;
+<<<<<<< HEAD
   localAuthority: string;
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   createdAt: string;
   updatedAt: string;
   archived: boolean;

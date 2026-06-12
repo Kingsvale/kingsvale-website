@@ -71,7 +71,11 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByText("Riverstone Mews")).toBeVisible();
 });
 
+<<<<<<< HEAD
 test("creates a land interest map page and opens the generated link", async ({ page }) => {
+=======
+test("creates a customer tracking site and opens the generated link", async ({ page }) => {
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   await page.goto(studioPath);
   await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
   await page.getByRole("button", { name: "Unlock studio" }).click();
@@ -82,6 +86,7 @@ test("creates a land interest map page and opens the generated link", async ({ p
   await expect(page.getByLabel("QR code preview")).toBeVisible();
   await setRangeValue(page, "Finder roundness", "86");
   await setRangeValue(page, "Cut corners", "34");
+<<<<<<< HEAD
   await page.getByLabel("Site title").fill("Oakdene title area");
   await page.getByLabel("Site address").fill("12 Meadow Lane");
   await page
@@ -92,17 +97,35 @@ test("creates a land interest map page and opens the generated link", async ({ p
   await page.getByLabel(/Resource 1 URL/).fill("https://example.com/title-plan.pdf");
   await page.getByRole("button", { name: "Save site" }).click();
   await expect(page.getByText("Map page saved.")).toBeVisible();
+=======
+  await page.getByLabel("Site title").fill("Oakdene planning tracker");
+  await page.getByLabel("Site address").fill("12 Meadow Lane");
+  await page.getByLabel("Apply status template").selectOption("construction");
+  await page.getByRole("button", { name: "Add resource" }).click();
+  await page.getByLabel(/Resource 1 title/).fill("Planning pack");
+  await page.getByLabel(/Resource 1 URL/).fill("https://example.com/planning-pack.pdf");
+  await page.getByRole("button", { name: "Save site" }).click();
+  await expect(page.getByText("Tracking page saved.")).toBeVisible();
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 
   const trackingLink = await page.getByTestId("generated-tracking-link").inputValue();
   expect(trackingLink).toContain("/track/");
 
   await page.goto(trackingLink);
+<<<<<<< HEAD
   await expect(page.getByRole("heading", { name: "Oakdene title area" })).toBeVisible();
   await expect(page.getByText("12 Meadow Lane")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Title area visualisation" })).toBeVisible();
   await expect(page.locator('iframe[title="Oakdene title area map"]')).toBeVisible();
   await expect(page.getByRole("heading", { name: "Supporting information" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Title plan" })).toBeVisible();
+=======
+  await expect(page.getByRole("heading", { name: "Oakdene planning tracker" })).toBeVisible();
+  await expect(page.getByText("12 Meadow Lane")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Milestones" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Images and documents" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Planning pack" })).toBeVisible();
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 });
 
 test("mobile navigation is keyboard and touch accessible", async ({ page, isMobile }) => {

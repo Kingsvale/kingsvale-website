@@ -5,6 +5,7 @@ import { createTrackingSite, upsertLocalTrackingSite } from "../lib/trackingStor
 import { TrackingPage } from "./TrackingPage";
 
 describe("TrackingPage", () => {
+<<<<<<< HEAD
   it("renders a public land interest map page by secret token", async () => {
     const site = upsertLocalTrackingSite({
       ...createTrackingSite(),
@@ -21,6 +22,24 @@ describe("TrackingPage", () => {
           title: "Title plan",
           url: "https://example.com/title-plan.pdf",
           note: "Reference document for the outlined area."
+=======
+  it("renders a public tracking page by secret token", async () => {
+    const site = upsertLocalTrackingSite({
+      ...createTrackingSite(),
+      title: "Oakdene planning tracker",
+      customerName: "Avery Stone",
+      siteAddress: "12 Meadow Lane",
+      reference: "KV-2401",
+      currentStatus: "submitted",
+      statusNote: "The planning application has been submitted for council review.",
+      resources: [
+        {
+          id: "resource-plan",
+          type: "document",
+          title: "Planning pack",
+          url: "https://example.com/planning-pack.pdf",
+          note: "Latest shared planning document."
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
         }
       ]
     });
@@ -28,6 +47,7 @@ describe("TrackingPage", () => {
     render(<TrackingPage content={defaultContent} token={site.token} />);
 
     await waitFor(() => {
+<<<<<<< HEAD
       expect(screen.getByRole("heading", { name: "Oakdene title area" })).toBeVisible();
     });
     expect(screen.getByText("12 Meadow Lane")).toBeVisible();
@@ -37,5 +57,14 @@ describe("TrackingPage", () => {
     expect(screen.getByTitle("Oakdene title area map")).toHaveAttribute("src", site.mapEmbedUrl);
     expect(screen.getByRole("heading", { name: "Supporting information" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Title plan" })).toBeVisible();
+=======
+      expect(screen.getByRole("heading", { name: "Oakdene planning tracker" })).toBeVisible();
+    });
+    expect(screen.getByText("12 Meadow Lane")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Submitted" })).toBeVisible();
+    expect(screen.getByText(/planning application has been submitted/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Images and documents" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Planning pack" })).toBeVisible();
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   });
 });

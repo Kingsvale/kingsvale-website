@@ -31,7 +31,10 @@ import type {
   IconKey,
   ImageAsset,
   NavLink,
+<<<<<<< HEAD
   SeoContent,
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   SiteContent
 } from "../lib/contentTypes";
 import {
@@ -94,6 +97,7 @@ const editorSections = [
   { id: "hero", label: "Hero" },
   { id: "brand", label: "Brand" },
   { id: "features", label: "Features" },
+<<<<<<< HEAD
   { id: "design", label: "Design & Build" },
   { id: "vision", label: "Vision & Process" },
   { id: "legacy", label: "About" },
@@ -101,6 +105,11 @@ const editorSections = [
   { id: "land", label: "Land" },
   { id: "contact", label: "Contact" },
   { id: "seo", label: "SEO" },
+=======
+  { id: "legacy", label: "Legacy" },
+  { id: "developments", label: "Developments" },
+  { id: "land", label: "Land" },
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   { id: "footer", label: "Footer" }
 ] as const;
 
@@ -485,6 +494,7 @@ export function AdminPage({
           </EditorPanel>
           )}
 
+<<<<<<< HEAD
           {activePanel === "design" && (
           <StaticPageEditor
             title="Design & Build Services page"
@@ -506,6 +516,11 @@ export function AdminPage({
           {activePanel === "legacy" && (
           <EditorialEditor
             title="About Us page"
+=======
+          {activePanel === "legacy" && (
+          <EditorialEditor
+            title="Legacy section"
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
             id="editor-panel-legacy"
             content={draft.about}
             path="about"
@@ -611,6 +626,7 @@ export function AdminPage({
           />
           )}
 
+<<<<<<< HEAD
           {activePanel === "contact" && (
           <StaticPageEditor
             title="Contact page"
@@ -661,6 +677,8 @@ export function AdminPage({
           </EditorPanel>
           )}
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           {activePanel === "footer" && (
           <EditorPanel title="Footer" id="editor-panel-footer">
             <Textarea
@@ -1006,6 +1024,7 @@ function FeatureEditor({
   );
 }
 
+<<<<<<< HEAD
 function StaticPageEditor({
   title,
   id,
@@ -1134,6 +1153,8 @@ function SeoEditor({
   );
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function EditorialEditor({
   title,
   id,

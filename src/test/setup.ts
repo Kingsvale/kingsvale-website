@@ -50,6 +50,7 @@ Object.defineProperty(window, "matchMedia", {
   }))
 });
 
+<<<<<<< HEAD
 if (typeof window.localStorage.clear !== "function") {
   const store = new Map<string, string>();
 
@@ -72,6 +73,8 @@ if (typeof window.localStorage.clear !== "function") {
   });
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 beforeEach(() => {
   window.localStorage.clear();
 });

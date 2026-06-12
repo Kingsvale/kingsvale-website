@@ -1,5 +1,10 @@
 import {
   AlertCircle,
+<<<<<<< HEAD
+=======
+  Building2,
+  CheckCircle2,
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   Clock,
   ExternalLink,
   FileText,
@@ -11,8 +16,17 @@ import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
 import { fetchTrackingSiteByToken } from "../lib/publicTrackingApi";
+<<<<<<< HEAD
 import {
   trackingResourceLabels,
+=======
+import { trackingStatusClass } from "../lib/trackingStorage";
+import {
+  trackingMilestoneLabels,
+  trackingResourceLabels,
+  trackingStatusLabels,
+  type TrackingMilestoneState,
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   type TrackingResource,
   type TrackingSite
 } from "../lib/trackingTypes";
@@ -57,8 +71,13 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
         <section className="tracking-empty" aria-labelledby="tracking-missing-title">
           <Logo brandName={content.brandName} brandSuffix={content.brandSuffix} />
           <AlertCircle aria-hidden="true" />
+<<<<<<< HEAD
           <h1 id="tracking-missing-title">Map link unavailable.</h1>
           <p>This private plot map link may have expired, been archived, or been typed incorrectly.</p>
+=======
+          <h1 id="tracking-missing-title">Tracking link unavailable.</h1>
+          <p>This private project link may have expired, been archived, or been typed incorrectly.</p>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           <a className="button-link button-link--dark" href="/">
             Return to Kingsvale
           </a>
@@ -71,12 +90,22 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
     <main className="tracking-page">
       <header className="tracking-header">
         <Logo brandName={content.brandName} brandSuffix={content.brandSuffix} />
+<<<<<<< HEAD
         <a href="/" className="tracking-header__home">Kingsvale Homes</a>
+=======
+        <span className={`tracking-status ${trackingStatusClass(site.currentStatus)}`}>
+          {trackingStatusLabels[site.currentStatus]}
+        </span>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       </header>
 
       <section className="tracking-hero" aria-labelledby="tracking-title">
         <div>
+<<<<<<< HEAD
           <p className="eyebrow">Land interest map</p>
+=======
+          <p className="eyebrow">Customer project tracker</p>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           <h1 id="tracking-title">{site.title}</h1>
           <p>{site.summary}</p>
         </div>
@@ -87,7 +116,11 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
           </div>
           {site.customerName && (
             <div>
+<<<<<<< HEAD
               <dt><Home aria-hidden="true" /> Recipient</dt>
+=======
+              <dt><Home aria-hidden="true" /> Customer</dt>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
               <dd>{site.customerName}</dd>
             </div>
           )}
@@ -100,6 +133,7 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
         </dl>
       </section>
 
+<<<<<<< HEAD
       <section className="tracking-current tracking-current--map" aria-labelledby="tracking-current-title">
         <div>
           <p className="eyebrow">Plot outline</p>
@@ -109,10 +143,18 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
             Call {content.footer.phone}
             {site.reference ? <span>Quote reference {site.reference}</span> : null}
           </a>
+=======
+      <section className="tracking-current" aria-labelledby="tracking-current-title">
+        <div>
+          <p className="eyebrow">Current update</p>
+          <h2 id="tracking-current-title">{trackingStatusLabels[site.currentStatus]}</h2>
+          <p>{site.statusNote}</p>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
         </div>
         <span>Updated {new Date(site.updatedAt).toLocaleString()}</span>
       </section>
 
+<<<<<<< HEAD
       <section className="tracking-map-section">
         <div className="section-heading">
           <p className="eyebrow">Interactive map</p>
@@ -133,13 +175,62 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
             <p>Kingsvale has not added the plot outline map to this page yet.</p>
           </div>
         )}
+=======
+      <section className="tracking-grid" aria-label="Project progress">
+        <div className="tracking-panel">
+          <h2>Milestones</h2>
+          <ol className="tracking-timeline">
+            {site.milestones.map((milestone) => (
+              <li key={milestone.id} className={`tracking-timeline__item tracking-timeline__item--${milestone.state}`}>
+                <span>{milestoneIcon(milestone.state)}</span>
+                <div>
+                  <strong>{milestone.label}</strong>
+                  <small>
+                    {trackingMilestoneLabels[milestone.state]}
+                    {milestone.date ? ` · ${new Date(milestone.date).toLocaleDateString()}` : ""}
+                  </small>
+                  {milestone.note && <p>{milestone.note}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <aside className="tracking-panel tracking-council">
+          <Building2 aria-hidden="true" />
+          <h2>Council application</h2>
+          <p>
+            {site.council.mode === "configured"
+              ? `${site.council.councilName || "Council"} reference ${site.council.applicationReference || "pending"}.`
+              : "Manual Kingsvale updates are active for this project."}
+          </p>
+          <dl>
+            <div>
+              <dt>Sync status</dt>
+              <dd>{site.council.lastSyncStatus}</dd>
+            </div>
+            <div>
+              <dt>Last checked</dt>
+              <dd>
+                {site.council.lastCheckedAt
+                  ? new Date(site.council.lastCheckedAt).toLocaleString()
+                  : "Not yet checked"}
+              </dd>
+            </div>
+          </dl>
+        </aside>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       </section>
 
       {site.resources.length > 0 && (
         <section className="tracking-resources" aria-labelledby="tracking-resources-title">
           <div className="section-heading">
             <p className="eyebrow">Shared resources</p>
+<<<<<<< HEAD
             <h2 id="tracking-resources-title">Supporting information</h2>
+=======
+            <h2 id="tracking-resources-title">Images and documents</h2>
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
           </div>
           <div className="tracking-resources__grid">
             {site.resources.map((resource) => (
@@ -181,3 +272,18 @@ function TrackingResourceCard({ resource }: { resource: TrackingResource }) {
     </article>
   );
 }
+<<<<<<< HEAD
+=======
+
+function milestoneIcon(state: TrackingMilestoneState) {
+  if (state === "complete") {
+    return <CheckCircle2 aria-hidden="true" />;
+  }
+
+  if (state === "blocked") {
+    return <AlertCircle aria-hidden="true" />;
+  }
+
+  return <Clock aria-hidden="true" />;
+}
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d

@@ -3,8 +3,13 @@ import { studioRoute } from "./studioRoute";
 import { verifyStudioPassphrase } from "./studioSecurity";
 
 describe("studio security", () => {
+<<<<<<< HEAD
   it("uses the public Studio route requested for deployment", () => {
     expect(studioRoute).toBe("studio");
+=======
+  it("uses a 16-character generated studio route", () => {
+    expect(studioRoute).toMatch(/^[a-f0-9]{16}$/);
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   });
 
   it("verifies the configured passphrase without storing plaintext", async () => {

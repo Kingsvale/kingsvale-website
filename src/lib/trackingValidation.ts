@@ -25,10 +25,13 @@ export const trackingFieldLimits = {
   reference: 64,
   summary: 240,
   statusNote: 320,
+<<<<<<< HEAD
   mapEmbedUrl: 1200,
   searchlandUrl: 900,
   privateNotes: 2000,
   localAuthority: 90,
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   councilName: 90,
   applicationReference: 80,
   apiBaseUrl: 180,
@@ -76,6 +79,7 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     "Site address",
     trackingFieldLimits.siteAddress
   );
+<<<<<<< HEAD
   addRequiredTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
   if (site.reference && !/^KV\d{4,}$/.test(site.reference)) {
     errors.push({ path: "reference", message: "Reference must use the KV0001 format." });
@@ -85,6 +89,10 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
   addOptionalTextError(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", trackingFieldLimits.searchlandUrl);
   addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private notes", trackingFieldLimits.privateNotes);
   addOptionalTextError(errors, "localAuthority", site.localAuthority, "Local authority", trackingFieldLimits.localAuthority);
+=======
+  addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
+  addOptionalTextError(errors, "summary", site.summary, "Summary", trackingFieldLimits.summary);
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   addRequiredTextError(
     errors,
     "statusNote",
@@ -155,6 +163,7 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     errors.push({ path: "council.apiBaseUrl", message: "Council API URL must be an HTTP URL." });
   }
 
+<<<<<<< HEAD
   if (site.mapEmbedUrl && !isValidMapEmbedUrl(site.mapEmbedUrl)) {
     errors.push({
       path: "mapEmbedUrl",
@@ -166,6 +175,8 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     errors.push({ path: "searchlandUrl", message: "Searchland URL must be an HTTP URL." });
   }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   return {
     valid: errors.length === 0,
     errors
@@ -340,6 +351,7 @@ function isValidResourceUrl(value: string) {
   return isValidHttpUrl(value);
 }
 
+<<<<<<< HEAD
 function isValidMapEmbedUrl(value: string) {
   try {
     const parsed = new URL(value);
@@ -358,6 +370,8 @@ function isValidMapEmbedUrl(value: string) {
   }
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function isHexColor(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value);
 }

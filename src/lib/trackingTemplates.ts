@@ -2,6 +2,10 @@ import { createMilestone } from "./trackingStorage";
 import type { TrackingSite, TrackingStatus } from "./trackingTypes";
 
 export type TrackingTemplateId =
+<<<<<<< HEAD
+=======
+  | "planning-application"
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   | "construction"
   | "snagging-handover";
 
@@ -19,6 +23,23 @@ export type TrackingStatusTemplate = {
 
 export const trackingStatusTemplates: TrackingStatusTemplate[] = [
   {
+<<<<<<< HEAD
+=======
+    id: "planning-application",
+    label: "Planning application",
+    status: "submitted",
+    summary: "Track planning submission, council review and the next decision point.",
+    statusNote: "The planning application has been submitted and is waiting for council review.",
+    milestones: [
+      { label: "Planning pack prepared", state: "complete" },
+      { label: "Application submitted", state: "active" },
+      { label: "Council validation", state: "pending" },
+      { label: "Public consultation", state: "pending" },
+      { label: "Decision issued", state: "pending" }
+    ]
+  },
+  {
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     id: "construction",
     label: "Construction",
     status: "construction",

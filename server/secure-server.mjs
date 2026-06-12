@@ -34,7 +34,11 @@ const auditDir = dataDir;
 const cmsStoreFile = join(cmsDir, "content.json");
 const trackingStoreFile = join(trackingDir, "sites.json");
 const analyticsStoreFile = join(analyticsDir, "visits.json");
+<<<<<<< HEAD
 const studioPath = "/studio";
+=======
+const studioPath = "/251db172b850d056";
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 const port = Number(process.env.PORT ?? 4173);
 const studioUser = process.env.STUDIO_USER ?? "kingsvale";
 const studioPassword = process.env.STUDIO_PASSWORD;
@@ -67,7 +71,11 @@ const mimeTypes = {
 
 const securityHeaders = {
   "Content-Security-Policy":
+<<<<<<< HEAD
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; frame-src https://www.google.com https://*.google.com https://earth.google.com; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
+=======
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -288,11 +296,14 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
+<<<<<<< HEAD
   if (url.pathname.startsWith("/api/tracking-sites/by-reference/")) {
     await handleTrackingSiteReferenceLookup(request, response, url);
     return;
   }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   if (url.pathname.startsWith("/api/tracking-sites/")) {
     await handleTrackingSiteItem(request, response, url);
     return;
@@ -690,17 +701,25 @@ async function handleTrackingSitesCollection(request, response) {
     }
 
     const payload = await readJsonBody(request, 90_000);
+<<<<<<< HEAD
     const site = normalizeTrackingSite(payload.site ?? {});
     const store = await readTrackingStore();
     if (!site.reference) {
       site.reference = `KV${String(maxTrackingReference(store.sites) + 1).padStart(4, "0")}`;
     }
+=======
+    const site = payload.site;
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const validation = validateTrackingSite(site);
     if (!validation.valid) {
       sendJson(response, 400, { errors: validation.errors });
       return;
     }
 
+<<<<<<< HEAD
+=======
+    const store = await readTrackingStore();
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const existingTokenOwner = store.sites.find(
       (item) => item.token === site.token && item.id !== site.id
     );
@@ -709,6 +728,7 @@ async function handleTrackingSitesCollection(request, response) {
       return;
     }
 
+<<<<<<< HEAD
     const existingReferenceOwner = store.sites.find(
       (item) => item.reference === site.reference && item.id !== site.id
     );
@@ -717,6 +737,8 @@ async function handleTrackingSitesCollection(request, response) {
       return;
     }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     const now = new Date().toISOString();
     const savedSite = {
       ...site,
@@ -744,7 +766,11 @@ async function handleTrackingSiteItem(request, response, url) {
   if (!action && request.method === "GET") {
     const store = await readTrackingStore();
     const site = store.sites.find((item) => item.token === decodedIdOrToken && !item.archived);
+<<<<<<< HEAD
     sendJson(response, site ? 200 : 404, { site: site ? publicTrackingSite(site) : null });
+=======
+    sendJson(response, site ? 200 : 404, { site: site ?? null });
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     return;
   }
 
@@ -807,6 +833,7 @@ async function handleTrackingSiteItem(request, response, url) {
   sendJson(response, 405, { error: "Method not allowed." });
 }
 
+<<<<<<< HEAD
 async function handleTrackingSiteReferenceLookup(request, response, url) {
   const session = requireSession(request, response);
   if (!session) {
@@ -840,6 +867,8 @@ async function handleTrackingSiteReferenceLookup(request, response, url) {
   });
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 async function handleAnalyticsVisit(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Method not allowed." });
@@ -1053,6 +1082,7 @@ async function readTrackingStore() {
   try {
     const raw = await readFile(trackingStoreFile, "utf8");
     const parsed = decodeCmsStore(raw);
+<<<<<<< HEAD
     const rawSites = Array.isArray(parsed.sites) ? parsed.sites : [];
     let nextReferenceNumber = maxTrackingReference(rawSites) + 1;
     const sites = rawSites
@@ -1065,6 +1095,11 @@ async function readTrackingStore() {
         return site;
       })
       .filter((site) => validateTrackingSite(site).valid);
+=======
+    const sites = Array.isArray(parsed.sites)
+      ? parsed.sites.map(normalizeTrackingSite).filter((site) => validateTrackingSite(site).valid)
+      : [];
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     return {
       sites,
       updatedAt: parsed.updatedAt ?? null
@@ -1312,6 +1347,7 @@ function validateTrackingSite(site) {
   }
 
   validateText(errors, "title", site.title, "Site title", 72);
+<<<<<<< HEAD
     validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
     validateText(errors, "statusNote", site.statusNote, "Status note", 320);
     validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
@@ -1330,6 +1366,13 @@ function validateTrackingSite(site) {
   if (site.searchlandUrl && !isSafeHttpUrl(site.searchlandUrl)) {
     errors.push({ path: "searchlandUrl", message: "Searchland URL must be an HTTP URL." });
   }
+=======
+  validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
+  validateText(errors, "statusNote", site.statusNote, "Status note", 320);
+  validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
+  validateOptionalText(errors, "reference", site.reference, "Reference", 64);
+  validateOptionalText(errors, "summary", site.summary, "Summary", 240);
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 
   if (!["planning", "submitted", "in-review", "approved", "construction", "complete", "on-hold"].includes(site.currentStatus)) {
     errors.push({ path: "currentStatus", message: "Choose an approved status." });
@@ -1405,10 +1448,13 @@ function normalizeTrackingSite(site) {
   const council = site.council ?? {};
   return {
     ...site,
+<<<<<<< HEAD
     reference: normalizeReference(site.reference ?? ""),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     searchlandUrl: site.searchlandUrl ?? "",
     privateNotes: site.privateNotes ?? "",
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? "#22211d",
@@ -1418,7 +1464,11 @@ function normalizeTrackingSite(site) {
       finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
       frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
       frameCut: numberOrFallback(qrStyle.frameCut, qrStyle.frameStyle === "cut-corner" ? 36 : 0),
+<<<<<<< HEAD
       frameLabel: qrStyle.frameLabel ?? "Scan to view the plot",
+=======
+      frameLabel: qrStyle.frameLabel ?? "Scan for project updates",
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
       includeLogo: qrStyle.includeLogo ?? true
     },
     council: {
@@ -1428,8 +1478,12 @@ function normalizeTrackingSite(site) {
       apiBaseUrl: council.apiBaseUrl ?? "",
       lastCheckedAt: council.lastCheckedAt ?? null,
       lastSyncStatus: council.lastSyncStatus ?? "Not configured"
+<<<<<<< HEAD
     },
     localAuthority: site.localAuthority || detectLocalAuthority(site.siteAddress) || "Uncategorised"
+=======
+    }
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
   };
 }
 
@@ -1648,6 +1702,7 @@ function isSafeImageSource(value) {
   }
 }
 
+<<<<<<< HEAD
 function isSafeMapEmbedUrl(value) {
   try {
     const url = new URL(value);
@@ -1743,6 +1798,8 @@ function publicTrackingSite(site) {
   return publicSite;
 }
 
+=======
+>>>>>>> ee14dfe16a5937e35e3aa5ae2ce7bcd0609ea05d
 function isEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
