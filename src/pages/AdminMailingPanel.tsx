@@ -1,4 +1,4 @@
-import { Clock, Mail, RefreshCw, Save, Search } from "lucide-react";
+import { Clock, ExternalLink, FileText, Mail, RefreshCw, Save, Search } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   checkMailingTrackingStatus,
@@ -26,7 +26,7 @@ const defaultReminderStorageKey = "kingsvale-mailing-default-reminder-days-v1";
 
 type SortMode = "priority" | "reminder" | "updated";
 
-export function AdminMailingPanel() {
+export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: string }) {
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
@@ -76,7 +76,6 @@ export function AdminMailingPanel() {
           site.title,
           site.siteAddress,
           site.customerName,
-          site.ownerContactName,
           site.royalMailTrackingNumber,
           site.mailingNotes
         ].some((value) => value.toLowerCase().includes(normalizedQuery));
@@ -84,6 +83,17 @@ export function AdminMailingPanel() {
       sortMode
     );
   }, [priorityFilter, query, sites, sortMode, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedSiteId) {
+      return;
+    }
+    const selected = sites.find((site) => site.id === selectedSiteId);
+    if (selected) {
+      setDraft(structuredClone(selected));
+      setStatus("Mailing details opened from Sites.");
+    }
+  }, [selectedSiteId, sites]);
 
   const reminders = useMemo(
     () => visibleSites.filter((site) => isRemailReminderOverdue(site)),
@@ -152,6 +162,33 @@ export function AdminMailingPanel() {
     const next = Math.min(120, Math.max(1, Math.trunc(value || 14)));
     setDefaultReminderDays(next);
     window.localStorage.setItem(defaultReminderStorageKey, String(next));
+  }
+
+  async function handleLetterUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!isAllowedLetterFile(file)) {
+      setStatus("Letter upload must be a PDF, image or Word document under 5MB.");
+      return;
+    }
+
+    const dataUrl = await readFileAsDataUrl(file);
+    updateDraft((site) => {
+      site.letterFileName = file.name;
+      site.letterFileUrl = dataUrl;
+    });
+    setStatus("Letter attached. Save mailing to keep it.");
+  }
+
+  function clearLetterUpload() {
+    updateDraft((site) => {
+      site.letterFileName = "";
+      site.letterFileUrl = "";
+    });
+    setStatus("Letter removed. Save mailing to keep this change.");
   }
 
   return (
@@ -279,20 +316,12 @@ export function AdminMailingPanel() {
                 </span>
               </div>
 
-              <div className="admin-grid admin-grid--two">
-                <TextInput
-                  label="Owner/contact name"
-                  value={draft.ownerContactName}
-                  maxLength={trackingFieldLimits.ownerContactName}
-                  onChange={(value) => updateDraft((site) => { site.ownerContactName = value; })}
-                />
-                <SelectField
-                  label="Contact priority"
-                  value={draft.contactPriority}
-                  onChange={(value) => updateDraft((site) => { site.contactPriority = value as ContactPriority; })}
-                  options={contactPriorities.map((item) => [item, contactPriorityLabels[item]] as const)}
-                />
-              </div>
+              <SelectField
+                label="Contact priority"
+                value={draft.contactPriority}
+                onChange={(value) => updateDraft((site) => { site.contactPriority = value as ContactPriority; })}
+                options={contactPriorities.map((item) => [item, contactPriorityLabels[item]] as const)}
+              />
 
               <div className="admin-grid admin-grid--two">
                 <SelectField
@@ -366,6 +395,38 @@ export function AdminMailingPanel() {
                   <RefreshCw aria-hidden="true" />
                   Check tracking
                 </button>
+              </div>
+
+              <div className="letter-upload">
+                <div>
+                  <FileText aria-hidden="true" />
+                  <span>
+                    <strong>{draft.letterFileName || "No letter uploaded"}</strong>
+                    <small>Shared with the Sites editor only, not the public map page.</small>
+                  </span>
+                </div>
+                <div className="letter-upload__actions">
+                  {draft.letterFileUrl && (
+                    <a href={draft.letterFileUrl} download={draft.letterFileName || "letter"} className="admin-open">
+                      <ExternalLink aria-hidden="true" />
+                      Open
+                    </a>
+                  )}
+                  <label className="admin-small">
+                    Upload letter
+                    <input
+                      className="sr-only"
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) => void handleLetterUpload(event.target.files)}
+                    />
+                  </label>
+                  {draft.letterFileUrl && (
+                    <button type="button" className="admin-ghost" onClick={clearLetterUpload}>
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
 
               <label className="admin-field" htmlFor="mailing-notes">
@@ -515,6 +576,27 @@ function readDefaultReminderDays() {
   }
   const parsed = Number(window.localStorage.getItem(defaultReminderStorageKey));
   return Number.isFinite(parsed) && parsed >= 1 && parsed <= 120 ? Math.trunc(parsed) : 14;
+}
+
+function isAllowedLetterFile(file: File) {
+  const allowedTypes = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ]);
+  return file.size <= 5_000_000 && allowedTypes.has(file.type);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("File could not be read.")));
+    reader.readAsDataURL(file);
+  });
 }
 
 function toId(label: string) {

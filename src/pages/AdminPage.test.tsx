@@ -19,13 +19,14 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
-  it("exposes Website, Sites, Mailing and Analytics studio tabs", async () => {
+  it("exposes Website, Sites, Mailing, Analytics and Backup studio tabs", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     expect(screen.getByRole("tab", { name: "Website" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Sites" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Mailing" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Analytics" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Backup" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Content editor" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Mailing" }));
@@ -36,6 +37,12 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Analytics" }));
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "Website analytics" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Backup" }));
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Backup and restore" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Export full backup/i })).toBeInTheDocument();
     });
   });
 
@@ -104,28 +111,50 @@ describe("AdminPage", () => {
     expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
   });
 
-  it("applies status templates and supports customer resources", async () => {
+  it("configures plot map pages and supports customer resources", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
     fireEvent.click(screen.getByRole("button", { name: /create site/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Apply status template")).toBeInTheDocument();
+      expect(screen.getByLabelText(/Google My Maps embed URL or iframe/)).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Apply status template"), {
-      target: { value: "construction" }
+    expect(screen.queryByLabelText(/Owner\/contact name/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Summary/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Private notes/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Searchland URL/)).toBeInTheDocument();
+    expect(screen.getByText("No letter uploaded")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Site address"), {
+      target: { value: "12 Meadow Lane, Wokingham" }
     });
-    expect(screen.getByLabelText("Current status")).toHaveValue("construction");
-    expect(screen.getByLabelText(/Milestone 1 label/)).toHaveValue("Site setup");
+    expect(screen.getByLabelText(/Folder \/ region/)).toHaveValue("Wokingham");
+
+    fireEvent.change(screen.getByLabelText(/Searchland URL/), {
+      target: {
+        value:
+          "https://app.searchland.co.uk/preview?token=c59efd5d-7ae6-46f7-b4de-f52eceee6e0e&titleNo=HP892254&custom=false"
+      }
+    });
+
+    fireEvent.change(screen.getByLabelText(/Google My Maps embed URL or iframe/), {
+      target: {
+        value:
+          '<iframe src="https://www.google.com/maps/d/embed?mid=abc123&ehbc=2E312F"></iframe>'
+      }
+    });
+    expect(screen.getByLabelText(/Google My Maps embed URL or iframe/)).toHaveValue(
+      "https://www.google.com/maps/d/embed?mid=abc123&ehbc=2E312F&basemap=satellite"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /add resource/i }));
     fireEvent.change(screen.getByLabelText(/Resource 1 title/), {
-      target: { value: "Planning pack" }
+      target: { value: "Title plan" }
     });
     fireEvent.change(screen.getByLabelText(/Resource 1 URL/), {
-      target: { value: "https://example.com/planning-pack.pdf" }
+      target: { value: "https://example.com/title-plan.pdf" }
     });
 
     expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();

@@ -29,6 +29,9 @@ const StudioAuthPage = lazy(() =>
 const TrackingPage = lazy(() =>
   import("./pages/TrackingPage").then((module) => ({ default: module.TrackingPage }))
 );
+const PlotLookupPage = lazy(() =>
+  import("./pages/PlotLookupPage").then((module) => ({ default: module.PlotLookupPage }))
+);
 
 export function App() {
   const content = useSiteContent();
@@ -71,6 +74,14 @@ export function App() {
     return (
       <RouteBoundary>
         <TrackingPage content={content} token={token ?? ""} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/plot-lookup") {
+    return (
+      <RouteBoundary>
+        <PlotLookupPage content={content} />
       </RouteBoundary>
     );
   }
@@ -169,7 +180,10 @@ function getRouteTitle(route: string) {
     return "Homepage";
   }
   if (route.startsWith("/track/")) {
-    return "Customer tracking page";
+    return "Plot map page";
+  }
+  if (route === "/plot-lookup") {
+    return "Plot lookup";
   }
 
   return route

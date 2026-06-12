@@ -5,22 +5,22 @@ import { createTrackingSite, upsertLocalTrackingSite } from "../lib/trackingStor
 import { TrackingPage } from "./TrackingPage";
 
 describe("TrackingPage", () => {
-  it("renders a public tracking page by secret token", async () => {
+  it("renders a public plot map page by secret token", async () => {
     const site = upsertLocalTrackingSite({
       ...createTrackingSite(),
-      title: "Oakdene planning tracker",
+      title: "Oakdene land interest",
       customerName: "Avery Stone",
       siteAddress: "12 Meadow Lane",
       reference: "KV-2401",
-      currentStatus: "submitted",
-      statusNote: "The planning application has been submitted for council review.",
+      statusNote: "Kingsvale is reviewing this land interest opportunity.",
+      mapEmbedUrl: "https://www.google.com/maps/d/embed?mid=abc123&basemap=satellite",
       resources: [
         {
           id: "resource-plan",
           type: "document",
-          title: "Planning pack",
-          url: "https://example.com/planning-pack.pdf",
-          note: "Latest shared planning document."
+          title: "Title plan",
+          url: "https://example.com/title-plan.pdf",
+          note: "Reference title document."
         }
       ]
     });
@@ -28,12 +28,16 @@ describe("TrackingPage", () => {
     render(<TrackingPage content={defaultContent} token={site.token} />);
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Oakdene planning tracker" })).toBeVisible();
+      expect(screen.getByRole("heading", { name: "Oakdene land interest" })).toBeVisible();
     });
     expect(screen.getByText("12 Meadow Lane")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Submitted" })).toBeVisible();
-    expect(screen.getByText(/planning application has been submitted/i)).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Images and documents" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Planning pack" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /View the area Kingsvale is interested in/i })).toBeVisible();
+    expect(screen.getByText(/land interest opportunity/i)).toBeVisible();
+    expect(screen.getByTitle("Oakdene land interest map")).toHaveAttribute(
+      "src",
+      "https://www.google.com/maps/d/embed?mid=abc123&basemap=satellite"
+    );
+    expect(screen.getByRole("heading", { name: "Supporting information" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Title plan" })).toBeVisible();
   });
 });

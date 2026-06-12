@@ -287,6 +287,43 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   }
 }
 
+export type KingsvaleBackup = {
+  kind: "kingsvale-full-backup";
+  version: number;
+  exportedAt: string;
+  stores: {
+    cms: unknown;
+    tracking: { sites: TrackingSite[]; updatedAt: string | null };
+    analytics: unknown;
+    leads: { contact: string; newsletter: string };
+  };
+};
+
+export async function exportFullBackup(): Promise<KingsvaleBackup> {
+  const response = await fetch("/api/backup", {
+    credentials: "same-origin",
+    headers: authHeaders({ Accept: "application/json" })
+  });
+  if (!response.ok) {
+    throw new Error("Backup could not be exported.");
+  }
+  const payload = (await response.json()) as { backup: KingsvaleBackup };
+  return payload.backup;
+}
+
+export async function importFullBackup(backup: KingsvaleBackup, mode: "replace" | "merge") {
+  const response = await fetch("/api/backup", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+    body: JSON.stringify({ backup, mode })
+  });
+  if (!response.ok) {
+    throw new Error("Backup could not be imported.");
+  }
+  return (await response.json()) as { ok: true; importedAt: string; mode: "replace" | "merge" };
+}
+
 function authHeaders(headers: Record<string, string> = {}) {
   return authToken
     ? { ...headers, Authorization: `Bearer ${authToken}` }

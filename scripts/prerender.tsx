@@ -26,6 +26,7 @@ const publicRoutes = [
   "/vision-process",
   "/about",
   "/land-wanted",
+  "/plot-lookup",
   "/contact",
   "/privacy",
   "/terms",

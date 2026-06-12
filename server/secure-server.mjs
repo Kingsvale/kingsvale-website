@@ -64,7 +64,7 @@ const mimeTypes = {
 
 const securityHeaders = {
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; frame-src https://www.google.com https://earth.google.com https://*.googleusercontent.com; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -234,8 +234,18 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/backup") {
+    await handleBackup(request, response);
+    return;
+  }
+
   if (url.pathname === "/api/tracking-sites") {
     await handleTrackingSitesCollection(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/tracking-sites/lookup") {
+    await handleTrackingSiteLookup(request, response);
     return;
   }
 
@@ -607,7 +617,7 @@ async function handleTrackingSitesCollection(request, response) {
   }
 
   if (request.method === "PUT") {
-    const payload = await readJsonBody(request, 90_000);
+    const payload = await readJsonBody(request, 8_000_000);
     const site = normalizeTrackingSite(payload.site ?? {});
     const validation = validateTrackingSite(site);
     if (!validation.valid) {
@@ -642,6 +652,30 @@ async function handleTrackingSitesCollection(request, response) {
   }
 
   sendJson(response, 405, { error: "Method not allowed." });
+}
+
+async function handleTrackingSiteLookup(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const payload = await readJsonBody(request, 10_000);
+  const reference = normalizeLookupText(payload.reference);
+  const postcode = normalizePostcode(payload.postcode);
+  if (!reference || !postcode) {
+    sendJson(response, 400, { error: "Reference and postcode are required." });
+    return;
+  }
+
+  const store = await readTrackingStore();
+  const site = store.sites.find((item) =>
+    !item.archived &&
+    normalizeLookupText(item.reference) === reference &&
+    extractPostcode(item.siteAddress) === postcode
+  );
+
+  sendJson(response, site ? 200 : 404, { site: site ? publicTrackingSite(site) : null });
 }
 
 async function handleTrackingSiteItem(request, response, url) {
@@ -778,6 +812,43 @@ async function handleAnalyticsSummary(request, response) {
   sendJson(response, 200, {
     summary: buildAnalyticsSummary(store.visits, store.updatedAt)
   });
+}
+
+async function handleBackup(request, response) {
+  const session = requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  if (request.method === "GET") {
+    const backup = await buildFullBackup();
+    await writeAudit("backup_exported", request, { user: session.user });
+    sendJson(response, 200, { backup });
+    return;
+  }
+
+  if (request.method === "PUT") {
+    const payload = await readJsonBody(request, 20_000_000);
+    const backup = payload.backup;
+    const mode = payload.mode === "merge" ? "merge" : "replace";
+    const validation = validateBackupPayload(backup);
+    if (!validation.valid) {
+      sendJson(response, 400, { errors: validation.errors });
+      return;
+    }
+
+    await mkdir(backupDir, { recursive: true });
+    await writeFile(
+      join(backupDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-before-import-${toSlug(session.user)}.json`),
+      JSON.stringify(await buildFullBackup(), null, 2)
+    );
+    await applyFullBackup(backup, mode);
+    await writeAudit("backup_imported", request, { user: session.user, mode });
+    sendJson(response, 200, { ok: true, importedAt: new Date().toISOString(), mode });
+    return;
+  }
+
+  sendJson(response, 405, { error: "Method not allowed." });
 }
 
 async function forwardLead(kind, record) {
@@ -989,6 +1060,84 @@ async function readAnalyticsStore() {
 async function writeAnalyticsStore(store) {
   await mkdir(analyticsDir, { recursive: true });
   await writeFile(analyticsStoreFile, encodeCmsStore(store));
+}
+
+async function buildFullBackup() {
+  return {
+    kind: "kingsvale-full-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    stores: {
+      cms: await readCmsStore(),
+      tracking: await readTrackingStore(),
+      analytics: await readAnalyticsStore(),
+      leads: await readLeadStores()
+    }
+  };
+}
+
+async function applyFullBackup(backup, mode) {
+  const now = new Date().toISOString();
+  const stores = backup.stores;
+
+  if (mode === "merge") {
+    const currentTracking = await readTrackingStore();
+    const importedSites = stores.tracking.sites.map(normalizeTrackingSite);
+    const mergedSites = [
+      ...importedSites,
+      ...currentTracking.sites.filter((site) => !importedSites.some((item) => item.id === site.id))
+    ];
+    await writeTrackingStore({ sites: mergedSites, updatedAt: now });
+
+    const currentAnalytics = await readAnalyticsStore();
+    const mergedVisits = [...stores.analytics.visits, ...currentAnalytics.visits].slice(0, 5_000);
+    await writeAnalyticsStore({ visits: mergedVisits.filter(isAnalyticsVisit), updatedAt: now });
+    await appendLeadStores(stores.leads);
+    await writeCmsStore({ ...stores.cms, updatedAt: now });
+    return;
+  }
+
+  await writeCmsStore({ ...stores.cms, updatedAt: now });
+  await writeTrackingStore({
+    sites: stores.tracking.sites.map(normalizeTrackingSite).filter((site) => validateTrackingSite(site).valid),
+    updatedAt: now
+  });
+  await writeAnalyticsStore({
+    visits: stores.analytics.visits.filter(isAnalyticsVisit),
+    updatedAt: now
+  });
+  await writeLeadStores(stores.leads);
+}
+
+async function readLeadStores() {
+  return {
+    contact: await readTextFile(join(leadsDir, "contact.jsonl")),
+    newsletter: await readTextFile(join(leadsDir, "newsletter.jsonl"))
+  };
+}
+
+async function readTextFile(path) {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+async function writeLeadStores(leads) {
+  await mkdir(leadsDir, { recursive: true });
+  await writeFile(join(leadsDir, "contact.jsonl"), String(leads?.contact ?? ""));
+  await writeFile(join(leadsDir, "newsletter.jsonl"), String(leads?.newsletter ?? ""));
+}
+
+async function appendLeadStores(leads) {
+  await mkdir(leadsDir, { recursive: true });
+  if (leads?.contact) {
+    await appendFile(join(leadsDir, "contact.jsonl"), String(leads.contact));
+  }
+  if (leads?.newsletter) {
+    await appendFile(join(leadsDir, "newsletter.jsonl"), String(leads.newsletter));
+  }
 }
 
 async function writeCmsBackup(store, event, user) {
@@ -1209,9 +1358,21 @@ function validateTrackingSite(site) {
   validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
   validateText(errors, "statusNote", site.statusNote, "Status note", 320);
   validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
-  validateOptionalText(errors, "ownerContactName", site.ownerContactName, "Owner/contact name", 100);
   validateOptionalText(errors, "reference", site.reference, "Reference", 64);
-  validateOptionalText(errors, "summary", site.summary, "Summary", 240);
+  validateOptionalText(errors, "region", site.region, "Region", 80);
+  validateOptionalText(errors, "mapEmbedUrl", site.mapEmbedUrl, "Google My Maps embed URL", 1200);
+  if (site.mapEmbedUrl && !isSafeMapEmbedUrl(site.mapEmbedUrl)) {
+    errors.push({ path: "mapEmbedUrl", message: "Google My Maps embed must be a safe Google map URL." });
+  }
+  validateOptionalText(errors, "privateNotes", site.privateNotes, "Private note", 1200);
+  validateOptionalText(errors, "letterFileName", site.letterFileName, "Letter filename", 160);
+  if (site.letterFileUrl && (site.letterFileUrl.length > 7_000_000 || !isSafeLetterDataUrl(site.letterFileUrl))) {
+    errors.push({ path: "letterFileUrl", message: "Letter upload must be a PDF, image or Word document under the upload limit." });
+  }
+  validateOptionalText(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", 1200);
+  if (site.searchlandUrl && !isSafeSearchlandUrl(site.searchlandUrl)) {
+    errors.push({ path: "searchlandUrl", message: "Searchland URL must be a safe Searchland link." });
+  }
 
   if (!["high", "medium", "low", "do-not-contact", "unknown"].includes(site.contactPriority)) {
     errors.push({ path: "contactPriority", message: "Choose an approved contact priority." });
@@ -1288,6 +1449,41 @@ function validateTrackingSite(site) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateBackupPayload(backup) {
+  const errors = [];
+  if (!backup || typeof backup !== "object") {
+    return { valid: false, errors: [{ path: "backup", message: "Backup file is required." }] };
+  }
+  if (backup.kind !== "kingsvale-full-backup") {
+    errors.push({ path: "kind", message: "This is not a Kingsvale full backup." });
+  }
+  const stores = backup.stores;
+  if (!stores || typeof stores !== "object") {
+    errors.push({ path: "stores", message: "Backup stores are missing." });
+    return { valid: false, errors };
+  }
+  if (!stores.cms || typeof stores.cms !== "object") {
+    errors.push({ path: "stores.cms", message: "CMS store is missing." });
+  }
+  if (!stores.tracking || !Array.isArray(stores.tracking.sites)) {
+    errors.push({ path: "stores.tracking", message: "Tracking store is missing." });
+  } else {
+    stores.tracking.sites.forEach((site, index) => {
+      const validation = validateTrackingSite(normalizeTrackingSite(site));
+      validation.errors.forEach((error) => {
+        errors.push({ path: `stores.tracking.sites.${index}.${error.path}`, message: error.message });
+      });
+    });
+  }
+  if (!stores.analytics || !Array.isArray(stores.analytics.visits)) {
+    errors.push({ path: "stores.analytics", message: "Analytics store is missing." });
+  }
+  if (!stores.leads || typeof stores.leads !== "object") {
+    errors.push({ path: "stores.leads", message: "Lead store is missing." });
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 function validateMailing(errors, site) {
   if (![
     "not-mailed",
@@ -1328,8 +1524,14 @@ function normalizeTrackingSite(site) {
   const remailReminderDays = boundedReminderDays(site.remailReminderDays);
   return {
     ...site,
+    region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
+    mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
+    privateNotes: site.privateNotes ?? "",
+    letterFileName: site.letterFileName ?? "",
+    letterFileUrl: site.letterFileUrl ?? "",
+    searchlandUrl: site.searchlandUrl ?? "",
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? "#22211d",
@@ -1339,7 +1541,7 @@ function normalizeTrackingSite(site) {
       finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
       frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
       frameCut: numberOrFallback(qrStyle.frameCut, qrStyle.frameStyle === "cut-corner" ? 36 : 0),
-      frameLabel: qrStyle.frameLabel ?? "Scan for project updates",
+      frameLabel: qrStyle.frameLabel ?? "Scan to view the plot",
       includeLogo: qrStyle.includeLogo ?? true
     },
     council: {
@@ -1373,6 +1575,10 @@ function publicTrackingSite(site) {
     royalMailTrackingNumber,
     trackingStatus,
     trackingLastCheckedAt,
+    privateNotes,
+    letterFileName,
+    letterFileUrl,
+    searchlandUrl,
     remailReminderDays,
     remailReminderDate,
     mailingNotes,
@@ -1387,11 +1593,81 @@ function publicTrackingSite(site) {
   void royalMailTrackingNumber;
   void trackingStatus;
   void trackingLastCheckedAt;
+  void privateNotes;
+  void letterFileName;
+  void letterFileUrl;
+  void searchlandUrl;
   void remailReminderDays;
   void remailReminderDate;
   void mailingNotes;
   void mailingLastUpdatedAt;
   return publicSite;
+}
+
+function normalizeMapEmbedInput(value) {
+  const trimmed = String(value ?? "").trim();
+  const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
+  return preferSatelliteMap(decodeHtmlAttribute(iframeSrc ?? trimmed));
+}
+
+function preferSatelliteMap(value) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname === "www.google.com" && url.pathname.includes("/maps/d/embed")) {
+      // Google My Maps does not reliably expose a documented satellite default.
+      // This query parameter is the closest safe hint when the embed honours it.
+      url.searchParams.set("basemap", "satellite");
+      return url.toString();
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
+}
+
+function decodeHtmlAttribute(value) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", "\"")
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
+function detectSiteRegion(address = "") {
+  const text = String(address).toLowerCase();
+  const knownRegions = [
+    "Wokingham",
+    "Hampshire",
+    "Berkshire",
+    "Surrey",
+    "London",
+    "Reading",
+    "Guildford",
+    "Winchester",
+    "Bracknell",
+    "Basingstoke",
+    "Hart"
+  ];
+  return knownRegions.find((region) => text.includes(region.toLowerCase())) ?? "";
+}
+
+function extractPostcode(address = "") {
+  const match = String(address).toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+  return match ? normalizePostcode(match[1]) : "";
+}
+
+function normalizePostcode(value = "") {
+  return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function normalizeLookupText(value = "") {
+  return String(value).trim().toUpperCase();
 }
 
 async function lookupRoyalMailTracking(trackingNumber) {
@@ -1661,6 +1937,40 @@ function isSafeResourceUrl(value) {
   }
 
   return isSafeHttpUrl(value);
+}
+
+function isSafeMapEmbedUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      (
+        url.hostname === "google.com" ||
+        url.hostname === "www.google.com" ||
+        url.hostname.endsWith(".google.com") ||
+        url.hostname === "earth.google.com" ||
+        url.hostname.endsWith(".googleusercontent.com")
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isSafeLetterDataUrl(value) {
+  return /^data:(application\/pdf|image\/png|image\/jpeg|image\/webp|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document);base64,[a-zA-Z0-9+/=]+$/.test(value);
+}
+
+function isSafeSearchlandUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "app.searchland.co.uk" || url.hostname.endsWith(".searchland.co.uk"))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHexColor(value) {

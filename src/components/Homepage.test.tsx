@@ -14,7 +14,9 @@ describe("Homepage", () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: /primary navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Lookup" })).toHaveAttribute("href", "/plot-lookup");
     expect(screen.getByRole("heading", { name: /Beautiful homes in exceptional locations./i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Reference number/i)).not.toBeInTheDocument();
     expect(
       screen.getByAltText(/grand stone-accent luxury home/i)
     ).toBeInTheDocument();

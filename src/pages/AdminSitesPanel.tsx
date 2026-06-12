@@ -1,13 +1,13 @@
 import {
   Archive,
-  Building2,
-  Clock,
   Copy,
   ExternalLink,
+  FileText,
+  Folder,
   Link,
+  Mail,
   Palette,
   Plus,
-  RefreshCw,
   Save,
   Search,
   Trash2
@@ -16,33 +16,24 @@ import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
-  checkTrackingCouncilStatus,
   listTrackingSites,
   saveTrackingSite
 } from "../lib/cmsApi";
 import {
   createTrackingResource,
-  createMilestone,
   createTrackingSite,
+  detectSiteRegion,
   mailingStatusClass,
+  normalizeMapEmbedInput,
   priorityClass,
-  trackingStatusClass
 } from "../lib/trackingStorage";
 import {
-  applyTrackingStatusTemplate,
-  trackingStatusTemplates
-} from "../lib/trackingTemplates";
-import {
-  trackingMilestoneLabels,
   trackingResourceLabels,
-  trackingStatusLabels,
   contactPriorityLabels,
   mailingStatusLabels,
   type ContactPriority,
-  type TrackingMilestoneState,
   type TrackingResourceType,
-  type TrackingSite,
-  type TrackingStatus
+  type TrackingSite
 } from "../lib/trackingTypes";
 import {
   trackingFieldLimits,
@@ -50,8 +41,6 @@ import {
   type TrackingValidationError
 } from "../lib/trackingValidation";
 
-const trackingStatuses = Object.keys(trackingStatusLabels) as TrackingStatus[];
-const milestoneStates = Object.keys(trackingMilestoneLabels) as TrackingMilestoneState[];
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 
@@ -59,10 +48,9 @@ export function AdminSitesPanel() {
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<ContactPriority | "all">("all");
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Create customer tracking pages and share their QR-ready links.");
+  const [status, setStatus] = useState("Create QR-ready land interest map pages.");
 
   useEffect(() => {
     let active = true;
@@ -74,8 +62,14 @@ export function AdminSitesPanel() {
       }
 
       const orderedSites = sortSites(loadedSites);
-      setSites(orderedSites);
-      setDraft(orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
+      setSites((current) => {
+        const merged = [
+          ...current,
+          ...orderedSites.filter((site) => !current.some((item) => item.id === site.id))
+        ];
+        return sortSites(merged);
+      });
+      setDraft((current) => current ?? orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
     }
 
     void loadSites();
@@ -90,10 +84,6 @@ export function AdminSitesPanel() {
       if (!showArchived && site.archived) {
         return false;
       }
-      if (priorityFilter !== "all" && site.contactPriority !== priorityFilter) {
-        return false;
-      }
-
       if (!normalizedQuery) {
         return true;
       }
@@ -101,15 +91,15 @@ export function AdminSitesPanel() {
       return [
         site.title,
         site.customerName,
-        site.ownerContactName,
         site.siteAddress,
+        site.region,
         site.reference,
-        trackingStatusLabels[site.currentStatus],
         contactPriorityLabels[site.contactPriority],
         mailingStatusLabels[site.mailingStatus]
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [priorityFilter, query, showArchived, sites]);
+  }, [query, showArchived, sites]);
+  const groupedSites = useMemo(() => groupSitesByRegion(visibleSites), [visibleSites]);
 
   const validation = useMemo(
     () => (draft ? validateTrackingSite(draft) : { valid: true, errors: [] }),
@@ -124,9 +114,9 @@ export function AdminSitesPanel() {
       const site = await saveTrackingSite(createTrackingSite());
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-      setStatus("Tracking page created. Edit the details, then save.");
+      setStatus("Map page created. Add the plot map link, then save.");
     } catch {
-      setStatus("Tracking page could not be created.");
+      setStatus("Map page could not be created.");
     } finally {
       setBusy(false);
     }
@@ -139,7 +129,7 @@ export function AdminSitesPanel() {
 
     const result = validateTrackingSite(draft);
     if (!result.valid) {
-      setStatus("Resolve the tracking page guardrails before saving.");
+      setStatus("Resolve the map page guardrails before saving.");
       return;
     }
 
@@ -148,9 +138,9 @@ export function AdminSitesPanel() {
       const saved = await saveTrackingSite(draft);
       setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
       setDraft(saved);
-      setStatus("Tracking page saved.");
+      setStatus("Map page saved.");
     } catch {
-      setStatus("Tracking page could not be saved.");
+      setStatus("Map page could not be saved.");
     } finally {
       setBusy(false);
     }
@@ -165,7 +155,7 @@ export function AdminSitesPanel() {
     try {
       const archived = await archiveTrackingSite(draft.id);
       if (!archived) {
-        setStatus("Tracking page could not be archived.");
+        setStatus("Map page could not be archived.");
         return;
       }
 
@@ -174,32 +164,9 @@ export function AdminSitesPanel() {
       );
       const next = sites.find((site) => site.id !== archived.id && !site.archived) ?? null;
       setDraft(next);
-      setStatus("Tracking page archived. Its public link is now unavailable.");
+      setStatus("Map page archived. Its public link is now unavailable.");
     } catch {
-      setStatus("Tracking page could not be archived.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCouncilCheck() {
-    if (!draft) {
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const synced = await checkTrackingCouncilStatus(draft.id);
-      if (!synced) {
-        setStatus("Council connector is not available for this tracking page.");
-        return;
-      }
-
-      setSites((current) => sortSites(current.map((site) => (site.id === synced.id ? synced : site))));
-      setDraft(synced);
-      setStatus(synced.council.lastSyncStatus);
-    } catch {
-      setStatus("Council connector check failed.");
+      setStatus("Map page could not be archived.");
     } finally {
       setBusy(false);
     }
@@ -212,20 +179,10 @@ export function AdminSitesPanel() {
 
     try {
       await navigator.clipboard.writeText(publicLink);
-      setStatus("Tracking link copied.");
+      setStatus("Map page link copied.");
     } catch {
       setStatus("Copy failed. Select the link field and copy it manually.");
     }
-  }
-
-  function handleTemplateChange(templateId: string) {
-    const template = trackingStatusTemplates.find((item) => item.id === templateId);
-    if (!template) {
-      return;
-    }
-
-    setDraft((current) => current ? applyTrackingStatusTemplate(current, template) : current);
-    setStatus(`${template.label} template applied. Review details, then save.`);
   }
 
   function updateDraft(recipe: (site: TrackingSite) => void) {
@@ -239,8 +196,42 @@ export function AdminSitesPanel() {
     });
   }
 
+  async function handleLetterUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!isAllowedLetterFile(file)) {
+      setStatus("Letter upload must be a PDF, image or Word document under 5MB.");
+      return;
+    }
+
+    const dataUrl = await readFileAsDataUrl(file);
+    updateDraft((site) => {
+      site.letterFileName = file.name;
+      site.letterFileUrl = dataUrl;
+    });
+    setStatus("Letter attached. Save the site to keep it.");
+  }
+
+  function clearLetterUpload() {
+    updateDraft((site) => {
+      site.letterFileName = "";
+      site.letterFileUrl = "";
+    });
+    setStatus("Letter removed. Save the site to keep this change.");
+  }
+
+  function openInMailing() {
+    if (!draft) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("kingsvale-open-mailing-site", { detail: { siteId: draft.id } }));
+  }
+
   return (
-    <section className="sites-admin" aria-label="Customer tracking sites">
+    <section className="sites-admin" aria-label="Land interest map pages">
       <div className="sites-admin__toolbar">
         <div className="admin-status sites-admin__status" role="status">
           <Link aria-hidden="true" />
@@ -253,11 +244,11 @@ export function AdminSitesPanel() {
       </div>
 
       <div className="sites-admin__layout">
-        <aside className="sites-admin__list" aria-label="Tracking page list">
+        <aside className="sites-admin__list" aria-label="Map page list">
           <div className="sites-admin__search">
             <Search aria-hidden="true" />
             <label className="sr-only" htmlFor="tracking-search">
-              Search tracking pages
+              Search map pages
             </label>
             <input
               id="tracking-search"
@@ -274,42 +265,30 @@ export function AdminSitesPanel() {
             />
             <span>Show archived</span>
           </label>
-          <label className="admin-field sites-admin__filter" htmlFor="sites-priority-filter">
-            <span className="admin-field__label">Priority</span>
-            <select
-              id="sites-priority-filter"
-              value={priorityFilter}
-              onChange={(event) => setPriorityFilter(event.target.value as ContactPriority | "all")}
-            >
-              <option value="all">All priorities</option>
-              {contactPriorities.map((priority) => (
-                <option key={priority} value={priority}>
-                  {contactPriorityLabels[priority]}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="sites-admin__rows">
             {visibleSites.length === 0 ? (
-              <div className="sites-admin__empty">No tracking pages yet.</div>
+              <div className="sites-admin__empty">No map pages yet.</div>
             ) : (
-              visibleSites.map((site) => (
+              groupedSites.flatMap(([region, regionSites]) => [
+                <div className="site-group-heading" key={`${region}-heading`}>
+                  <Folder aria-hidden="true" />
+                  <span>{region}</span>
+                  <span>{regionSites.length}</span>
+                </div>,
+                ...regionSites.map((site) => (
                 <button
                   key={site.id}
                   type="button"
                   className={draft?.id === site.id ? "site-row site-row--active" : "site-row"}
                   onClick={() => {
                     setDraft(structuredClone(site));
-                    setStatus(site.archived ? "Archived tracking page selected." : "Tracking page selected.");
+                    setStatus(site.archived ? "Archived map page selected." : "Map page selected.");
                   }}
                 >
                   <span className="site-row__title">{site.title}</span>
                   <span className="site-row__meta">
                     {site.siteAddress}
                     {site.reference ? ` · ${site.reference}` : ""}
-                  </span>
-                  <span className={`tracking-status ${trackingStatusClass(site.currentStatus)}`}>
-                    {trackingStatusLabels[site.currentStatus]}
                   </span>
                   <span className="site-row__badges">
                     <span className={`priority-badge ${priorityClass(site.contactPriority)}`}>
@@ -320,7 +299,8 @@ export function AdminSitesPanel() {
                     </span>
                   </span>
                 </button>
-              ))
+                ))
+              ])
             )}
           </div>
         </aside>
@@ -329,13 +309,13 @@ export function AdminSitesPanel() {
           {!draft ? (
             <div className="admin-panel sites-admin__blank">
               <h2>Sites</h2>
-              <p>Create a customer tracking page to generate a QR-ready link.</p>
+              <p>Create a QR-ready map page for a land interest letter.</p>
             </div>
           ) : (
             <>
               {!validation.valid && (
-                <div className="admin-errors" role="alert" aria-label="Tracking validation issues">
-                  <h2>Tracking guardrails</h2>
+                <div className="admin-errors" role="alert" aria-label="Map page validation issues">
+                  <h2>Map page guardrails</h2>
                   <ul>
                     {validation.errors.slice(0, 8).map((error) => (
                       <li key={`${error.path}-${error.message}`}>{error.message}</li>
@@ -350,9 +330,6 @@ export function AdminSitesPanel() {
                     <h2 id="site-editor-title">{draft.title}</h2>
                     <p>Updated {new Date(draft.updatedAt).toLocaleString()}</p>
                   </div>
-                  <span className={`tracking-status ${trackingStatusClass(draft.currentStatus)}`}>
-                    {trackingStatusLabels[draft.currentStatus]}
-                  </span>
                   <span className={`priority-badge ${priorityClass(draft.contactPriority)}`}>
                     {contactPriorityLabels[draft.contactPriority]}
                   </span>
@@ -360,7 +337,7 @@ export function AdminSitesPanel() {
 
                 <div className="tracking-link-box">
                   <div>
-                    <span>Public tracking link</span>
+                    <span>Public map page link</span>
                     <input
                       data-testid="generated-tracking-link"
                       value={publicLink}
@@ -376,11 +353,15 @@ export function AdminSitesPanel() {
                     <ExternalLink aria-hidden="true" />
                     Open
                   </a>
+                  <button type="button" className="admin-ghost" onClick={openInMailing}>
+                    <Mail aria-hidden="true" />
+                    Mailing
+                  </button>
                 </div>
 
-                <details className="qr-designer qr-designer--folded" open>
+                <details className="qr-designer qr-designer--folded">
                   <summary className="qr-designer__summary">
-                    <span><Palette aria-hidden="true" /> QR code design</span>
+                    <span><Palette aria-hidden="true" /> QR Code Design</span>
                     <small>Colours, module shape, frame shape and download</small>
                   </summary>
                   <div className="qr-designer__controls">
@@ -475,13 +456,6 @@ export function AdminSitesPanel() {
                   />
                 </div>
                 <div className="admin-grid admin-grid--two">
-                  <TrackingTextInput
-                    label="Owner/contact name"
-                    value={draft.ownerContactName}
-                    maxLength={trackingFieldLimits.ownerContactName}
-                    error={errorsByPath.ownerContactName}
-                    onChange={(value) => updateDraft((site) => { site.ownerContactName = value; })}
-                  />
                   <label className="admin-field" htmlFor="contact-priority">
                     <span className="admin-field__label">Contact priority</span>
                     <select
@@ -495,18 +469,9 @@ export function AdminSitesPanel() {
                         <option key={priority} value={priority}>
                           {contactPriorityLabels[priority]}
                         </option>
-                      ))}
+                      ))} 
                     </select>
                   </label>
-                </div>
-                <TrackingTextInput
-                  label="Site address"
-                  value={draft.siteAddress}
-                  maxLength={trackingFieldLimits.siteAddress}
-                  error={errorsByPath.siteAddress}
-                  onChange={(value) => updateDraft((site) => { site.siteAddress = value; })}
-                />
-                <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
                     label="Reference"
                     value={draft.reference}
@@ -514,45 +479,38 @@ export function AdminSitesPanel() {
                     error={errorsByPath.reference}
                     onChange={(value) => updateDraft((site) => { site.reference = value; })}
                   />
-                  <label className="admin-field" htmlFor="tracking-status">
-                    <span className="admin-field__label">Current status</span>
-                    <select
-                      id="tracking-status"
-                      value={draft.currentStatus}
-                      onChange={(event) =>
-                        updateDraft((site) => { site.currentStatus = event.target.value as TrackingStatus; })
-                      }
-                    >
-                      {trackingStatuses.map((trackingStatus) => (
-                        <option key={trackingStatus} value={trackingStatus}>
-                          {trackingStatusLabels[trackingStatus]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                 </div>
-                <label className="admin-field" htmlFor="status-template">
-                  <span className="admin-field__label">Apply status template</span>
-                  <select
-                    id="status-template"
-                    value=""
-                    onChange={(event) => handleTemplateChange(event.target.value)}
-                  >
-                    <option value="">Choose a template</option>
-                    {trackingStatusTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <TrackingTextarea
-                  label="Summary"
-                  value={draft.summary}
-                  maxLength={trackingFieldLimits.summary}
-                  error={errorsByPath.summary}
-                  onChange={(value) => updateDraft((site) => { site.summary = value; })}
+                <TrackingTextInput
+                  label="Site address"
+                  value={draft.siteAddress}
+                  maxLength={trackingFieldLimits.siteAddress}
+                  error={errorsByPath.siteAddress}
+                  onChange={(value) =>
+                    updateDraft((site) => {
+                      site.siteAddress = value;
+                      if (!site.region || site.region === "Uncategorised") {
+                        site.region = detectSiteRegion(value) || "Uncategorised";
+                      }
+                    })
+                  }
                 />
+                <div className="admin-grid admin-grid--two">
+                  <TrackingTextInput
+                    label="Folder / region"
+                    value={draft.region}
+                    maxLength={trackingFieldLimits.region}
+                    error={errorsByPath.region}
+                    onChange={(value) => updateDraft((site) => { site.region = value; })}
+                  />
+                  <TrackingTextInput
+                    label="Searchland URL"
+                    type="url"
+                    value={draft.searchlandUrl}
+                    maxLength={trackingFieldLimits.searchlandUrl}
+                    error={errorsByPath.searchlandUrl}
+                    onChange={(value) => updateDraft((site) => { site.searchlandUrl = value; })}
+                  />
+                </div>
                 <TrackingTextarea
                   label="Status note"
                   value={draft.statusNote}
@@ -560,98 +518,65 @@ export function AdminSitesPanel() {
                   error={errorsByPath.statusNote}
                   onChange={(value) => updateDraft((site) => { site.statusNote = value; })}
                 />
+                <TrackingTextarea
+                  label="Google My Maps embed URL or iframe"
+                  value={draft.mapEmbedUrl}
+                  maxLength={trackingFieldLimits.mapEmbedUrl}
+                  error={errorsByPath.mapEmbedUrl}
+                  onChange={(value) =>
+                    updateDraft((site) => { site.mapEmbedUrl = normalizeMapEmbedInput(value); })
+                  }
+                />
               </section>
 
-              <section className="admin-panel" aria-labelledby="tracking-milestones-title">
+              <section className="admin-panel" aria-labelledby="site-private-title">
                 <div className="admin-section-heading">
-                  <h2 id="tracking-milestones-title">Milestones</h2>
-                  <button
-                    type="button"
-                    className="admin-small"
-                    disabled={draft.milestones.length >= 8}
-                    onClick={() =>
-                      updateDraft((site) => {
-                        site.milestones.push(createMilestone());
-                      })
-                    }
-                  >
-                    <Plus aria-hidden="true" />
-                    Add
-                  </button>
+                  <h2 id="site-private-title">Editor-only notes and letter</h2>
                 </div>
-                <div className="admin-stack">
-                  {draft.milestones.map((milestone, index) => (
-                    <article className="admin-subcard milestone-editor" key={milestone.id}>
-                      <div className="card-controls">
-                        <h3>Milestone {index + 1}</h3>
-                        {draft.milestones.length > 1 && (
-                          <button
-                            type="button"
-                            aria-label={`Remove milestone ${index + 1}`}
-                            onClick={() =>
-                              updateDraft((site) => {
-                                site.milestones.splice(index, 1);
-                              })
-                            }
-                          >
-                            <Trash2 aria-hidden="true" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="admin-grid admin-grid--two">
-                        <TrackingTextInput
-                          label={`Milestone ${index + 1} label`}
-                          value={milestone.label}
-                          maxLength={trackingFieldLimits.milestoneLabel}
-                          error={errorsByPath[`milestones.${index}.label`]}
-                          onChange={(value) =>
-                            updateDraft((site) => { site.milestones[index].label = value; })
-                          }
-                        />
-                        <label className="admin-field" htmlFor={`milestone-state-${index}`}>
-                          <span className="admin-field__label">State</span>
-                          <select
-                            id={`milestone-state-${index}`}
-                            value={milestone.state}
-                            onChange={(event) =>
-                              updateDraft((site) => {
-                                site.milestones[index].state = event.target.value as TrackingMilestoneState;
-                              })
-                            }
-                          >
-                            {milestoneStates.map((state) => (
-                              <option key={state} value={state}>
-                                {trackingMilestoneLabels[state]}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className="admin-grid admin-grid--two">
-                        <label className="admin-field" htmlFor={`milestone-date-${index}`}>
-                          <span className="admin-field__label">Date</span>
-                          <input
-                            id={`milestone-date-${index}`}
-                            type="date"
-                            value={milestone.date ?? ""}
-                            onChange={(event) =>
-                              updateDraft((site) => { site.milestones[index].date = event.target.value; })
-                            }
-                          />
-                        </label>
-                        <TrackingTextInput
-                          label={`Milestone ${index + 1} note`}
-                          value={milestone.note ?? ""}
-                          maxLength={trackingFieldLimits.milestoneNote}
-                          error={errorsByPath[`milestones.${index}.note`]}
-                          onChange={(value) =>
-                            updateDraft((site) => { site.milestones[index].note = value; })
-                          }
-                        />
-                      </div>
-                    </article>
-                  ))}
+                <TrackingTextarea
+                  label="Private notes"
+                  value={draft.privateNotes}
+                  maxLength={trackingFieldLimits.privateNotes}
+                  error={errorsByPath.privateNotes}
+                  onChange={(value) => updateDraft((site) => { site.privateNotes = value; })}
+                />
+                <div className="letter-upload">
+                  <div>
+                    <FileText aria-hidden="true" />
+                    <span>
+                      <strong>{draft.letterFileName || "No letter uploaded"}</strong>
+                      <small>Visible in Studio and Mailing only.</small>
+                    </span>
+                  </div>
+                  <div className="letter-upload__actions">
+                    {draft.letterFileUrl && (
+                      <a href={draft.letterFileUrl} download={draft.letterFileName || "letter"} className="admin-open">
+                        <ExternalLink aria-hidden="true" />
+                        Open
+                      </a>
+                    )}
+                    <label className="admin-small">
+                      Upload letter
+                      <input
+                        className="sr-only"
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event) => void handleLetterUpload(event.target.files)}
+                      />
+                    </label>
+                    {draft.letterFileUrl && (
+                      <button type="button" className="admin-ghost" onClick={clearLetterUpload}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {draft.searchlandUrl && (
+                  <a className="admin-open" href={draft.searchlandUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink aria-hidden="true" />
+                    Open Searchland
+                  </a>
+                )}
               </section>
 
               <section className="admin-panel" aria-labelledby="tracking-resources-title">
@@ -748,66 +673,6 @@ export function AdminSitesPanel() {
                 )}
               </section>
 
-              <section className="admin-panel" aria-labelledby="council-shell-title">
-                <div className="site-editor__heading">
-                  <div>
-                    <h2 id="council-shell-title">Council connector</h2>
-                    <p>Manual updates stay available while API automation is prepared.</p>
-                  </div>
-                  <button type="button" className="admin-ghost" onClick={handleCouncilCheck} disabled={busy}>
-                    <RefreshCw aria-hidden="true" />
-                    Check status
-                  </button>
-                </div>
-                <label className="sites-admin__toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.council.mode === "configured"}
-                    onChange={(event) =>
-                      updateDraft((site) => {
-                        site.council.mode = event.target.checked ? "configured" : "none";
-                      })
-                    }
-                  />
-                  <span>Enable council API connector shell</span>
-                </label>
-                <div className="admin-grid admin-grid--two">
-                  <TrackingTextInput
-                    label="Council name"
-                    value={draft.council.councilName}
-                    maxLength={trackingFieldLimits.councilName}
-                    error={errorsByPath["council.councilName"]}
-                    onChange={(value) => updateDraft((site) => { site.council.councilName = value; })}
-                  />
-                  <TrackingTextInput
-                    label="Application reference"
-                    value={draft.council.applicationReference}
-                    maxLength={trackingFieldLimits.applicationReference}
-                    error={errorsByPath["council.applicationReference"]}
-                    onChange={(value) =>
-                      updateDraft((site) => { site.council.applicationReference = value; })
-                    }
-                  />
-                </div>
-                <TrackingTextInput
-                  label="Council API base URL"
-                  value={draft.council.apiBaseUrl ?? ""}
-                  maxLength={trackingFieldLimits.apiBaseUrl}
-                  error={errorsByPath["council.apiBaseUrl"]}
-                  onChange={(value) => updateDraft((site) => { site.council.apiBaseUrl = value; })}
-                />
-                <div className="council-sync-summary">
-                  <Building2 aria-hidden="true" />
-                  <span>{draft.council.lastSyncStatus}</span>
-                  <Clock aria-hidden="true" />
-                  <span>
-                    {draft.council.lastCheckedAt
-                      ? new Date(draft.council.lastCheckedAt).toLocaleString()
-                      : "Never checked"}
-                  </span>
-                </div>
-              </section>
-
               <div className="sites-admin__actions">
                 <button
                   type="button"
@@ -860,6 +725,7 @@ function TrackingTextInput({
       </span>
       <input
         id={id}
+        aria-label={label}
         type={type}
         value={value}
         maxLength={maxLength}
@@ -950,6 +816,7 @@ function TrackingTextarea({
       </span>
       <textarea
         id={id}
+        aria-label={label}
         value={value}
         rows={3}
         maxLength={maxLength}
@@ -971,6 +838,45 @@ function buildPublicLink(token: string) {
 
 function sortSites(sites: TrackingSite[]) {
   return [...sites].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function groupSitesByRegion(sites: TrackingSite[]) {
+  const groups = new Map<string, TrackingSite[]>();
+  for (const site of sites) {
+    const region = site.region?.trim() || detectSiteRegion(site.siteAddress) || "Uncategorised";
+    groups.set(region, [...(groups.get(region) ?? []), site]);
+  }
+
+  return [...groups.entries()].sort(([left], [right]) => {
+    if (left === "Uncategorised") {
+      return 1;
+    }
+    if (right === "Uncategorised") {
+      return -1;
+    }
+    return left.localeCompare(right);
+  });
+}
+
+function isAllowedLetterFile(file: File) {
+  const allowedTypes = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ]);
+  return file.size <= 5_000_000 && allowedTypes.has(file.type);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("File could not be read.")));
+    reader.readAsDataURL(file);
+  });
 }
 
 function toTrackingErrorMap(errors: TrackingValidationError[]) {

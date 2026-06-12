@@ -23,10 +23,14 @@ export const trackingFieldLimits = {
   token: 40,
   title: 72,
   customerName: 80,
-  ownerContactName: 100,
   siteAddress: 160,
   reference: 64,
-  summary: 240,
+  region: 80,
+  mapEmbedUrl: 1200,
+  privateNotes: 1200,
+  letterFileName: 160,
+  letterFileUrl: 7_000_000,
+  searchlandUrl: 1200,
   statusNote: 320,
   royalMailTrackingNumber: 40,
   trackingStatus: 140,
@@ -90,17 +94,29 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     trackingFieldLimits.siteAddress
   );
   addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
-  addOptionalTextError(
-    errors,
-    "ownerContactName",
-    site.ownerContactName,
-    "Owner/contact name",
-    trackingFieldLimits.ownerContactName
-  );
+  addOptionalTextError(errors, "region", site.region, "Region", trackingFieldLimits.region);
   if (!contactPriorities.includes(site.contactPriority)) {
     errors.push({ path: "contactPriority", message: "Choose an approved contact priority." });
   }
-  addOptionalTextError(errors, "summary", site.summary, "Summary", trackingFieldLimits.summary);
+  addOptionalTextError(errors, "mapEmbedUrl", site.mapEmbedUrl, "Google My Maps embed URL", trackingFieldLimits.mapEmbedUrl);
+  if (site.mapEmbedUrl && !isValidMapEmbedUrl(site.mapEmbedUrl)) {
+    errors.push({
+      path: "mapEmbedUrl",
+      message: "Google My Maps embed must be a safe Google Maps, Google My Maps or Google Earth URL."
+    });
+  }
+  addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private note", trackingFieldLimits.privateNotes);
+  addOptionalTextError(errors, "letterFileName", site.letterFileName, "Letter filename", trackingFieldLimits.letterFileName);
+  if (site.letterFileUrl && (site.letterFileUrl.length > trackingFieldLimits.letterFileUrl || !isValidLetterDataUrl(site.letterFileUrl))) {
+    errors.push({
+      path: "letterFileUrl",
+      message: "Letter upload must be a PDF, image or Word document under the upload limit."
+    });
+  }
+  addOptionalTextError(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", trackingFieldLimits.searchlandUrl);
+  if (site.searchlandUrl && !isValidSearchlandUrl(site.searchlandUrl)) {
+    errors.push({ path: "searchlandUrl", message: "Searchland URL must be a safe Searchland link." });
+  }
   addRequiredTextError(
     errors,
     "statusNote",
@@ -387,6 +403,40 @@ function isValidResourceUrl(value: string) {
   }
 
   return isValidHttpUrl(value);
+}
+
+function isValidMapEmbedUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      (
+        parsed.hostname === "www.google.com" ||
+        parsed.hostname === "google.com" ||
+        parsed.hostname.endsWith(".google.com") ||
+        parsed.hostname === "earth.google.com" ||
+        parsed.hostname.endsWith(".googleusercontent.com")
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isValidLetterDataUrl(value: string) {
+  return /^data:(application\/pdf|image\/png|image\/jpeg|image\/webp|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document);base64,[a-zA-Z0-9+/=]+$/.test(value);
+}
+
+function isValidSearchlandUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === "https:" &&
+      (parsed.hostname === "app.searchland.co.uk" || parsed.hostname.endsWith(".searchland.co.uk"))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHexColor(value: string) {

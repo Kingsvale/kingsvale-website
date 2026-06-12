@@ -37,6 +37,13 @@ export function Header({ brandName, brandSuffix, navLinks }: HeaderProps) {
               {link.label}
             </a>
           ))}
+          <a
+            href="/plot-lookup"
+            aria-current={currentPath === "/plot-lookup" ? "page" : undefined}
+            onClick={() => setOpen(false)}
+          >
+            Lookup
+          </a>
         </nav>
       </div>
     </header>

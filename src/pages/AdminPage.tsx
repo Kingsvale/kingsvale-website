@@ -55,6 +55,7 @@ import {
   uploadCmsImage
 } from "../lib/cmsApi";
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
+import { AdminBackupPanel } from "./AdminBackupPanel";
 import { AdminMailingPanel } from "./AdminMailingPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
 
@@ -72,7 +73,7 @@ type RevisionSummary = {
   title: string;
 };
 
-type AdminRootTab = "website" | "sites" | "mailing" | "analytics";
+type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup";
 type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 
@@ -112,14 +113,14 @@ type FieldProps = {
 const emptyLink: NavLink = { label: "New link", href: "#" };
 
 const editorSections = [
-  { id: "hero", label: "Hero" },
-  { id: "brand", label: "Brand" },
-  { id: "features", label: "Features" },
-  { id: "design", label: "Design & Build" },
-  { id: "vision", label: "Vision & Process" },
-  { id: "legacy", label: "About" },
-  { id: "developments", label: "Developments" },
-  { id: "land", label: "Land" },
+  { id: "hero", label: "Homepage hero" },
+  { id: "features", label: "Homepage highlights" },
+  { id: "legacy", label: "Homepage/about" },
+  { id: "developments", label: "Homepage developments" },
+  { id: "land", label: "Land wanted" },
+  { id: "brand", label: "Header/nav" },
+  { id: "design", label: "Design page" },
+  { id: "vision", label: "Vision page" },
   { id: "contact", label: "Contact" },
   { id: "seo", label: "SEO" },
   { id: "footer", label: "Footer" }
@@ -129,7 +130,8 @@ const adminRootTabs: { id: AdminRootTab; label: string }[] = [
   { id: "website", label: "Website" },
   { id: "sites", label: "Sites" },
   { id: "mailing", label: "Mailing" },
-  { id: "analytics", label: "Analytics" }
+  { id: "analytics", label: "Analytics" },
+  { id: "backup", label: "Backup" }
 ];
 
 const previewRoutes: { value: PreviewRoute; label: string }[] = [
@@ -144,6 +146,16 @@ const previewRoutes: { value: PreviewRoute; label: string }[] = [
 
 type EditorSectionId = (typeof editorSections)[number]["id"];
 
+const previewRoutePanels: Record<PreviewRoute, EditorSectionId> = {
+  "/": "hero",
+  "/design-build": "design",
+  "/land-wanted": "land",
+  "/vision-process": "vision",
+  "/about": "legacy",
+  "/developments": "developments",
+  "/contact": "contact"
+};
+
 export function AdminPage({
   publishedContent,
   studioSecret = "",
@@ -154,6 +166,7 @@ export function AdminPage({
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
   const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>("website");
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
+  const [selectedMailingSiteId, setSelectedMailingSiteId] = useState("");
   const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const [previewKey, setPreviewKey] = useState(0);
@@ -198,6 +211,19 @@ export function AdminPage({
     void loadServerDraft();
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleOpenMailingSite(event: Event) {
+      const siteId = (event as CustomEvent<{ siteId?: string }>).detail?.siteId ?? "";
+      setSelectedMailingSiteId(siteId);
+      setActiveRootTab("mailing");
+    }
+
+    window.addEventListener("kingsvale-open-mailing-site", handleOpenMailingSite);
+    return () => {
+      window.removeEventListener("kingsvale-open-mailing-site", handleOpenMailingSite);
     };
   }, []);
 
@@ -281,6 +307,11 @@ export function AdminPage({
     } finally {
       setBusy(false);
     }
+  }
+
+  function handlePreviewRouteChange(route: PreviewRoute) {
+    setPreviewRoute(route);
+    setActivePanel(previewRoutePanels[route]);
   }
 
   return (
@@ -409,9 +440,14 @@ export function AdminPage({
               </button>
             ))}
           </div>
+          <p className="admin-panel__note">
+            Homepage content is edited in the first five tabs: hero, highlights,
+            about, developments and land wanted. The live preview page selector
+            opens the matching editor tab automatically.
+          </p>
 
           {activePanel === "brand" && (
-          <EditorPanel title="Brand and navigation" id="editor-panel-brand">
+          <EditorPanel title="Header and navigation" id="editor-panel-brand">
             <div className="admin-grid admin-grid--two">
               <TextInput
                 label="Brand name"
@@ -441,7 +477,7 @@ export function AdminPage({
           )}
 
           {activePanel === "hero" && (
-          <EditorPanel title="Hero" id="editor-panel-hero">
+          <EditorPanel title="Homepage hero" id="editor-panel-hero">
             <TextInput
               label="Eyebrow"
               value={draft.hero.eyebrow}
@@ -491,10 +527,9 @@ export function AdminPage({
           )}
 
           {activePanel === "features" && (
-          <EditorPanel title="Feature strip" id="editor-panel-features">
+          <EditorPanel title="Homepage highlights" id="editor-panel-features">
             <p className="admin-panel__note">
-              The strip always keeps four value propositions to preserve the
-              balanced editorial rhythm.
+              These four cards sit directly below the homepage hero.
             </p>
             <div className="admin-stack">
               {draft.features.map((feature, index) => (
@@ -551,7 +586,7 @@ export function AdminPage({
           )}
 
           {activePanel === "developments" && (
-          <EditorPanel title="Developments" id="editor-panel-developments">
+          <EditorPanel title="Homepage developments" id="editor-panel-developments">
             <TextInput
               label="Section eyebrow"
               value={draft.developmentsIntro.eyebrow}
@@ -803,7 +838,7 @@ export function AdminPage({
             <select
               id="preview-route"
               value={previewRoute}
-              onChange={(event) => setPreviewRoute(event.target.value as PreviewRoute)}
+              onChange={(event) => handlePreviewRouteChange(event.target.value as PreviewRoute)}
             >
               {previewRoutes.map((route) => (
                 <option key={route.value} value={route.value}>
@@ -846,12 +881,17 @@ export function AdminPage({
       )}
       {activeRootTab === "mailing" && (
       <main className="admin-root-main" id="admin-root-panel-mailing" role="tabpanel">
-        <AdminMailingPanel />
+        <AdminMailingPanel selectedSiteId={selectedMailingSiteId} />
       </main>
       )}
       {activeRootTab === "analytics" && (
       <main className="admin-root-main" id="admin-root-panel-analytics" role="tabpanel">
         <AdminAnalyticsPanel />
+      </main>
+      )}
+      {activeRootTab === "backup" && (
+      <main className="admin-root-main" id="admin-root-panel-backup" role="tabpanel">
+        <AdminBackupPanel />
       </main>
       )}
     </div>

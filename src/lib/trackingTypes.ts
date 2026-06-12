@@ -67,9 +67,15 @@ export type TrackingSite = {
   customerName: string;
   siteAddress: string;
   reference: string;
+  region: string;
   ownerContactName: string;
   contactPriority: ContactPriority;
   summary: string;
+  mapEmbedUrl: string;
+  privateNotes: string;
+  letterFileName: string;
+  letterFileUrl: string;
+  searchlandUrl: string;
   currentStatus: TrackingStatus;
   statusNote: string;
   milestones: TrackingMilestone[];

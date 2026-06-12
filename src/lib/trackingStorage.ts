@@ -80,11 +80,17 @@ export function createTrackingSite(): TrackingSite {
     customerName: "",
     siteAddress: "Site address",
     reference: "",
+    region: "Uncategorised",
     ownerContactName: "",
     contactPriority: "unknown",
-    summary: "Track the planning and construction progress for this Kingsvale project.",
+    summary: "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
+    mapEmbedUrl: "",
+    privateNotes: "",
+    letterFileName: "",
+    letterFileUrl: "",
+    searchlandUrl: "",
     currentStatus: "planning",
-    statusNote: "Initial details are being prepared by the Kingsvale team.",
+    statusNote: "Kingsvale is reviewing this land interest opportunity.",
     milestones: [
       createMilestone("Planning details prepared", "active"),
       createMilestone("Application submitted", "pending"),
@@ -131,8 +137,14 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
   const remailReminderDays = boundedReminderDays(site.remailReminderDays);
   return {
     ...site,
+    region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
+    mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
+    privateNotes: site.privateNotes ?? "",
+    letterFileName: site.letterFileName ?? "",
+    letterFileUrl: site.letterFileUrl ?? "",
+    searchlandUrl: site.searchlandUrl ?? "",
     resources: Array.isArray(site.resources) ? site.resources : [],
     qrStyle: {
       foreground: qrStyle.foreground ?? defaultStyle.foreground,
@@ -198,9 +210,33 @@ export function defaultQrStyle(): TrackingQrStyle {
     finderRoundness: 24,
     frameRoundness: 42,
     frameCut: 0,
-    frameLabel: "Scan for project updates",
+    frameLabel: "Scan to view the plot",
     includeLogo: true
   };
+}
+
+export function normalizeMapEmbedInput(value: string) {
+  const trimmed = value.trim();
+  const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
+  return preferSatelliteMap(decodeHtmlAttribute(iframeSrc ?? trimmed));
+}
+
+export function detectSiteRegion(address: string) {
+  const text = address.toLowerCase();
+  const knownRegions = [
+    "Wokingham",
+    "Hampshire",
+    "Berkshire",
+    "Surrey",
+    "London",
+    "Reading",
+    "Guildford",
+    "Winchester",
+    "Bracknell",
+    "Basingstoke",
+    "Hart"
+  ];
+  return knownRegions.find((region) => text.includes(region.toLowerCase())) ?? "";
 }
 
 export function trackingStatusClass(status: TrackingStatus) {
@@ -254,6 +290,35 @@ export function generateTrackingToken() {
 
 function randomPart(length: number) {
   return Math.random().toString(36).slice(2, 2 + length);
+}
+
+function preferSatelliteMap(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname === "www.google.com" && url.pathname.includes("/maps/d/embed")) {
+      // Google My Maps embeds do not reliably expose a documented satellite default.
+      // This is the closest safe hint and is preserved when the embed supports it.
+      url.searchParams.set("basemap", "satellite");
+      return url.toString();
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
+}
+
+function decodeHtmlAttribute(value: string) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", "\"")
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
 }
 
 function normalizeContactPriority(value: ContactPriority | undefined): ContactPriority {
