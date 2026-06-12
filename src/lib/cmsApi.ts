@@ -4,6 +4,7 @@ import {
   archiveLocalTrackingSite,
   findLocalTrackingSiteByToken,
   loadLocalTrackingSites,
+  normalizeTrackingSite,
   upsertLocalTrackingSite
 } from "./trackingStorage";
 
@@ -157,7 +158,7 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
     }
 
     const payload = (await response.json()) as { sites: TrackingSite[] };
-    return payload.sites;
+    return payload.sites.map(normalizeTrackingSite);
   } catch {
     return loadLocalTrackingSites();
   }
@@ -178,7 +179,7 @@ export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite
     }
 
     const payload = (await response.json()) as { site: TrackingSite };
-    return payload.site;
+    return normalizeTrackingSite(payload.site);
   } catch {
     return upsertLocalTrackingSite(site);
   }
@@ -198,7 +199,7 @@ export async function archiveTrackingSite(id: string): Promise<TrackingSite | nu
     }
 
     const payload = (await response.json()) as { site: TrackingSite };
-    return payload.site;
+    return normalizeTrackingSite(payload.site);
   } catch {
     return archiveLocalTrackingSite(id);
   }
@@ -218,7 +219,7 @@ export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSi
     }
 
     const payload = (await response.json()) as { site: TrackingSite };
-    return payload.site;
+    return normalizeTrackingSite(payload.site);
   } catch {
     return markLocalCouncilSyncAttempt(id);
   }
@@ -236,7 +237,7 @@ export async function fetchTrackingSiteByToken(token: string): Promise<TrackingS
     }
 
     const payload = (await response.json()) as { site: TrackingSite | null };
-    return payload.site;
+    return payload.site ? normalizeTrackingSite(payload.site) : null;
   } catch {
     return findLocalTrackingSiteByToken(token);
   }

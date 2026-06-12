@@ -14,6 +14,15 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+async function setRangeValue(page: import("@playwright/test").Page, label: string, value: string) {
+  await page.getByLabel(label).evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    input.value = nextValue;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
 test("views homepage, edits admin content, uploads an image and verifies publication", async ({ page }) => {
   await page.goto("/");
   await expect(
@@ -66,8 +75,15 @@ test("creates a customer tracking site and opens the generated link", async ({ p
 
   await page.getByRole("tab", { name: "Sites" }).click();
   await page.getByRole("button", { name: "Create site" }).click();
+  await expect(page.getByLabel("QR code preview")).toBeVisible();
+  await setRangeValue(page, "Finder roundness", "86");
+  await setRangeValue(page, "Cut corners", "34");
   await page.getByLabel("Site title").fill("Oakdene planning tracker");
   await page.getByLabel("Site address").fill("12 Meadow Lane");
+  await page.getByLabel("Apply status template").selectOption("construction");
+  await page.getByRole("button", { name: "Add resource" }).click();
+  await page.getByLabel(/Resource 1 title/).fill("Planning pack");
+  await page.getByLabel(/Resource 1 URL/).fill("https://example.com/planning-pack.pdf");
   await page.getByRole("button", { name: "Save site" }).click();
   await expect(page.getByText("Tracking page saved.")).toBeVisible();
 
@@ -78,6 +94,8 @@ test("creates a customer tracking site and opens the generated link", async ({ p
   await expect(page.getByRole("heading", { name: "Oakdene planning tracker" })).toBeVisible();
   await expect(page.getByText("12 Meadow Lane")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Milestones" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Images and documents" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Planning pack" })).toBeVisible();
 });
 
 test("mobile navigation is keyboard and touch accessible", async ({ page, isMobile }) => {

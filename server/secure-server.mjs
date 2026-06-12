@@ -954,8 +954,11 @@ async function readTrackingStore() {
   try {
     const raw = await readFile(trackingStoreFile, "utf8");
     const parsed = decodeCmsStore(raw);
+    const sites = Array.isArray(parsed.sites)
+      ? parsed.sites.map(normalizeTrackingSite).filter((site) => validateTrackingSite(site).valid)
+      : [];
     return {
-      sites: Array.isArray(parsed.sites) ? parsed.sites.filter((site) => validateTrackingSite(site).valid) : [],
+      sites,
       updatedAt: parsed.updatedAt ?? null
     };
   } catch {
@@ -1205,6 +1208,23 @@ function validateTrackingSite(site) {
     });
   }
 
+  validateQrStyle(errors, site.qrStyle);
+
+  if (!Array.isArray(site.resources) || site.resources.length > 8) {
+    errors.push({ path: "resources", message: "Use up to eight customer resources." });
+  } else {
+    site.resources.forEach((resource, index) => {
+      validateText(errors, `resources.${index}.title`, resource.title, "Resource title", 80);
+      validateOptionalText(errors, `resources.${index}.note`, resource.note ?? "", "Resource note", 180);
+      if (!["image", "document", "link"].includes(resource.type)) {
+        errors.push({ path: `resources.${index}.type`, message: "Choose an approved resource type." });
+      }
+      if (typeof resource.url !== "string" || resource.url.length > 900 || !isSafeResourceUrl(resource.url)) {
+        errors.push({ path: `resources.${index}.url`, message: "Resource URL must be safe." });
+      }
+    });
+  }
+
   const council = site.council;
   if (!council || typeof council !== "object") {
     errors.push({ path: "council", message: "Council settings are required." });
@@ -1239,6 +1259,88 @@ function validateTrackingSite(site) {
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+function normalizeTrackingSite(site) {
+  const qrStyle = site.qrStyle ?? {};
+  const council = site.council ?? {};
+  return {
+    ...site,
+    resources: Array.isArray(site.resources) ? site.resources : [],
+    qrStyle: {
+      foreground: qrStyle.foreground ?? "#22211d",
+      background: qrStyle.background ?? "#fbf8f2",
+      accent: qrStyle.accent ?? "#ad9576",
+      dotStyle: qrStyle.dotStyle ?? "rounded",
+      finderStyle: qrStyle.finderStyle ?? "rounded",
+      frameStyle: qrStyle.frameStyle ?? "rounded",
+      dotRoundness: numberOrFallback(qrStyle.dotRoundness, presetRoundness(qrStyle.dotStyle)),
+      finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
+      frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
+      frameCut: numberOrFallback(qrStyle.frameCut, qrStyle.frameStyle === "cut-corner" ? 36 : 0),
+      frameLabel: qrStyle.frameLabel ?? "Scan for project updates",
+      includeLogo: qrStyle.includeLogo ?? true
+    },
+    council: {
+      mode: council.mode ?? "none",
+      councilName: council.councilName ?? "",
+      applicationReference: council.applicationReference ?? "",
+      apiBaseUrl: council.apiBaseUrl ?? "",
+      lastCheckedAt: council.lastCheckedAt ?? null,
+      lastSyncStatus: council.lastSyncStatus ?? "Not configured"
+    }
+  };
+}
+
+function validateQrStyle(errors, qrStyle) {
+  if (!qrStyle || typeof qrStyle !== "object") {
+    errors.push({ path: "qrStyle", message: "QR style settings are required." });
+    return;
+  }
+
+  if (!isHexColor(qrStyle.foreground)) {
+    errors.push({ path: "qrStyle.foreground", message: "QR foreground must be a hex colour." });
+  }
+  if (!isHexColor(qrStyle.background)) {
+    errors.push({ path: "qrStyle.background", message: "QR background must be a hex colour." });
+  }
+  if (!isHexColor(qrStyle.accent)) {
+    errors.push({ path: "qrStyle.accent", message: "QR accent must be a hex colour." });
+  }
+  if (!["square", "rounded", "circle"].includes(qrStyle.dotStyle)) {
+    errors.push({ path: "qrStyle.dotStyle", message: "Choose an approved QR dot style." });
+  }
+  if (!["square", "rounded", "circle"].includes(qrStyle.finderStyle)) {
+    errors.push({ path: "qrStyle.finderStyle", message: "Choose an approved QR finder shape." });
+  }
+  if (!["square", "rounded", "cut-corner"].includes(qrStyle.frameStyle)) {
+    errors.push({ path: "qrStyle.frameStyle", message: "Choose an approved QR frame shape." });
+  }
+  validatePercentage(errors, "qrStyle.dotRoundness", qrStyle.dotRoundness, "Dot roundness");
+  validatePercentage(errors, "qrStyle.finderRoundness", qrStyle.finderRoundness, "Finder roundness");
+  validatePercentage(errors, "qrStyle.frameRoundness", qrStyle.frameRoundness, "Frame roundness");
+  validatePercentage(errors, "qrStyle.frameCut", qrStyle.frameCut, "Frame cut");
+  validateText(errors, "qrStyle.frameLabel", qrStyle.frameLabel, "QR label", 46);
+}
+
+function validatePercentage(errors, path, value, label) {
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    errors.push({ path, message: `${label} must be between 0 and 100.` });
+  }
+}
+
+function numberOrFallback(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function presetRoundness(value) {
+  if (value === "square") {
+    return 0;
+  }
+  if (value === "circle") {
+    return 100;
+  }
+  return 48;
 }
 
 function validateEditorial(errors, path, content) {
@@ -1313,6 +1415,18 @@ function isSafeHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function isSafeResourceUrl(value) {
+  if (value.startsWith("/media/") || value.startsWith("/assets/") || value.startsWith("/")) {
+    return true;
+  }
+
+  return isSafeHttpUrl(value);
+}
+
+function isHexColor(value) {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
 function isSafeImageSource(value) {

@@ -1,4 +1,11 @@
-import type { TrackingMilestoneState, TrackingSite, TrackingStatus } from "./trackingTypes";
+import type {
+  TrackingMilestoneState,
+  TrackingQrStyle,
+  TrackingResource,
+  TrackingResourceType,
+  TrackingSite,
+  TrackingStatus
+} from "./trackingTypes";
 import { validateTrackingSite } from "./trackingValidation";
 
 export const trackingStorageKey = "kingsvale-tracking-sites-v1";
@@ -16,7 +23,9 @@ export function loadLocalTrackingSites(): TrackingSite[] {
   try {
     const parsed = JSON.parse(raw) as TrackingSite[];
     return Array.isArray(parsed)
-      ? parsed.filter((site) => validateTrackingSite(site).valid)
+      ? parsed
+        .map(normalizeTrackingSite)
+        .filter((site) => validateTrackingSite(site).valid)
       : [];
   } catch {
     return [];
@@ -78,6 +87,8 @@ export function createTrackingSite(): TrackingSite {
       createMilestone("Decision issued", "pending"),
       createMilestone("Construction progress", "pending")
     ],
+    resources: [],
+    qrStyle: defaultQrStyle(),
     council: {
       mode: "none",
       councilName: "",
@@ -92,6 +103,48 @@ export function createTrackingSite(): TrackingSite {
   };
 }
 
+export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
+  const qrStyle = site.qrStyle ?? {};
+  return {
+    ...site,
+    resources: Array.isArray(site.resources) ? site.resources : [],
+    qrStyle: {
+      ...defaultQrStyle(),
+      ...qrStyle,
+      dotRoundness: typeof qrStyle.dotRoundness === "number"
+        ? qrStyle.dotRoundness
+        : presetRoundness(qrStyle.dotStyle),
+      finderRoundness: typeof qrStyle.finderRoundness === "number"
+        ? qrStyle.finderRoundness
+        : presetRoundness(qrStyle.finderStyle),
+      frameRoundness: typeof qrStyle.frameRoundness === "number"
+        ? qrStyle.frameRoundness
+        : qrStyle.frameStyle === "square" ? 0 : 42,
+      frameCut: typeof qrStyle.frameCut === "number"
+        ? qrStyle.frameCut
+        : qrStyle.frameStyle === "cut-corner" ? 36 : 0
+    },
+    council: {
+      mode: site.council?.mode ?? "none",
+      councilName: site.council?.councilName ?? "",
+      applicationReference: site.council?.applicationReference ?? "",
+      apiBaseUrl: site.council?.apiBaseUrl ?? "",
+      lastCheckedAt: site.council?.lastCheckedAt ?? null,
+      lastSyncStatus: site.council?.lastSyncStatus ?? "Not configured"
+    }
+  };
+}
+
+function presetRoundness(value?: string) {
+  if (value === "square") {
+    return 0;
+  }
+  if (value === "circle") {
+    return 100;
+  }
+  return 48;
+}
+
 export function createMilestone(
   label = "New milestone",
   state: TrackingMilestoneState = "pending"
@@ -102,6 +155,33 @@ export function createMilestone(
     state,
     date: "",
     note: ""
+  };
+}
+
+export function createTrackingResource(type: TrackingResourceType = "document"): TrackingResource {
+  return {
+    id: `resource-${Date.now()}-${randomPart(4)}`,
+    type,
+    title: type === "image" ? "Site image" : type === "link" ? "Useful link" : "Project document",
+    url: "",
+    note: ""
+  };
+}
+
+export function defaultQrStyle(): TrackingQrStyle {
+  return {
+    foreground: "#22211d",
+    background: "#fbf8f2",
+    accent: "#ad9576",
+    dotStyle: "rounded",
+    finderStyle: "rounded",
+    frameStyle: "rounded",
+    dotRoundness: 48,
+    finderRoundness: 24,
+    frameRoundness: 42,
+    frameCut: 0,
+    frameLabel: "Scan for project updates",
+    includeLogo: true
   };
 }
 

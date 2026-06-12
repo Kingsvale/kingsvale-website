@@ -1398,11 +1398,115 @@ button:disabled {
   padding: 11px 12px;
 }
 
+.qr-designer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.qr-designer__controls .admin-section-heading {
+  margin-top: 0;
+}
+
+.qr-designer__controls h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qr-designer__controls h3 svg {
+  width: 18px;
+  height: 18px;
+  color: #365e7e;
+}
+
+.qr-designer__preview {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.qr-designer__svg {
+  width: min(100%, 280px);
+  padding: 12px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: var(--ivory-2);
+}
+
+.qr-designer__svg svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.color-field__control {
+  min-height: 45px;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px 5px 5px;
+  border: 1px solid rgba(70, 59, 48, 0.22);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.color-field__control input {
+  width: 42px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.color-field__control span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.range-field .admin-field__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-field .admin-field__label span {
+  min-width: 42px;
+  color: #365e7e;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.range-field input[type="range"] {
+  width: 100%;
+  min-height: 45px;
+  padding: 0;
+  accent-color: #365e7e;
+  cursor: pointer;
+}
+
 .milestone-editor .card-controls {
   align-items: center;
 }
 
 .milestone-editor .card-controls button {
+  margin-left: auto;
+}
+
+.resource-editor .card-controls {
+  align-items: center;
+}
+
+.resource-editor .card-controls button {
   margin-left: auto;
 }
 
@@ -1549,7 +1653,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   gap: 24px;
-  padding-bottom: 72px;
+  padding-bottom: 24px;
 }
 
 .tracking-panel {
@@ -1637,6 +1741,91 @@ button:disabled {
   display: grid;
   gap: 12px;
   margin: 18px 0 0;
+}
+
+.tracking-resources {
+  width: min(100% - 56px, 1180px);
+  margin: 0 auto;
+  padding: 24px 0 72px;
+}
+
+.tracking-resources .section-heading {
+  width: 100%;
+  margin-bottom: 22px;
+}
+
+.tracking-resources__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.tracking-resource {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 260px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.tracking-resource__media {
+  aspect-ratio: 1.55;
+  overflow: hidden;
+  background: var(--cream);
+}
+
+.tracking-resource__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tracking-resource__icon {
+  min-height: 132px;
+  display: grid;
+  place-items: center;
+  background: rgba(237, 244, 248, 0.82);
+  color: #365e7e;
+}
+
+.tracking-resource__icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.tracking-resource__body {
+  display: grid;
+  gap: 9px;
+  align-content: start;
+  padding: 18px;
+}
+
+.tracking-resource__body span,
+.tracking-resource__body a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #365e7e;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tracking-resource__body h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.tracking-resource__body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tracking-resource__body svg {
+  width: 15px;
+  height: 15px;
 }
 
 .tracking-empty {
@@ -2124,7 +2313,8 @@ button:disabled {
 
   .sites-admin__layout,
   .tracking-hero,
-  .tracking-grid {
+  .tracking-grid,
+  .tracking-resources__grid {
     grid-template-columns: 1fr;
   }
 
@@ -2363,6 +2553,7 @@ button:disabled {
 
   .admin-grid--two,
   .image-editor,
+  .qr-designer,
   .tracking-link-box,
   .tracking-current {
     grid-template-columns: 1fr;
@@ -2376,7 +2567,8 @@ button:disabled {
 
   .tracking-hero,
   .tracking-current,
-  .tracking-grid {
+  .tracking-grid,
+  .tracking-resources {
     width: min(100% - 32px, 720px);
   }
 

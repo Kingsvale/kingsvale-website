@@ -18,6 +18,35 @@ export type CouncilSyncSettings = {
   lastSyncStatus: string;
 };
 
+export type TrackingQrDotStyle = "square" | "rounded" | "circle";
+export type TrackingQrFinderStyle = "square" | "rounded" | "circle";
+export type TrackingQrFrameStyle = "square" | "rounded" | "cut-corner";
+
+export type TrackingQrStyle = {
+  foreground: string;
+  background: string;
+  accent: string;
+  dotStyle: TrackingQrDotStyle;
+  finderStyle: TrackingQrFinderStyle;
+  frameStyle: TrackingQrFrameStyle;
+  dotRoundness: number;
+  finderRoundness: number;
+  frameRoundness: number;
+  frameCut: number;
+  frameLabel: string;
+  includeLogo: boolean;
+};
+
+export type TrackingResourceType = "image" | "document" | "link";
+
+export type TrackingResource = {
+  id: string;
+  type: TrackingResourceType;
+  title: string;
+  url: string;
+  note: string;
+};
+
 export type TrackingMilestone = {
   id: string;
   label: string;
@@ -37,6 +66,8 @@ export type TrackingSite = {
   currentStatus: TrackingStatus;
   statusNote: string;
   milestones: TrackingMilestone[];
+  resources: TrackingResource[];
+  qrStyle: TrackingQrStyle;
   council: CouncilSyncSettings;
   createdAt: string;
   updatedAt: string;
@@ -58,4 +89,10 @@ export const trackingMilestoneLabels: Record<TrackingMilestoneState, string> = {
   active: "Active",
   complete: "Complete",
   blocked: "Blocked"
+};
+
+export const trackingResourceLabels: Record<TrackingResourceType, string> = {
+  image: "Image",
+  document: "Document",
+  link: "Link"
 };

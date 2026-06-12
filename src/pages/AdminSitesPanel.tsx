@@ -5,6 +5,7 @@ import {
   Copy,
   ExternalLink,
   Link,
+  Palette,
   Plus,
   RefreshCw,
   Save,
@@ -12,6 +13,7 @@ import {
   Trash2
 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
   checkTrackingCouncilStatus,
@@ -19,14 +21,21 @@ import {
   saveTrackingSite
 } from "../lib/cmsApi";
 import {
+  createTrackingResource,
   createMilestone,
   createTrackingSite,
   trackingStatusClass
 } from "../lib/trackingStorage";
 import {
+  applyTrackingStatusTemplate,
+  trackingStatusTemplates
+} from "../lib/trackingTemplates";
+import {
   trackingMilestoneLabels,
+  trackingResourceLabels,
   trackingStatusLabels,
   type TrackingMilestoneState,
+  type TrackingResourceType,
   type TrackingSite,
   type TrackingStatus
 } from "../lib/trackingTypes";
@@ -38,6 +47,7 @@ import {
 
 const trackingStatuses = Object.keys(trackingStatusLabels) as TrackingStatus[];
 const milestoneStates = Object.keys(trackingMilestoneLabels) as TrackingMilestoneState[];
+const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 
 export function AdminSitesPanel() {
   const [sites, setSites] = useState<TrackingSite[]>([]);
@@ -195,6 +205,16 @@ export function AdminSitesPanel() {
     }
   }
 
+  function handleTemplateChange(templateId: string) {
+    const template = trackingStatusTemplates.find((item) => item.id === templateId);
+    if (!template) {
+      return;
+    }
+
+    setDraft((current) => current ? applyTrackingStatusTemplate(current, template) : current);
+    setStatus(`${template.label} template applied. Review details, then save.`);
+  }
+
   function updateDraft(recipe: (site: TrackingSite) => void) {
     setDraft((current) => {
       if (!current) {
@@ -319,6 +339,85 @@ export function AdminSitesPanel() {
                   </a>
                 </div>
 
+                <div className="qr-designer">
+                  <div className="qr-designer__controls">
+                    <div className="admin-section-heading">
+                      <h3><Palette aria-hidden="true" /> QR design</h3>
+                    </div>
+                    <div className="admin-grid admin-grid--two">
+                      <ColorInput
+                        label="Foreground"
+                        value={draft.qrStyle.foreground}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.foreground = value; })
+                        }
+                      />
+                      <ColorInput
+                        label="Background"
+                        value={draft.qrStyle.background}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.background = value; })
+                        }
+                      />
+                      <ColorInput
+                        label="Accent"
+                        value={draft.qrStyle.accent}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.accent = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Dot roundness"
+                        value={draft.qrStyle.dotRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.dotRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Finder roundness"
+                        value={draft.qrStyle.finderRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.finderRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Frame roundness"
+                        value={draft.qrStyle.frameRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.frameRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Cut corners"
+                        value={draft.qrStyle.frameCut}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.frameCut = value; })
+                        }
+                      />
+                    </div>
+                    <TrackingTextInput
+                      label="QR label"
+                      value={draft.qrStyle.frameLabel}
+                      maxLength={trackingFieldLimits.qrFrameLabel}
+                      error={errorsByPath["qrStyle.frameLabel"]}
+                      onChange={(value) =>
+                        updateDraft((site) => { site.qrStyle.frameLabel = value; })
+                      }
+                    />
+                    <label className="sites-admin__toggle">
+                      <input
+                        type="checkbox"
+                        checked={draft.qrStyle.includeLogo}
+                        onChange={(event) =>
+                          updateDraft((site) => { site.qrStyle.includeLogo = event.target.checked; })
+                        }
+                      />
+                      <span>Include Kingsvale mark</span>
+                    </label>
+                  </div>
+                  <TrackingQrCode value={publicLink} style={draft.qrStyle} title={draft.title} />
+                </div>
+
                 <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
                     label="Site title"
@@ -367,6 +466,21 @@ export function AdminSitesPanel() {
                     </select>
                   </label>
                 </div>
+                <label className="admin-field" htmlFor="status-template">
+                  <span className="admin-field__label">Apply status template</span>
+                  <select
+                    id="status-template"
+                    value=""
+                    onChange={(event) => handleTemplateChange(event.target.value)}
+                  >
+                    <option value="">Choose a template</option>
+                    {trackingStatusTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <TrackingTextarea
                   label="Summary"
                   value={draft.summary}
@@ -473,6 +587,100 @@ export function AdminSitesPanel() {
                     </article>
                   ))}
                 </div>
+              </section>
+
+              <section className="admin-panel" aria-labelledby="tracking-resources-title">
+                <div className="admin-section-heading">
+                  <h2 id="tracking-resources-title">Customer resources</h2>
+                  <button
+                    type="button"
+                    className="admin-small"
+                    aria-label="Add resource"
+                    disabled={draft.resources.length >= 8}
+                    onClick={() =>
+                      updateDraft((site) => {
+                        site.resources.push(createTrackingResource());
+                      })
+                    }
+                  >
+                    <Plus aria-hidden="true" />
+                    Add
+                  </button>
+                </div>
+                {draft.resources.length === 0 ? (
+                  <p className="admin-panel__note">
+                    Add images, planning documents, drawings, schedules or useful links for customers.
+                  </p>
+                ) : (
+                  <div className="admin-stack">
+                    {draft.resources.map((resource, index) => (
+                      <article className="admin-subcard resource-editor" key={resource.id}>
+                        <div className="card-controls">
+                          <h3>{trackingResourceLabels[resource.type]} {index + 1}</h3>
+                          <button
+                            type="button"
+                            aria-label={`Remove resource ${index + 1}`}
+                            onClick={() =>
+                              updateDraft((site) => {
+                                site.resources.splice(index, 1);
+                              })
+                            }
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </button>
+                        </div>
+                        <div className="admin-grid admin-grid--two">
+                          <label className="admin-field" htmlFor={`resource-type-${index}`}>
+                            <span className="admin-field__label">Type</span>
+                            <select
+                              id={`resource-type-${index}`}
+                              value={resource.type}
+                              onChange={(event) =>
+                                updateDraft((site) => {
+                                  site.resources[index].type = event.target.value as TrackingResourceType;
+                                })
+                              }
+                            >
+                              {resourceTypes.map((type) => (
+                                <option key={type} value={type}>
+                                  {trackingResourceLabels[type]}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <TrackingTextInput
+                            label={`Resource ${index + 1} title`}
+                            value={resource.title}
+                            maxLength={trackingFieldLimits.resourceTitle}
+                            error={errorsByPath[`resources.${index}.title`]}
+                            onChange={(value) =>
+                              updateDraft((site) => { site.resources[index].title = value; })
+                            }
+                          />
+                        </div>
+                        <TrackingTextInput
+                          label={`Resource ${index + 1} URL`}
+                          type="url"
+                          value={resource.url}
+                          maxLength={trackingFieldLimits.resourceUrl}
+                          error={errorsByPath[`resources.${index}.url`]}
+                          onChange={(value) =>
+                            updateDraft((site) => { site.resources[index].url = value; })
+                          }
+                        />
+                        <TrackingTextInput
+                          label={`Resource ${index + 1} note`}
+                          value={resource.note}
+                          maxLength={trackingFieldLimits.resourceNote}
+                          error={errorsByPath[`resources.${index}.note`]}
+                          onChange={(value) =>
+                            updateDraft((site) => { site.resources[index].note = value; })
+                          }
+                        />
+                      </article>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <section className="admin-panel" aria-labelledby="council-shell-title">
@@ -594,6 +802,63 @@ function TrackingTextInput({
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
       />
       {error && <span className="admin-field__error">{error}</span>}
+    </label>
+  );
+}
+
+function ColorInput({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = toId(label);
+  return (
+    <label className="admin-field color-field" htmlFor={id}>
+      <span className="admin-field__label">{label}</span>
+      <span className="color-field__control">
+        <input
+          id={id}
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <span>{value}</span>
+      </span>
+    </label>
+  );
+}
+
+function RangeInput({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const id = toId(label);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return (
+    <label className="admin-field range-field" htmlFor={id}>
+      <span className="admin-field__label">
+        {label}
+        <span aria-hidden="true">{Math.round(safeValue)}%</span>
+      </span>
+      <input
+        id={id}
+        aria-label={label}
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value={safeValue}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
     </label>
   );
 }

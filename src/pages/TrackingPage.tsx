@@ -1,4 +1,14 @@
-import { AlertCircle, Building2, CheckCircle2, Clock, Home, MapPin } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileText,
+  Home,
+  Image as ImageIcon,
+  MapPin
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
@@ -6,8 +16,10 @@ import { fetchTrackingSiteByToken } from "../lib/cmsApi";
 import { trackingStatusClass } from "../lib/trackingStorage";
 import {
   trackingMilestoneLabels,
+  trackingResourceLabels,
   trackingStatusLabels,
   type TrackingMilestoneState,
+  type TrackingResource,
   type TrackingSite
 } from "../lib/trackingTypes";
 
@@ -149,7 +161,51 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
           </dl>
         </aside>
       </section>
+
+      {site.resources.length > 0 && (
+        <section className="tracking-resources" aria-labelledby="tracking-resources-title">
+          <div className="section-heading">
+            <p className="eyebrow">Shared resources</p>
+            <h2 id="tracking-resources-title">Images and documents</h2>
+          </div>
+          <div className="tracking-resources__grid">
+            {site.resources.map((resource) => (
+              <TrackingResourceCard key={resource.id} resource={resource} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
+  );
+}
+
+function TrackingResourceCard({ resource }: { resource: TrackingResource }) {
+  const isImage = resource.type === "image";
+
+  return (
+    <article className={isImage ? "tracking-resource tracking-resource--image" : "tracking-resource"}>
+      {isImage ? (
+        <a className="tracking-resource__media" href={resource.url} target="_blank" rel="noreferrer">
+          <img src={resource.url} alt={resource.title} loading="lazy" decoding="async" />
+        </a>
+      ) : (
+        <div className="tracking-resource__icon">
+          {resource.type === "document" ? <FileText aria-hidden="true" /> : <ExternalLink aria-hidden="true" />}
+        </div>
+      )}
+      <div className="tracking-resource__body">
+        <span>
+          {isImage ? <ImageIcon aria-hidden="true" /> : null}
+          {trackingResourceLabels[resource.type]}
+        </span>
+        <h3>{resource.title}</h3>
+        {resource.note && <p>{resource.note}</p>}
+        <a href={resource.url} target="_blank" rel="noreferrer">
+          Open resource
+          <ExternalLink aria-hidden="true" />
+        </a>
+      </div>
+    </article>
   );
 }
 

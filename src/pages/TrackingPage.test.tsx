@@ -13,7 +13,16 @@ describe("TrackingPage", () => {
       siteAddress: "12 Meadow Lane",
       reference: "KV-2401",
       currentStatus: "submitted",
-      statusNote: "The planning application has been submitted for council review."
+      statusNote: "The planning application has been submitted for council review.",
+      resources: [
+        {
+          id: "resource-plan",
+          type: "document",
+          title: "Planning pack",
+          url: "https://example.com/planning-pack.pdf",
+          note: "Latest shared planning document."
+        }
+      ]
     });
 
     render(<TrackingPage content={defaultContent} token={site.token} />);
@@ -24,5 +33,7 @@ describe("TrackingPage", () => {
     expect(screen.getByText("12 Meadow Lane")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Submitted" })).toBeVisible();
     expect(screen.getByText(/planning application has been submitted/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Images and documents" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Planning pack" })).toBeVisible();
   });
 });

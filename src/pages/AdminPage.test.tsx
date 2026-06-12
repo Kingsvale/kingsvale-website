@@ -77,6 +77,45 @@ describe("AdminPage", () => {
       const link = screen.getByTestId("generated-tracking-link") as HTMLInputElement;
       expect(link.value).toMatch(/\/track\/[a-zA-Z0-9_-]+/);
     });
+    expect(screen.getByLabelText("QR code preview")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dot roundness")).toHaveValue("48");
+    expect(screen.getByLabelText("Finder roundness")).toHaveValue("24");
+    expect(screen.getByLabelText("Frame roundness")).toHaveValue("42");
+    fireEvent.change(screen.getByLabelText("Finder roundness"), {
+      target: { value: "86" }
+    });
+    fireEvent.change(screen.getByLabelText("Cut corners"), {
+      target: { value: "34" }
+    });
+    expect(screen.getByLabelText("Finder roundness")).toHaveValue("86");
+    expect(screen.getByLabelText("Cut corners")).toHaveValue("34");
+    expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
+  });
+
+  it("applies status templates and supports customer resources", async () => {
+    render(<AdminPage publishedContent={defaultContent} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    fireEvent.click(screen.getByRole("button", { name: /create site/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Apply status template")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Apply status template"), {
+      target: { value: "construction" }
+    });
+    expect(screen.getByLabelText("Current status")).toHaveValue("construction");
+    expect(screen.getByLabelText(/Milestone 1 label/)).toHaveValue("Site setup");
+
+    fireEvent.click(screen.getByRole("button", { name: /add resource/i }));
+    fireEvent.change(screen.getByLabelText(/Resource 1 title/), {
+      target: { value: "Planning pack" }
+    });
+    fireEvent.change(screen.getByLabelText(/Resource 1 URL/), {
+      target: { value: "https://example.com/planning-pack.pdf" }
+    });
+
     expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
   });
 
