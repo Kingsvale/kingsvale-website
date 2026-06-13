@@ -46,6 +46,7 @@ const royalMailTrackingApiUrl = process.env.ROYAL_MAIL_TRACKING_API_URL ?? "";
 const royalMailTrackingApiKey = process.env.ROYAL_MAIL_TRACKING_API_KEY ?? "";
 const maxCmsRevisions = clampNumber(process.env.CMS_MAX_REVISIONS, 25, 5, 100);
 const maxCmsBackups = clampNumber(process.env.CMS_MAX_BACKUPS, 30, 5, 120);
+const backupImportMaxBytes = clampNumber(process.env.BACKUP_IMPORT_MAX_MB, 25, 5, 100) * 1_000_000;
 const requestBuckets = new Map();
 
 const mimeTypes = {
@@ -828,7 +829,7 @@ async function handleBackup(request, response) {
   }
 
   if (request.method === "PUT") {
-    const payload = await readJsonBody(request, 20_000_000);
+    const payload = await readJsonBody(request, backupImportMaxBytes);
     const backup = payload.backup;
     const mode = payload.mode === "merge" ? "merge" : "replace";
     const validation = validateBackupPayload(backup);

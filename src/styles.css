@@ -347,9 +347,12 @@ button:disabled {
 }
 
 .editorial-split {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  background: var(--ivory-2);
+  background:
+    linear-gradient(90deg, var(--ivory) 0 50%, var(--ivory-2) 50% 100%);
+  border-bottom: 1px solid rgba(70, 59, 48, 0.16);
 }
 
 .editorial-split__media {
@@ -397,8 +400,23 @@ button:disabled {
 }
 
 .developments {
-  padding: 72px 0 88px;
-  background: var(--ivory-2);
+  position: relative;
+  padding: 86px 0 100px;
+  background:
+    linear-gradient(180deg, rgba(222, 208, 189, 0.56) 0%, rgba(239, 231, 218, 0.82) 42%, var(--ivory-2) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 28px 52px rgba(34, 33, 29, 0.035);
+}
+
+.developments::before {
+  content: "";
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  width: min(100% - 56px, 1240px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(117, 97, 77, 0.38), transparent);
+  transform: translateX(-50%);
 }
 
 .plot-lookup {
@@ -524,7 +542,7 @@ button:disabled {
 
 .section-heading {
   text-align: center;
-  margin-bottom: 42px;
+  margin-bottom: 48px;
 }
 
 .section-heading h2 {
@@ -539,15 +557,18 @@ button:disabled {
 
 .development-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 290px));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   justify-content: center;
-  gap: 28px;
+  gap: 26px;
 }
 
 .development-card {
-  background: var(--ivory);
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgba(251, 248, 242, 0.94);
   border: 1px solid rgba(70, 59, 48, 0.12);
-  box-shadow: 0 18px 38px rgba(34, 33, 29, 0.06);
+  box-shadow: 0 18px 44px rgba(34, 33, 29, 0.08);
   transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
@@ -559,8 +580,9 @@ button:disabled {
 }
 
 .development-card__media {
+  position: relative;
   display: block;
-  aspect-ratio: 1.36;
+  aspect-ratio: 1.46;
   overflow: hidden;
   background: var(--cream);
 }
@@ -577,8 +599,28 @@ button:disabled {
   transform: scale(1.045);
 }
 
+.development-card__status {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  max-width: calc(100% - 28px);
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
+  background: rgba(34, 33, 29, 0.82);
+  color: var(--ivory);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
 .development-card__body {
-  padding: 22px 22px 24px;
+  display: grid;
+  align-content: start;
+  padding: 24px;
 }
 
 .development-card h3 {
@@ -600,10 +642,51 @@ button:disabled {
   margin-top: 2px !important;
   color: var(--charcoal) !important;
   font-size: 13px !important;
+  font-weight: 800;
+}
+
+.development-card__specs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 20px 0 0;
+  border: 1px solid rgba(70, 59, 48, 0.12);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.development-card__specs div {
+  min-width: 0;
+  padding: 11px 10px;
+  border-right: 1px solid rgba(70, 59, 48, 0.1);
+}
+
+.development-card__specs div:last-child {
+  border-right: 0;
+}
+
+.development-card__specs dt,
+.development-card__specs dd {
+  margin: 0;
+}
+
+.development-card__specs dt {
+  color: var(--taupe-dark);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.development-card__specs dd {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .development-card__link {
-  margin-top: 22px;
+  margin-top: 24px;
   min-height: auto;
   font-size: 11px;
 }
@@ -1125,6 +1208,45 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.admin-storage-pill {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  padding: 0 13px;
+  border: 1px solid rgba(70, 59, 48, 0.16);
+  background: rgba(255, 255, 255, 0.46);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-storage-pill svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.admin-storage-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-storage-pill--server {
+  border-color: rgba(72, 98, 81, 0.24);
+  background: rgba(72, 98, 81, 0.08);
+  color: var(--success);
+}
+
+.admin-storage-pill--local,
+.admin-storage-pill--unavailable {
+  border-color: rgba(150, 103, 52, 0.34);
+  background: rgba(190, 146, 87, 0.14);
+  color: #76512c;
+}
+
 .admin-status {
   display: flex;
   align-items: center;
@@ -1396,6 +1518,64 @@ button:disabled {
 .sites-admin__status {
   flex: 1;
   margin: 0;
+}
+
+.tracking-storage-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: -4px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tracking-storage-banner svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.tracking-storage-banner strong,
+.tracking-storage-banner span {
+  display: block;
+}
+
+.tracking-storage-banner strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tracking-storage-banner span {
+  margin-top: 2px;
+}
+
+.tracking-storage-banner--server {
+  border-color: rgba(72, 98, 81, 0.22);
+  background: rgba(72, 98, 81, 0.08);
+}
+
+.tracking-storage-banner--server svg,
+.tracking-storage-banner--server strong {
+  color: var(--success);
+}
+
+.tracking-storage-banner--local,
+.tracking-storage-banner--unavailable {
+  border-color: rgba(150, 103, 52, 0.32);
+  background: rgba(190, 146, 87, 0.12);
+}
+
+.tracking-storage-banner--local svg,
+.tracking-storage-banner--local strong,
+.tracking-storage-banner--unavailable svg,
+.tracking-storage-banner--unavailable strong {
+  color: #76512c;
 }
 
 .sites-admin__layout {
@@ -1887,6 +2067,12 @@ button:disabled {
 .backup-list {
   margin: 0;
   padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.backup-intro {
+  max-width: 720px;
+  margin: 12px 0 20px;
   color: var(--muted);
 }
 

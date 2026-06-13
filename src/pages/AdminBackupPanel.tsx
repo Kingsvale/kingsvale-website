@@ -5,7 +5,7 @@ import { exportFullBackup, importFullBackup, type KingsvaleBackup } from "../lib
 type ImportMode = "replace" | "merge";
 
 export function AdminBackupPanel() {
-  const [status, setStatus] = useState("Export a complete Kingsvale backup before major edits.");
+  const [status, setStatus] = useState("Export local edits as JSON, then import that file in production Studio.");
   const [busy, setBusy] = useState(false);
   const [importMode, setImportMode] = useState<ImportMode>("replace");
   const [pendingBackup, setPendingBackup] = useState<KingsvaleBackup | null>(null);
@@ -19,7 +19,7 @@ export function AdminBackupPanel() {
       downloadJson(backup);
       setStatus(`Backup exported with ${backup.stores.tracking.sites.length} site records.`);
     } catch {
-      setStatus("Backup export failed. Check the server session.");
+      setStatus("Backup export failed. Sign back in if you are exporting from production.");
     } finally {
       setBusy(false);
     }
@@ -51,9 +51,9 @@ export function AdminBackupPanel() {
     setStatus(importMode === "replace" ? "Replacing stored data..." : "Merging stored data...");
     try {
       await importFullBackup(pendingBackup, importMode);
-      setStatus("Backup imported. Refresh the Studio panels to review the restored data.");
+      setStatus("Backup imported. Open Website and Sites to review the restored data.");
     } catch {
-      setStatus("Backup import failed. The automatic pre-import backup remains on the server.");
+      setStatus("Backup import failed. Check the file and your production Studio session.");
     } finally {
       setBusy(false);
     }
@@ -74,7 +74,11 @@ export function AdminBackupPanel() {
 
       <div className="backup-grid">
         <section className="admin-panel" aria-labelledby="backup-export-title">
-          <h2 id="backup-export-title">What gets exported</h2>
+          <p className="eyebrow">Local to production</p>
+          <h2 id="backup-export-title">Move Studio data with one JSON file</h2>
+          <p className="backup-intro">
+            Use this when you edit locally, build a new image, and want the Portainer instance to show the same content.
+          </p>
           <ul className="backup-list">
             <li>Published website content, draft content and revision history.</li>
             <li>Sites, QR links, map embeds, private notes, Searchland links and uploaded letters.</li>
@@ -84,6 +88,7 @@ export function AdminBackupPanel() {
         </section>
 
         <section className="admin-panel" aria-labelledby="backup-import-title">
+          <p className="eyebrow">Restore</p>
           <h2 id="backup-import-title">Import backup</h2>
           <label className="backup-drop">
             <UploadCloud aria-hidden="true" />

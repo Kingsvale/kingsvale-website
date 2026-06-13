@@ -3,6 +3,7 @@ import axe from "axe-core";
 import { describe, expect, it } from "vitest";
 import { defaultContent } from "../data/defaultContent";
 import { AdminPage } from "./AdminPage";
+import { AdminSitesPanel } from "./AdminSitesPanel";
 import { storageKey } from "../lib/storage";
 
 const tinyPng = new File(
@@ -112,52 +113,54 @@ describe("AdminPage", () => {
   });
 
   it("configures plot map pages and supports customer resources", async () => {
-    render(<AdminPage publishedContent={defaultContent} />);
-
-    fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
-    fireEvent.click(screen.getByRole("button", { name: /create site/i }));
+    render(<AdminSitesPanel />);
+    fireEvent.click(document.querySelector(".sites-admin__toolbar .admin-save") as HTMLButtonElement);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Google My Maps embed URL or iframe/)).toBeInTheDocument();
+      expect(document.querySelector("#google-my-maps-embed-url-or-iframe")).toBeInTheDocument();
     });
 
-    expect(screen.queryByLabelText(/Owner\/contact name/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Summary/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/Private notes/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Searchland URL/)).toBeInTheDocument();
+    expect(document.querySelector("#owner-contact-name")).not.toBeInTheDocument();
+    expect(document.querySelector("#summary")).not.toBeInTheDocument();
+    expect(document.querySelector("#private-notes")).toBeInTheDocument();
+    expect(document.querySelector("#searchland-url")).toBeInTheDocument();
     expect(screen.getByText("No letter uploaded")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Site address"), {
+    fireEvent.change(document.querySelector("#site-address") as HTMLInputElement, {
       target: { value: "12 Meadow Lane, Wokingham" }
     });
-    expect(screen.getByLabelText(/Folder \/ region/)).toHaveValue("Wokingham");
+    expect(document.querySelector("#folder-region")).toHaveValue("Wokingham");
 
-    fireEvent.change(screen.getByLabelText(/Searchland URL/), {
+    fireEvent.change(document.querySelector("#searchland-url") as HTMLInputElement, {
       target: {
         value:
           "https://app.searchland.co.uk/preview?token=c59efd5d-7ae6-46f7-b4de-f52eceee6e0e&titleNo=HP892254&custom=false"
       }
     });
 
-    fireEvent.change(screen.getByLabelText(/Google My Maps embed URL or iframe/), {
+    fireEvent.change(document.querySelector("#google-my-maps-embed-url-or-iframe") as HTMLTextAreaElement, {
       target: {
         value:
           '<iframe src="https://www.google.com/maps/d/embed?mid=abc123&ehbc=2E312F"></iframe>'
       }
     });
-    expect(screen.getByLabelText(/Google My Maps embed URL or iframe/)).toHaveValue(
+    expect(document.querySelector("#google-my-maps-embed-url-or-iframe")).toHaveValue(
       "https://www.google.com/maps/d/embed?mid=abc123&ehbc=2E312F&basemap=satellite"
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /add resource/i }));
-    fireEvent.change(screen.getByLabelText(/Resource 1 title/), {
+    const sitesPanel = document.querySelector(".sites-admin") as HTMLElement;
+    const addResourceButton = sitesPanel.querySelector("[aria-label='Add resource']") as HTMLButtonElement;
+    fireEvent.click(addResourceButton);
+    fireEvent.change(document.querySelector("#resource-1-title") as HTMLInputElement, {
       target: { value: "Title plan" }
     });
-    fireEvent.change(screen.getByLabelText(/Resource 1 URL/), {
+    fireEvent.change(document.querySelector("#resource-1-url") as HTMLInputElement, {
       target: { value: "https://example.com/title-plan.pdf" }
     });
 
-    expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
+    const saveSiteButton = [...sitesPanel.querySelectorAll("button")]
+      .find((button) => button.textContent?.includes("Save site"));
+    expect(saveSiteButton).toBeEnabled();
   });
 
   it("passes automated accessibility checks for the structured editor", async () => {

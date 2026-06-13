@@ -38,6 +38,12 @@ function DevelopmentCard({
   development: Development;
   delay: number;
 }) {
+  const specs = [
+    { label: "Guide", value: development.priceGuide },
+    { label: "Homes", value: development.homes },
+    { label: "Bedrooms", value: development.bedrooms }
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+
   return (
     <Reveal className="development-card" delay={delay}>
       <a href={development.ctaHref} className="development-card__media">
@@ -46,11 +52,24 @@ function DevelopmentCard({
           sizes="(max-width: 720px) 100vw, (max-width: 1180px) 50vw, 25vw"
           widthHint={720}
         />
+        {development.status && (
+          <span className="development-card__status">{development.status}</span>
+        )}
       </a>
       <div className="development-card__body">
         <h3>{development.title}</h3>
         <p className="development-card__location">{development.location}</p>
         <p>{development.description}</p>
+        {specs.length > 0 && (
+          <dl className="development-card__specs">
+            {specs.map((spec) => (
+              <div key={spec.label}>
+                <dt>{spec.label}</dt>
+                <dd>{spec.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         <ButtonLink href={development.ctaHref} variant="dark" className="development-card__link">
           {development.ctaLabel}
         </ButtonLink>

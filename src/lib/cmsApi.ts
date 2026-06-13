@@ -1,13 +1,19 @@
 import type { ImageAsset, SiteContent } from "./contentTypes";
-import { loadLocalAnalyticsVisits } from "./analytics";
+import { isAnalyticsVisit, loadLocalAnalyticsVisits, saveLocalAnalyticsVisits } from "./analytics";
 import { buildAnalyticsSummary, type AnalyticsSummary } from "./analyticsSummary";
 import type { TrackingSite } from "./trackingTypes";
 import {
   archiveLocalTrackingSite,
   loadLocalTrackingSites,
   normalizeTrackingSite,
+  saveLocalTrackingSites,
   upsertLocalTrackingSite
 } from "./trackingStorage";
+import { isLocalDemoRuntime } from "./runtimeMode";
+import { loadPublishedContent, savePublishedContent } from "./storage";
+import { normalizeSiteContent } from "./contentNormalize";
+import { validateSiteContent } from "./contentValidation";
+import { validateTrackingSite } from "./trackingValidation";
 
 type StudioSession = {
   authenticated: boolean;
@@ -23,10 +29,39 @@ type RevisionSummary = {
   title: string;
 };
 
+export type TrackingStorageStatus = {
+  mode: "checking" | "server" | "local" | "unavailable";
+  label: string;
+  detail: string;
+};
+
 const authTokenStorageKey = "kingsvale-studio-auth-token-v1";
+const trackingStorageStatusEvent = "kingsvale-tracking-storage-status";
+const backupSessionError = "Backup requires an active server session.";
 
 let authToken = "";
 authToken = readStoredAuthToken();
+let trackingStorageStatus: TrackingStorageStatus = {
+  mode: "checking",
+  label: "Checking tracking storage",
+  detail: "Studio has not checked where tracking pages are being saved yet."
+};
+
+export function getTrackingStorageStatus() {
+  return trackingStorageStatus;
+}
+
+export function subscribeTrackingStorageStatus(listener: (status: TrackingStorageStatus) => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handler = (event: Event) => {
+    listener((event as CustomEvent<TrackingStorageStatus>).detail);
+  };
+  window.addEventListener(trackingStorageStatusEvent, handler);
+  return () => window.removeEventListener(trackingStorageStatusEvent, handler);
+}
 
 export async function loginServerSession(passphrase: string, username = "kingsvale") {
   try {
@@ -182,12 +217,23 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Tracking sites require the secure server API.");
+      }
+      markTrackingStorageLocal();
       return loadLocalTrackingSites();
     }
 
-    const payload = (await response.json()) as { sites: TrackingSite[] };
+    const payload = (await response.json()) as { sites: TrackingSite[]; storage?: string };
+    markTrackingStorageServer(payload.storage);
     return payload.sites.map(normalizeTrackingSite);
   } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Tracking sites require the secure server API.");
+    }
+    markTrackingStorageLocal();
     return loadLocalTrackingSites();
   }
 }
@@ -202,12 +248,23 @@ export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Tracking site could not be saved to the secure server.");
+      }
+      markTrackingStorageLocal();
       return upsertLocalTrackingSite(site);
     }
 
-    const payload = (await response.json()) as { site: TrackingSite };
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
     return normalizeTrackingSite(payload.site);
   } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Tracking site could not be saved to the secure server.");
+    }
+    markTrackingStorageLocal();
     return upsertLocalTrackingSite(site);
   }
 }
@@ -221,12 +278,23 @@ export async function archiveTrackingSite(id: string): Promise<TrackingSite | nu
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Tracking site could not be archived on the secure server.");
+      }
+      markTrackingStorageLocal();
       return archiveLocalTrackingSite(id);
     }
 
-    const payload = (await response.json()) as { site: TrackingSite };
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
     return normalizeTrackingSite(payload.site);
   } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Tracking site could not be archived on the secure server.");
+    }
+    markTrackingStorageLocal();
     return archiveLocalTrackingSite(id);
   }
 }
@@ -240,12 +308,23 @@ export async function checkTrackingCouncilStatus(id: string): Promise<TrackingSi
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Council sync requires the secure server API.");
+      }
+      markTrackingStorageLocal();
       return markLocalCouncilSyncAttempt(id);
     }
 
-    const payload = (await response.json()) as { site: TrackingSite };
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
     return normalizeTrackingSite(payload.site);
   } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Council sync requires the secure server API.");
+    }
+    markTrackingStorageLocal();
     return markLocalCouncilSyncAttempt(id);
   }
 }
@@ -259,12 +338,23 @@ export async function checkMailingTrackingStatus(id: string): Promise<TrackingSi
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Postal tracking sync requires the secure server API.");
+      }
+      markTrackingStorageLocal();
       return markLocalPostalSyncAttempt(id);
     }
 
-    const payload = (await response.json()) as { site: TrackingSite };
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
     return normalizeTrackingSite(payload.site);
   } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Postal tracking sync requires the secure server API.");
+    }
+    markTrackingStorageLocal();
     return markLocalPostalSyncAttempt(id);
   }
 }
@@ -300,28 +390,201 @@ export type KingsvaleBackup = {
 };
 
 export async function exportFullBackup(): Promise<KingsvaleBackup> {
-  const response = await fetch("/api/backup", {
-    credentials: "same-origin",
-    headers: authHeaders({ Accept: "application/json" })
-  });
-  if (!response.ok) {
-    throw new Error("Backup could not be exported.");
+  if (isLocalDemoRuntime() && !authToken) {
+    return buildLocalFullBackup();
   }
-  const payload = (await response.json()) as { backup: KingsvaleBackup };
-  return payload.backup;
+
+  try {
+    const response = await fetch("/api/backup", {
+      credentials: "same-origin",
+      headers: authHeaders({ Accept: "application/json" })
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(backupSessionError);
+    }
+
+    if (response.ok && isJsonResponse(response)) {
+      const payload = (await response.json()) as { backup: KingsvaleBackup };
+      return payload.backup;
+    }
+  } catch (error) {
+    if (isBackupSessionError(error)) {
+      throw error;
+    }
+    if (!isLocalDemoRuntime()) {
+      throw error;
+    }
+    return buildLocalFullBackup();
+  }
+
+  if (isLocalDemoRuntime()) {
+    return buildLocalFullBackup();
+  }
+
+  throw new Error("Backup could not be exported.");
 }
 
 export async function importFullBackup(backup: KingsvaleBackup, mode: "replace" | "merge") {
-  const response = await fetch("/api/backup", {
-    method: "PUT",
-    credentials: "same-origin",
-    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
-    body: JSON.stringify({ backup, mode })
-  });
-  if (!response.ok) {
-    throw new Error("Backup could not be imported.");
+  if (isLocalDemoRuntime() && !authToken) {
+    return importLocalFullBackup(backup, mode);
   }
-  return (await response.json()) as { ok: true; importedAt: string; mode: "replace" | "merge" };
+
+  try {
+    const response = await fetch("/api/backup", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+      body: JSON.stringify({ backup, mode })
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(backupSessionError);
+    }
+
+    if (response.ok && isJsonResponse(response)) {
+      return (await response.json()) as { ok: true; importedAt: string; mode: "replace" | "merge" };
+    }
+  } catch (error) {
+    if (isBackupSessionError(error)) {
+      throw error;
+    }
+    if (!isLocalDemoRuntime()) {
+      throw error;
+    }
+    return importLocalFullBackup(backup, mode);
+  }
+
+  if (isLocalDemoRuntime()) {
+    return importLocalFullBackup(backup, mode);
+  }
+
+  throw new Error("Backup could not be imported.");
+}
+
+async function buildLocalFullBackup(): Promise<KingsvaleBackup> {
+  const now = new Date().toISOString();
+  const published = loadPublishedContent();
+  const trackingSites = await listTrackingSites();
+
+  return {
+    kind: "kingsvale-full-backup",
+    version: 1,
+    exportedAt: now,
+    stores: {
+      cms: {
+        published,
+        draft: published,
+        revisions: [],
+        updatedAt: now
+      },
+      tracking: {
+        sites: trackingSites,
+        updatedAt: now
+      },
+      analytics: {
+        visits: loadLocalAnalyticsVisits(),
+        updatedAt: now
+      },
+      leads: {
+        contact: "",
+        newsletter: ""
+      }
+    }
+  };
+}
+
+async function importLocalFullBackup(backup: KingsvaleBackup, mode: "replace" | "merge") {
+  const content = extractBackupContent(backup);
+  const importedSites = extractBackupTrackingSites(backup);
+  const importedVisits = extractBackupAnalyticsVisits(backup);
+
+  await importLocalTrackingBackup(backup, importedSites, mode);
+  savePublishedContent(content);
+  saveLocalAnalyticsVisits(
+    mode === "merge"
+      ? dedupeVisits([...importedVisits, ...loadLocalAnalyticsVisits()]).slice(0, 500)
+      : importedVisits.slice(0, 500)
+  );
+
+  return { ok: true as const, importedAt: new Date().toISOString(), mode };
+}
+
+function extractBackupContent(backup: KingsvaleBackup) {
+  const cms = backup.stores.cms as { published?: SiteContent | null; draft?: SiteContent | null } | null;
+  const candidate = cms?.published ?? cms?.draft;
+  if (!candidate) {
+    throw new Error("Backup does not include website content.");
+  }
+
+  const normalized = normalizeSiteContent(candidate);
+  const validation = validateSiteContent(normalized);
+  if (!validation.valid) {
+    throw new Error("Backup website content is invalid.");
+  }
+  return normalized;
+}
+
+function extractBackupTrackingSites(backup: KingsvaleBackup) {
+  return backup.stores.tracking.sites
+    .map(normalizeTrackingSite)
+    .filter((site) => validateTrackingSite(site).valid);
+}
+
+function extractBackupAnalyticsVisits(backup: KingsvaleBackup) {
+  const analytics = backup.stores.analytics as { visits?: unknown[] } | null;
+  return Array.isArray(analytics?.visits) ? analytics.visits.filter(isAnalyticsVisit) : [];
+}
+
+async function importLocalTrackingBackup(
+  backup: KingsvaleBackup,
+  importedSites: TrackingSite[],
+  mode: "replace" | "merge"
+) {
+  try {
+    const response = await fetch("/api/backup", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ backup, mode })
+    });
+
+    if (response.ok && isJsonResponse(response)) {
+      markTrackingStorageServer("dev-file");
+      return;
+    }
+  } catch {
+    // Fall through to browser-only storage when no development API is available.
+  }
+
+  const existingSites = loadLocalTrackingSites();
+  const nextSites = mode === "merge"
+    ? [
+        ...importedSites,
+        ...existingSites.filter((site) => !importedSites.some((imported) => imported.id === site.id))
+      ]
+    : importedSites;
+  saveLocalTrackingSites(nextSites);
+  markTrackingStorageLocal();
+}
+
+function dedupeVisits(visits: ReturnType<typeof loadLocalAnalyticsVisits>) {
+  const seen = new Set<string>();
+  return visits.filter((visit) => {
+    if (seen.has(visit.id)) {
+      return false;
+    }
+    seen.add(visit.id);
+    return true;
+  });
+}
+
+function isJsonResponse(response: Response) {
+  return response.headers.get("content-type")?.includes("application/json") ?? false;
+}
+
+function isBackupSessionError(error: unknown) {
+  return error instanceof Error && error.message === backupSessionError;
 }
 
 function authHeaders(headers: Record<string, string> = {}) {
@@ -362,6 +625,39 @@ function clearStoredAuthToken() {
   authToken = "";
   if (typeof window !== "undefined") {
     window.sessionStorage.removeItem(authTokenStorageKey);
+  }
+}
+
+function markTrackingStorageServer(storage?: string) {
+  setTrackingStorageStatus({
+    mode: "server",
+    label: storage === "dev-file" ? "Development server storage active" : "Server storage active",
+    detail: storage === "dev-file"
+      ? "Tracking pages are saved to this Vite dev server and are visible across browser sessions on this machine."
+      : "Tracking pages are saved through the secure server API and are visible to anyone with the public link."
+  });
+}
+
+function markTrackingStorageLocal() {
+  setTrackingStorageStatus({
+    mode: "local",
+    label: "Local browser storage only",
+    detail: "Tracking pages are only saved in this browser. Links will not work in incognito, another browser, or another device."
+  });
+}
+
+function markTrackingStorageUnavailable() {
+  setTrackingStorageStatus({
+    mode: "unavailable",
+    label: "Server storage unavailable",
+    detail: "Studio could not reach the tracking storage API, so tracking pages were not saved server-side."
+  });
+}
+
+function setTrackingStorageStatus(status: TrackingStorageStatus) {
+  trackingStorageStatus = status;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(trackingStorageStatusEvent, { detail: status }));
   }
 }
 

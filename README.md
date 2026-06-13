@@ -69,6 +69,7 @@ Optional hardening:
 $env:STUDIO_TOTP_SECRET="BASE32-TOTP-SECRET"
 $env:CMS_MAX_REVISIONS="25"
 $env:CMS_MAX_BACKUPS="30"
+$env:BACKUP_IMPORT_MAX_MB="25"
 ```
 
 Optional Royal Mail or third-party tracking lookup:
@@ -144,6 +145,7 @@ Optional variables:
 STUDIO_TOTP_SECRET=
 CMS_MAX_REVISIONS=25
 CMS_MAX_BACKUPS=30
+BACKUP_IMPORT_MAX_MB=25
 ROYAL_MAIL_TRACKING_API_URL=
 ROYAL_MAIL_TRACKING_API_KEY=
 CONTACT_WEBHOOK_URL=
@@ -174,6 +176,15 @@ Deploy the uploaded image as a Portainer Stack:
 4. Deploy the stack.
 5. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
 6. Open Studio at `/studio`.
+
+Move local Studio data to the deployed instance:
+
+1. In the local Studio, open `Backup` and choose `Export full backup`.
+2. Build and upload the new Docker image as usual.
+3. In the production Studio on Portainer, open `Backup`, choose the exported JSON, and import it.
+4. Use `Replace everything` when production should exactly match local content, or `Merge sites, visits and leads` when production records should be kept.
+
+The Docker image and the editable Studio data are intentionally separate. The image carries code and default placeholders; the backup JSON carries website edits, Sites/QR pages, mailing workflow data, analytics and lead logs. Keep the `kingsvale_data` Docker volume and `CMS_ENCRYPTION_KEY` stable between redeploys so existing production data remains readable.
 
 Portainer Git deployment:
 

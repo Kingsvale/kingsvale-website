@@ -1,0 +1,94 @@
+{
+  "sites": [
+    {
+      "id": "tracking-1781306992872-3i0s",
+      "token": "8029bBnJTdMeM47X_6nbo9FD",
+      "title": "skibidi",
+      "customerName": "",
+      "siteAddress": "Site address",
+      "reference": "",
+      "region": "Uncategorised",
+      "ownerContactName": "",
+      "contactPriority": "unknown",
+      "summary": "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
+      "mapEmbedUrl": "",
+      "privateNotes": "",
+      "letterFileName": "",
+      "letterFileUrl": "",
+      "searchlandUrl": "",
+      "currentStatus": "planning",
+      "statusNote": "Kingsvale is reviewing this land interest opportunity.",
+      "milestones": [
+        {
+          "id": "milestone-1781306992872-ig7s",
+          "label": "Planning details prepared",
+          "state": "active",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781306992872-f1x3",
+          "label": "Application submitted",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781306992872-9izl",
+          "label": "Council review",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781306992872-fbc5",
+          "label": "Decision issued",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781306992872-ttrs",
+          "label": "Construction progress",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        }
+      ],
+      "resources": [],
+      "qrStyle": {
+        "foreground": "#22211d",
+        "background": "#fbf8f2",
+        "accent": "#ad9576",
+        "dotRoundness": 48,
+        "finderRoundness": 24,
+        "frameRoundness": 42,
+        "frameCut": 0,
+        "frameLabel": "Scan to view the plot",
+        "includeLogo": true
+      },
+      "council": {
+        "mode": "none",
+        "councilName": "",
+        "applicationReference": "",
+        "apiBaseUrl": "",
+        "lastCheckedAt": null,
+        "lastSyncStatus": "Not configured"
+      },
+      "mailingStatus": "not-mailed",
+      "firstMailedAt": "",
+      "lastMailedAt": "",
+      "royalMailTrackingNumber": "",
+      "trackingStatus": "Tracking unavailable",
+      "trackingLastCheckedAt": null,
+      "remailReminderDays": 14,
+      "remailReminderDate": "",
+      "mailingNotes": "",
+      "mailingLastUpdatedAt": "2026-06-12T23:29:52.872Z",
+      "createdAt": "2026-06-12T23:29:52.872Z",
+      "updatedAt": "2026-06-13T00:24:16.190Z",
+      "archived": true
+    }
+  ],
+  "updatedAt": "2026-06-13T00:24:16.190Z"
+}
