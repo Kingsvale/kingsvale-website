@@ -189,28 +189,26 @@ The Docker image and the editable Studio data are intentionally separate. The im
 Portainer Git deployment with automatic image rebuilds:
 
 1. Push this project to `https://github.com/Kingsvale/kingsvale-website`.
-2. The GitHub Actions workflow at `.github/workflows/docker-image.yml` builds and pushes `ghcr.io/kingsvale/kingsvale-website:latest` whenever you push to `main` or `master`.
-3. Make sure Portainer can pull the GHCR image:
-   - Public image: in GitHub, open the package settings for `kingsvale-website` and make the package public.
-   - Private image: in Portainer, add a GitHub Container Registry credential for `ghcr.io` using a GitHub PAT with package read access.
-4. In Portainer, go to `Stacks` -> `Add stack`.
-5. Choose `Git repository`, enter the repository URL and branch.
-6. Set `Compose path` to `docker-compose.portainer.yml`.
-7. Add the environment variables above in the Stack environment section.
-8. Deploy the stack. Portainer will pull `ghcr.io/kingsvale/kingsvale-website:latest`.
-9. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
-10. Open Studio at `/studio`.
+2. In Portainer, go to `Stacks` -> `Add stack`.
+3. Choose `Git repository`, enter the repository URL and branch.
+4. Set `Compose path` to `docker-compose.portainer.yml`.
+5. Add the environment variables above in the Stack environment section.
+6. Deploy the stack. Portainer will build `kingsvale-luxury-real-estate:latest` from the Git checkout because the compose file includes a `build:` block.
+7. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
+8. Open Studio at `/studio`.
 
 Automatic redeploy from GitHub:
 
 1. Edit the Git-backed stack in Portainer.
-2. Enable the stack webhook/update URL and copy it.
-3. In GitHub, open `Kingsvale/kingsvale-website` -> `Settings` -> `Secrets and variables` -> `Actions`.
-4. Add a repository secret named `PORTAINER_WEBHOOK_URL` and paste the Portainer stack webhook URL.
-5. Push a change. GitHub Actions will build and push the Docker image first, then call the Portainer webhook.
-6. Portainer will pull the latest image and recreate the container using the same `kingsvale_data` volume.
+2. Enable `GitOps updates`.
+3. Choose either `Polling` or `Webhook`.
+   - `Polling`: set a fetch interval, for example every 5 minutes.
+   - `Webhook`: copy the Portainer webhook URL.
+4. If using `Webhook`, in GitHub open `Kingsvale/kingsvale-website` -> `Settings` -> `Webhooks` -> `Add webhook`.
+5. Paste the Portainer webhook URL as the payload URL, set content type to `application/json`, and select push events.
+6. Save. Each pushed change can now trigger Portainer to pull the latest commit, rebuild the local image from the repo and redeploy the stack.
 
-You can also enable Portainer `GitOps updates` with polling as a fallback, for example every 5 minutes. Keep the `kingsvale_data` volume attached so redeploys keep Studio data.
+The repository also includes `.github/workflows/docker-image.yml` for an optional GHCR image workflow. Do not point `docker-compose.portainer.yml` at `ghcr.io/kingsvale/kingsvale-website:latest` unless the GitHub Container Registry package is public or Portainer has valid `ghcr.io` registry credentials. Keep the `kingsvale_data` volume attached so redeploys keep Studio data.
 
 If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep HTTPS enabled.
 
