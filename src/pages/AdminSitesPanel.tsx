@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   Archive,
   Copy,
   ExternalLink,
@@ -10,14 +11,17 @@ import {
   Plus,
   Save,
   Search,
+  ShieldCheck,
   Trash2
 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
+  getTrackingStorageStatus,
   listTrackingSites,
-  saveTrackingSite
+  saveTrackingSite,
+  subscribeTrackingStorageStatus
 } from "../lib/cmsApi";
 import {
   createTrackingResource,
@@ -51,25 +55,32 @@ export function AdminSitesPanel() {
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Create QR-ready land interest map pages.");
+  const [storageStatus, setStorageStatus] = useState(() => getTrackingStorageStatus());
 
   useEffect(() => {
     let active = true;
 
     async function loadSites() {
-      const loadedSites = await listTrackingSites();
-      if (!active) {
-        return;
-      }
+      try {
+        const loadedSites = await listTrackingSites();
+        if (!active) {
+          return;
+        }
 
-      const orderedSites = sortSites(loadedSites);
-      setSites((current) => {
-        const merged = [
-          ...current,
-          ...orderedSites.filter((site) => !current.some((item) => item.id === site.id))
-        ];
-        return sortSites(merged);
-      });
-      setDraft((current) => current ?? orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
+        const orderedSites = sortSites(loadedSites);
+        setSites((current) => {
+          const merged = [
+            ...current,
+            ...orderedSites.filter((site) => !current.some((item) => item.id === site.id))
+          ];
+          return sortSites(merged);
+        });
+        setDraft((current) => current ?? orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
+      } catch {
+        if (active) {
+          setStatus("Tracking storage API is unavailable.");
+        }
+      }
     }
 
     void loadSites();
@@ -77,6 +88,8 @@ export function AdminSitesPanel() {
       active = false;
     };
   }, []);
+
+  useEffect(() => subscribeTrackingStorageStatus(setStorageStatus), []);
 
   const visibleSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -241,6 +254,17 @@ export function AdminSitesPanel() {
           <Plus aria-hidden="true" />
           Create site
         </button>
+      </div>
+      <div className={`tracking-storage-banner tracking-storage-banner--${storageStatus.mode}`} role="status">
+        {storageStatus.mode === "local" || storageStatus.mode === "unavailable" ? (
+          <AlertCircle aria-hidden="true" />
+        ) : (
+          <ShieldCheck aria-hidden="true" />
+        )}
+        <div>
+          <strong>{storageStatus.label}</strong>
+          <span>{storageStatus.detail}</span>
+        </div>
       </div>
 
       <div className="sites-admin__layout">

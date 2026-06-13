@@ -48,10 +48,12 @@ import {
 import { saveEncryptedEditorSnapshot } from "../lib/studioSecurity";
 import {
   fetchCmsDraft,
+  getTrackingStorageStatus,
   listCmsRevisions,
   publishCmsContent,
   restoreCmsRevision,
   saveCmsDraft,
+  subscribeTrackingStorageStatus,
   uploadCmsImage
 } from "../lib/cmsApi";
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
@@ -171,6 +173,7 @@ export function AdminPage({
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const [previewKey, setPreviewKey] = useState(0);
   const [serverMode, setServerMode] = useState(false);
+  const [trackingStorageStatus, setTrackingStorageStatus] = useState(() => getTrackingStorageStatus());
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState("");
   const [busy, setBusy] = useState(false);
@@ -226,6 +229,8 @@ export function AdminPage({
       window.removeEventListener("kingsvale-open-mailing-site", handleOpenMailingSite);
     };
   }, []);
+
+  useEffect(() => subscribeTrackingStorageStatus(setTrackingStorageStatus), []);
 
   function updateDraft(recipe: (content: SiteContent) => void) {
     setDraft((current) => {
@@ -346,6 +351,14 @@ export function AdminPage({
           <div className="admin-secure-pill">
             <ShieldCheck aria-hidden="true" />
             <span>{serverMode ? "Server CMS session active" : encryptedSnapshotSummary}</span>
+          </div>
+          <div className={`admin-storage-pill admin-storage-pill--${trackingStorageStatus.mode}`} role="status">
+            {trackingStorageStatus.mode === "local" || trackingStorageStatus.mode === "unavailable" ? (
+              <AlertCircle aria-hidden="true" />
+            ) : (
+              <ShieldCheck aria-hidden="true" />
+            )}
+            <span>{trackingStorageStatus.label}</span>
           </div>
           {activeRootTab === "website" && serverMode && revisions.length > 0 && (
             <details className="admin-versioning">

@@ -2,6 +2,7 @@ import { Lock, ShieldCheck } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import type { SiteContent } from "../lib/contentTypes";
 import { getServerSession, loginServerSession, logoutServerSession } from "../lib/cmsApi";
+import { isLocalDemoRuntime, requireServerBackedStudio } from "../lib/runtimeMode";
 import {
   clearStudioSession,
   createStudioSession,
@@ -16,7 +17,7 @@ type StudioAuthPageProps = {
 };
 
 export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
-  const [authenticated, setAuthenticated] = useState(() => hasStudioSession());
+  const [authenticated, setAuthenticated] = useState(() => isLocalDemoRuntime() && hasStudioSession());
   const [serverAuthenticated, setServerAuthenticated] = useState(false);
   const [passphrase, setPassphrase] = useState("");
   const [sessionSecret, setSessionSecret] = useState("");
@@ -53,6 +54,12 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
     }
 
     const serverSession = await loginServerSession(passphrase);
+    if (requireServerBackedStudio() && !serverSession?.authenticated) {
+      setBusy(false);
+      setError("Studio server unavailable");
+      return;
+    }
+
     createStudioSession();
     setSessionSecret(passphrase);
     setPassphrase("");

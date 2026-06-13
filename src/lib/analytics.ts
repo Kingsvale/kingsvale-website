@@ -104,7 +104,7 @@ export function loadLocalAnalyticsVisits(): AnalyticsVisit[] {
   }
 }
 
-function saveLocalAnalyticsVisits(visits: AnalyticsVisit[]) {
+export function saveLocalAnalyticsVisits(visits: AnalyticsVisit[]) {
   window.localStorage.setItem(analyticsStorageKey, JSON.stringify(visits));
   window.dispatchEvent(new Event("kingsvale-analytics-updated"));
 }

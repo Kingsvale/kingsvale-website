@@ -4,6 +4,7 @@ import {
   normalizeTrackingSite
 } from "./trackingStorage";
 import type { TrackingSite } from "./trackingTypes";
+import { isLocalDemoRuntime } from "./runtimeMode";
 
 export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
   try {
@@ -13,13 +14,13 @@ export async function fetchTrackingSiteByToken(token: string): Promise<TrackingS
     });
 
     if (!response.ok) {
-      return findLocalTrackingSiteByToken(token);
+      return isLocalDemoRuntime() ? findLocalTrackingSiteByToken(token) : null;
     }
 
     const payload = (await response.json()) as { site: TrackingSite | null };
     return payload.site ? normalizeTrackingSite(payload.site) : null;
   } catch {
-    return findLocalTrackingSiteByToken(token);
+    return isLocalDemoRuntime() ? findLocalTrackingSiteByToken(token) : null;
   }
 }
 
@@ -33,13 +34,13 @@ export async function lookupTrackingSite(reference: string, postcode: string): P
     });
 
     if (!response.ok) {
-      return lookupLocalTrackingSite(reference, postcode);
+      return isLocalDemoRuntime() ? lookupLocalTrackingSite(reference, postcode) : null;
     }
 
     const payload = (await response.json()) as { site: TrackingSite | null };
     return payload.site ? normalizeTrackingSite(payload.site) : null;
   } catch {
-    return lookupLocalTrackingSite(reference, postcode);
+    return isLocalDemoRuntime() ? lookupLocalTrackingSite(reference, postcode) : null;
   }
 }
 
