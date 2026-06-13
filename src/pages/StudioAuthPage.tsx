@@ -47,17 +47,28 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
     setBusy(true);
     setError("");
 
+    const serverSession = await loginServerSession(passphrase, "kingsvale", mfaCode);
+    if (serverSession?.authenticated) {
+      createStudioSession();
+      setSessionSecret(passphrase);
+      setPassphrase("");
+      setMfaCode("");
+      setAuthenticated(true);
+      setServerAuthenticated(true);
+      setBusy(false);
+      return;
+    }
+
+    if (requireServerBackedStudio()) {
+      setBusy(false);
+      setError("Invalid passphrase or authenticator code");
+      return;
+    }
+
     const verified = await verifyStudioPassphrase(passphrase);
     if (!verified) {
       setBusy(false);
       setError("Invalid credentials");
-      return;
-    }
-
-    const serverSession = await loginServerSession(passphrase, "kingsvale", mfaCode);
-    if (requireServerBackedStudio() && !serverSession?.authenticated) {
-      setBusy(false);
-      setError("Invalid passphrase or authenticator code");
       return;
     }
 
@@ -66,7 +77,7 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
     setPassphrase("");
     setMfaCode("");
     setAuthenticated(true);
-    setServerAuthenticated(Boolean(serverSession?.authenticated));
+    setServerAuthenticated(false);
     setBusy(false);
   }
 

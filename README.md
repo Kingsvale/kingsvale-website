@@ -139,6 +139,8 @@ STUDIO_AUTH_TOKEN_SECRET=replace-with-a-long-random-auth-token-secret
 CMS_ENCRYPTION_KEY=replace-with-a-long-random-cms-key
 ```
 
+In deployed Docker/Portainer mode, Studio login uses `STUDIO_PASSWORD` from the environment. The older browser-only passphrase verifier is only a local demo fallback when the secure server is not available.
+
 Optional variables:
 
 ```bash
