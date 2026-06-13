@@ -64,13 +64,13 @@ export function subscribeTrackingStorageStatus(listener: (status: TrackingStorag
   return () => window.removeEventListener(trackingStorageStatusEvent, handler);
 }
 
-export async function loginServerSession(passphrase: string, username = "kingsvale") {
+export async function loginServerSession(passphrase: string, username = "kingsvale", mfaCode = "") {
   try {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ username, password: passphrase })
+      body: JSON.stringify({ username, password: passphrase, mfaCode })
     });
 
     if (!response.ok) {

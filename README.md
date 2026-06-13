@@ -153,6 +153,8 @@ NEWSLETTER_WEBHOOK_URL=
 LEAD_WEBHOOK_HMAC_SECRET=
 ```
 
+Leave `STUDIO_TOTP_SECRET` blank unless you have set up an authenticator app with a Base32 TOTP secret. If it is set, Studio login requires both the passphrase and the current 6-digit authenticator code.
+
 Create a `.tar` image for Portainer upload:
 
 ```bash
