@@ -55,6 +55,16 @@ export function upsertLocalTrackingSite(site: TrackingSite): TrackingSite {
 
   const sites = loadLocalTrackingSites();
   const nextSite = { ...site, updatedAt: new Date().toISOString() };
+  const duplicateReference = nextSite.reference.trim()
+    ? sites.find(
+        (item) =>
+          item.id !== nextSite.id &&
+          item.reference.trim().toUpperCase() === nextSite.reference.trim().toUpperCase()
+      )
+    : null;
+  if (duplicateReference) {
+    throw new Error("Tracking reference already exists.");
+  }
   const nextSites = sites.some((item) => item.id === site.id)
     ? sites.map((item) => (item.id === site.id ? nextSite : item))
     : [nextSite, ...sites];
@@ -72,6 +82,17 @@ export function archiveLocalTrackingSite(id: string): TrackingSite | null {
   const nextSite = { ...target, archived: true, updatedAt: new Date().toISOString() };
   saveLocalTrackingSites(sites.map((site) => (site.id === id ? nextSite : site)));
   return nextSite;
+}
+
+export function deleteLocalTrackingSite(id: string): TrackingSite | null {
+  const sites = loadLocalTrackingSites();
+  const target = sites.find((site) => site.id === id);
+  if (!target) {
+    return null;
+  }
+
+  saveLocalTrackingSites(sites.filter((site) => site.id !== id));
+  return target;
 }
 
 export function findLocalTrackingSiteByToken(token: string): TrackingSite | null {

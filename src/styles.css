@@ -908,6 +908,7 @@ button:disabled {
 .admin-back,
 .admin-open,
 .admin-ghost,
+.admin-danger,
 .admin-save,
 .admin-small {
   display: inline-flex;
@@ -1010,8 +1011,15 @@ button:disabled {
   color: var(--ivory);
 }
 
+.admin-danger {
+  border-color: rgba(138, 59, 48, 0.32);
+  background: rgba(138, 59, 48, 0.08);
+  color: var(--danger);
+}
+
 .admin-open:hover,
 .admin-ghost:hover,
+.admin-danger:hover,
 .admin-save:hover,
 .admin-small:hover {
   transform: translateY(-1px);

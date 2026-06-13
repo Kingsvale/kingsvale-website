@@ -4,6 +4,7 @@ import { buildAnalyticsSummary, type AnalyticsSummary } from "./analyticsSummary
 import type { TrackingSite } from "./trackingTypes";
 import {
   archiveLocalTrackingSite,
+  deleteLocalTrackingSite,
   loadLocalTrackingSites,
   normalizeTrackingSite,
   saveLocalTrackingSites,
@@ -296,6 +297,36 @@ export async function archiveTrackingSite(id: string): Promise<TrackingSite | nu
     }
     markTrackingStorageLocal();
     return archiveLocalTrackingSite(id);
+  }
+}
+
+export async function deleteTrackingSite(id: string): Promise<TrackingSite | null> {
+  try {
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/delete`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders()
+    });
+
+    if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Tracking site could not be deleted on the secure server.");
+      }
+      markTrackingStorageLocal();
+      return deleteLocalTrackingSite(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Tracking site could not be deleted on the secure server.");
+    }
+    markTrackingStorageLocal();
+    return deleteLocalTrackingSite(id);
   }
 }
 

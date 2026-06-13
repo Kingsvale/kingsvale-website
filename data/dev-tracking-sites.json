@@ -1,6 +1,95 @@
 {
   "sites": [
     {
+      "id": "tracking-1781312847018-7qwv",
+      "token": "x-rot1OEZKgpV6A4b1_ncwG1",
+      "title": "New customer tracking page",
+      "customerName": "",
+      "siteAddress": "Site address",
+      "reference": "KV0001",
+      "region": "Uncategorised",
+      "ownerContactName": "",
+      "contactPriority": "unknown",
+      "summary": "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
+      "mapEmbedUrl": "",
+      "privateNotes": "",
+      "letterFileName": "",
+      "letterFileUrl": "",
+      "searchlandUrl": "",
+      "currentStatus": "planning",
+      "statusNote": "Kingsvale is reviewing this land interest opportunity.",
+      "milestones": [
+        {
+          "id": "milestone-1781312847019-0n68",
+          "label": "Planning details prepared",
+          "state": "active",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781312847019-fjpp",
+          "label": "Application submitted",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781312847019-9rgh",
+          "label": "Council review",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781312847019-cfmk",
+          "label": "Decision issued",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1781312847019-vc5h",
+          "label": "Construction progress",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        }
+      ],
+      "resources": [],
+      "qrStyle": {
+        "foreground": "#22211d",
+        "background": "#fbf8f2",
+        "accent": "#ad9576",
+        "dotRoundness": 48,
+        "finderRoundness": 24,
+        "frameRoundness": 42,
+        "frameCut": 0,
+        "frameLabel": "Scan to view the plot",
+        "includeLogo": true
+      },
+      "council": {
+        "mode": "none",
+        "councilName": "",
+        "applicationReference": "",
+        "apiBaseUrl": "",
+        "lastCheckedAt": null,
+        "lastSyncStatus": "Not configured"
+      },
+      "mailingStatus": "not-mailed",
+      "firstMailedAt": "",
+      "lastMailedAt": "",
+      "royalMailTrackingNumber": "",
+      "trackingStatus": "Tracking unavailable",
+      "trackingLastCheckedAt": null,
+      "remailReminderDays": 14,
+      "remailReminderDate": "",
+      "mailingNotes": "",
+      "mailingLastUpdatedAt": "2026-06-13T01:07:27.018Z",
+      "createdAt": "2026-06-13T01:07:27.018Z",
+      "updatedAt": "2026-06-13T01:07:27.021Z",
+      "archived": false
+    },
+    {
       "id": "tracking-1781306992872-3i0s",
       "token": "8029bBnJTdMeM47X_6nbo9FD",
       "title": "skibidi",
@@ -90,5 +179,5 @@
       "archived": true
     }
   ],
-  "updatedAt": "2026-06-13T00:24:16.190Z"
+  "updatedAt": "2026-06-13T01:07:27.021Z"
 }

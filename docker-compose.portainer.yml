@@ -1,6 +1,6 @@
 services:
   kingsvale:
-    image: kingsvale-luxury-real-estate:latest
+    image: ghcr.io/kingsvale/kingsvale-website:latest
     container_name: kingsvale-site
     restart: unless-stopped
     ports:

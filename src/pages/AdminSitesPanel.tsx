@@ -18,6 +18,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
+  deleteTrackingSite,
   getTrackingStorageStatus,
   listTrackingSites,
   saveTrackingSite,
@@ -124,10 +125,12 @@ export function AdminSitesPanel() {
   async function handleCreate() {
     setBusy(true);
     try {
-      const site = await saveTrackingSite(createTrackingSite());
+      const siteDraft = createTrackingSite();
+      siteDraft.reference = nextTrackingReference(sites);
+      const site = await saveTrackingSite(siteDraft);
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-      setStatus("Map page created. Add the plot map link, then save.");
+      setStatus(`Map page created with reference ${site.reference}. Add the plot map link, then save.`);
     } catch {
       setStatus("Map page could not be created.");
     } finally {
@@ -137,6 +140,11 @@ export function AdminSitesPanel() {
 
   async function handleSave() {
     if (!draft) {
+      return;
+    }
+
+    if (isDuplicateReference(draft, sites)) {
+      setStatus(`Reference ${draft.reference.trim()} already exists. Use a unique reference before saving.`);
       return;
     }
 
@@ -180,6 +188,37 @@ export function AdminSitesPanel() {
       setStatus("Map page archived. Its public link is now unavailable.");
     } catch {
       setStatus("Map page could not be archived.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!draft) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${draft.reference || draft.title}? This permanently removes the map page and cannot be undone.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const deleted = await deleteTrackingSite(draft.id);
+      if (!deleted) {
+        setStatus("Map page could not be deleted.");
+        return;
+      }
+
+      const remainingSites = sites.filter((site) => site.id !== draft.id);
+      setSites(sortSites(remainingSites));
+      setDraft(remainingSites.find((site) => !site.archived) ?? remainingSites[0] ?? null);
+      setStatus("Map page deleted.");
+    } catch {
+      setStatus("Map page could not be deleted.");
     } finally {
       setBusy(false);
     }
@@ -504,6 +543,11 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateDraft((site) => { site.reference = value; })}
                   />
                 </div>
+                {isDuplicateReference(draft, sites) && (
+                  <p className="admin-field__error" role="alert">
+                    This reference already exists. References must be unique.
+                  </p>
+                )}
                 <TrackingTextInput
                   label="Site address"
                   value={draft.siteAddress}
@@ -716,6 +760,15 @@ export function AdminSitesPanel() {
                   <Archive aria-hidden="true" />
                   Archive
                 </button>
+                <button
+                  type="button"
+                  className="admin-danger"
+                  onClick={handleDelete}
+                  disabled={busy}
+                >
+                  <Trash2 aria-hidden="true" />
+                  Delete
+                </button>
               </div>
             </>
           )}
@@ -880,6 +933,30 @@ function groupSitesByRegion(sites: TrackingSite[]) {
     }
     return left.localeCompare(right);
   });
+}
+
+function nextTrackingReference(sites: TrackingSite[]) {
+  const usedNumbers = sites
+    .map((site) => site.reference.trim().toUpperCase().match(/^KV(\d{4,})$/)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map((value) => Number(value));
+  let next = Math.max(0, ...usedNumbers) + 1;
+  const usedReferences = new Set(sites.map((site) => normalizeReference(site.reference)));
+
+  while (usedReferences.has(`KV${String(next).padStart(4, "0")}`)) {
+    next += 1;
+  }
+
+  return `KV${String(next).padStart(4, "0")}`;
+}
+
+function isDuplicateReference(draft: TrackingSite, sites: TrackingSite[]) {
+  const reference = normalizeReference(draft.reference);
+  return Boolean(reference) && sites.some((site) => site.id !== draft.id && normalizeReference(site.reference) === reference);
+}
+
+function normalizeReference(reference: string) {
+  return reference.trim().toUpperCase();
 }
 
 function isAllowedLetterFile(file: File) {
