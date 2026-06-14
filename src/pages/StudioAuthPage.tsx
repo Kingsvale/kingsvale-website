@@ -20,6 +20,7 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
   const [authenticated, setAuthenticated] = useState(() => isLocalDemoRuntime() && hasStudioSession());
   const [serverAuthenticated, setServerAuthenticated] = useState(false);
   const [passphrase, setPassphrase] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [sessionSecret, setSessionSecret] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,6 +47,24 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
     setBusy(true);
     setError("");
 
+    const serverSession = await loginServerSession(passphrase, "kingsvale", mfaCode);
+    if (serverSession?.authenticated) {
+      createStudioSession();
+      setSessionSecret(passphrase);
+      setPassphrase("");
+      setMfaCode("");
+      setAuthenticated(true);
+      setServerAuthenticated(true);
+      setBusy(false);
+      return;
+    }
+
+    if (requireServerBackedStudio()) {
+      setBusy(false);
+      setError("Invalid passphrase or authenticator code");
+      return;
+    }
+
     const verified = await verifyStudioPassphrase(passphrase);
     if (!verified) {
       setBusy(false);
@@ -53,18 +72,12 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
       return;
     }
 
-    const serverSession = await loginServerSession(passphrase);
-    if (requireServerBackedStudio() && !serverSession?.authenticated) {
-      setBusy(false);
-      setError("Studio server unavailable");
-      return;
-    }
-
     createStudioSession();
     setSessionSecret(passphrase);
     setPassphrase("");
+    setMfaCode("");
     setAuthenticated(true);
-    setServerAuthenticated(Boolean(serverSession?.authenticated));
+    setServerAuthenticated(false);
     setBusy(false);
   }
 
@@ -107,6 +120,20 @@ export function StudioAuthPage({ publishedContent }: StudioAuthPageProps) {
               value={passphrase}
               autoComplete="current-password"
               onChange={(event) => setPassphrase(event.target.value)}
+            />
+          </label>
+          <label className="admin-field" htmlFor="studio-mfa-code">
+            <span className="admin-field__label">Authenticator code</span>
+            <input
+              id="studio-mfa-code"
+              type="text"
+              value={mfaCode}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="Only needed if MFA is enabled"
+              onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
             />
           </label>
           {error && <p className="admin-field__error" role="alert">{error}</p>}

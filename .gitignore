@@ -1,11 +1,47 @@
+# Dependencies
 node_modules/
+
+# Build outputs
+dist/
+build/
 .vite/
+.cache/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test / coverage output
+coverage/
 playwright-report/
 test-results/
-coverage/
-data/
+blob-report/
+.nyc_output/
+
+# TypeScript
 *.tsbuildinfo
-*.log
-.env
-.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Local archives / temporary files
+*.zip
+*.tar
+*.tar.gz
+
+# Project-specific temp file
 workspace-task-app/taskforge-workspace.tar

@@ -1,5 +1,8 @@
 services:
   kingsvale:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: kingsvale-luxury-real-estate:latest
     container_name: kingsvale-site
     restart: unless-stopped

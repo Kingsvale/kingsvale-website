@@ -634,6 +634,17 @@ async function handleTrackingSitesCollection(request, response) {
       sendJson(response, 409, { error: "Tracking link token already exists." });
       return;
     }
+    const existingReferenceOwner = site.reference.trim()
+      ? store.sites.find(
+          (item) =>
+            item.id !== site.id &&
+            normalizeLookupText(item.reference) === normalizeLookupText(site.reference)
+        )
+      : null;
+    if (existingReferenceOwner) {
+      sendJson(response, 409, { error: "Reference already exists." });
+      return;
+    }
 
     const now = new Date().toISOString();
     const savedSite = {
@@ -713,6 +724,22 @@ async function handleTrackingSiteItem(request, response, url) {
     await writeTrackingStore(store);
     await writeAudit("tracking_site_archived", request, { user: session.user, siteId: archivedSite.id });
     sendJson(response, 200, { ok: true, site: archivedSite });
+    return;
+  }
+
+  if (action === "delete" && request.method === "POST") {
+    const store = await readTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    store.sites = store.sites.filter((site) => site.id !== decodedIdOrToken);
+    store.updatedAt = new Date().toISOString();
+    await writeTrackingStore(store);
+    await writeAudit("tracking_site_deleted", request, { user: session.user, siteId: target.id });
+    sendJson(response, 200, { ok: true, site: target });
     return;
   }
 

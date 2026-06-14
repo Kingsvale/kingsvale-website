@@ -1,5 +1,15 @@
 # syntax=docker/dockerfile:1
 
+FROM node:22-bookworm-slim AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --include=optional --no-audit --no-fund
+
+COPY . .
+RUN npm run build
+
 FROM node:22-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
@@ -8,10 +18,10 @@ ENV PORT=4173
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev --include=optional --no-audit --no-fund \
+RUN npm ci --omit=dev --include=optional --no-audit --no-fund \
   && npm cache clean --force
 
-COPY dist ./dist
+COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY public ./public
 

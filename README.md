@@ -114,7 +114,7 @@ The repo includes a `Dockerfile`, a local `docker-compose.yml`, and a Portainer 
 
 The Docker image can build without secrets, but the container entrypoint refuses to start unless `STUDIO_PASSWORD`, `STUDIO_AUTH_TOKEN_SECRET` and `CMS_ENCRYPTION_KEY` are set.
 
-The Dockerfile packages the current `dist/` production build. If you change the site source, rebuild `dist/` before creating the Docker image:
+The Dockerfile builds the production `dist/` output inside Docker, then copies it into a smaller runtime image. For local checks before building the image:
 
 ```bash
 npm install
@@ -139,6 +139,8 @@ STUDIO_AUTH_TOKEN_SECRET=replace-with-a-long-random-auth-token-secret
 CMS_ENCRYPTION_KEY=replace-with-a-long-random-cms-key
 ```
 
+In deployed Docker/Portainer mode, Studio login uses `STUDIO_PASSWORD` from the environment. The older browser-only passphrase verifier is only a local demo fallback when the secure server is not available.
+
 Optional variables:
 
 ```bash
@@ -152,6 +154,8 @@ CONTACT_WEBHOOK_URL=
 NEWSLETTER_WEBHOOK_URL=
 LEAD_WEBHOOK_HMAC_SECRET=
 ```
+
+Leave `STUDIO_TOTP_SECRET` blank unless you have set up an authenticator app with a Base32 TOTP secret. If it is set, Studio login requires both the passphrase and the current 6-digit authenticator code.
 
 Create a `.tar` image for Portainer upload:
 
@@ -186,15 +190,29 @@ Move local Studio data to the deployed instance:
 
 The Docker image and the editable Studio data are intentionally separate. The image carries code and default placeholders; the backup JSON carries website edits, Sites/QR pages, mailing workflow data, analytics and lead logs. Keep the `kingsvale_data` Docker volume and `CMS_ENCRYPTION_KEY` stable between redeploys so existing production data remains readable.
 
-Portainer Git deployment:
+Portainer Git deployment with automatic image rebuilds:
 
-1. Push this project to a Git repository the Docker host can access.
+1. Push this project to `https://github.com/Kingsvale/kingsvale-website`.
 2. In Portainer, go to `Stacks` -> `Add stack`.
-3. Choose `Git repository`, enter the repository URL, branch, and set `Compose path` to `docker-compose.yml`.
-4. Add the environment variables above in the Stack environment section.
-5. Deploy the stack.
-6. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
-7. Open Studio at `/studio`.
+3. Choose `Git repository`, enter the repository URL and branch.
+4. Set `Compose path` to `docker-compose.portainer.yml`.
+5. Add the environment variables above in the Stack environment section.
+6. Deploy the stack. Portainer will build `kingsvale-luxury-real-estate:latest` from the Git checkout because the compose file includes a `build:` block.
+7. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
+8. Open Studio at `/studio`.
+
+Automatic redeploy from GitHub:
+
+1. Edit the Git-backed stack in Portainer.
+2. Enable `GitOps updates`.
+3. Choose either `Polling` or `Webhook`.
+   - `Polling`: set a fetch interval, for example every 5 minutes.
+   - `Webhook`: copy the Portainer webhook URL.
+4. If using `Webhook`, in GitHub open `Kingsvale/kingsvale-website` -> `Settings` -> `Webhooks` -> `Add webhook`.
+5. Paste the Portainer webhook URL as the payload URL, set content type to `application/json`, and select push events.
+6. Save. Each pushed change can now trigger Portainer to pull the latest commit, rebuild the local image from the repo and redeploy the stack.
+
+The repository also includes `.github/workflows/docker-image.yml` for an optional GHCR image workflow. Do not point `docker-compose.portainer.yml` at `ghcr.io/kingsvale/kingsvale-website:latest` unless the GitHub Container Registry package is public or Portainer has valid `ghcr.io` registry credentials. Keep the `kingsvale_data` volume attached so redeploys keep Studio data.
 
 If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep HTTPS enabled.
 

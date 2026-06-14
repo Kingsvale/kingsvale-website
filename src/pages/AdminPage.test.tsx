@@ -97,6 +97,7 @@ describe("AdminPage", () => {
       const link = screen.getByTestId("generated-tracking-link") as HTMLInputElement;
       expect(link.value).toMatch(/\/track\/[a-zA-Z0-9_-]+/);
     });
+    expect(screen.getByLabelText("Reference")).toHaveValue("KV0001");
     expect(screen.getByLabelText("QR code preview")).toBeInTheDocument();
     expect(screen.getByLabelText("Dot roundness")).toHaveValue("48");
     expect(screen.getByLabelText("Finder roundness")).toHaveValue("24");
@@ -161,6 +162,7 @@ describe("AdminPage", () => {
     const saveSiteButton = [...sitesPanel.querySelectorAll("button")]
       .find((button) => button.textContent?.includes("Save site"));
     expect(saveSiteButton).toBeEnabled();
+    expect([...sitesPanel.querySelectorAll("button")].some((button) => button.textContent?.includes("Delete"))).toBe(true);
   });
 
   it("passes automated accessibility checks for the structured editor", async () => {
