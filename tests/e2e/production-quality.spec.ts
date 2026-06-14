@@ -8,6 +8,9 @@ const publicRoutes = [
   "/vision-process",
   "/about",
   "/land-wanted",
+  "/land-opportunities",
+  "/new-homes-south-england",
+  "/faq",
   "/contact"
 ];
 

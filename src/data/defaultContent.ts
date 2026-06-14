@@ -420,17 +420,17 @@ export const defaultContent: SiteContent = {
   },
   seo: {
     home: {
-      title: "Kingsvale Homes | Luxury homes and exceptional communities",
-      description: "Thoughtfully designed homes. Exceptional craftsmanship. Lasting value.",
+      title: "Kingsvale Homes | UK Luxury Homes & Real Estate Development",
+      description: "UK property developer creating luxury homes, residential communities and land development opportunities across the South of England.",
       image: {
-        src: "https://images.unsplash.com/photo-1756435292384-1bf32eff7baf",
-        alt: "A grand stone-accent luxury home at sunset with warm interior lighting",
-        focalPoint: "54% 52%"
+        src: "/brand/kingsvale-logo.png",
+        alt: "Kingsvale Homes logo",
+        focalPoint: "50% 50%"
       }
     },
     developments: {
-      title: "Developments | Kingsvale Homes",
-      description: "Distinctive homes in carefully chosen locations.",
+      title: "UK New Home Developments | Kingsvale Homes",
+      description: "Explore Kingsvale Homes developments, luxury new homes and carefully planned residential communities across desirable UK locations.",
       image: {
         src: "https://images.unsplash.com/photo-1570129477492-45c003edd2be",
         alt: "A luxury detached home set behind landscaped planting",
@@ -438,8 +438,8 @@ export const defaultContent: SiteContent = {
       }
     },
     about: {
-      title: "About Us | Kingsvale Homes",
-      description: "Building homes and creating legacies across the South.",
+      title: "UK Property Developer | About Kingsvale Homes",
+      description: "Learn about Kingsvale Homes, a UK property developer building luxury homes, lasting communities and design-led residential projects.",
       image: {
         src: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0",
         alt: "An elegant neutral living room with a fireplace and bespoke shelving",
@@ -447,8 +447,8 @@ export const defaultContent: SiteContent = {
       }
     },
     landWanted: {
-      title: "Land Wanted | Kingsvale Homes",
-      description: "Kingsvale is actively seeking land and development opportunities across the South.",
+      title: "Land Wanted for Development | UK Land Opportunities | Kingsvale Homes",
+      description: "Kingsvale Homes is seeking land opportunities, development sites and residential plots across the South of England.",
       image: {
         src: "https://images.unsplash.com/photo-1500382017468-9049fed747ef",
         alt: "Rolling British countryside at golden hour",
@@ -466,8 +466,10 @@ export const defaultContent: SiteContent = {
       { label: "Land Wanted", href: "/land-wanted" },
       { label: "Our Vision & Process", href: "/vision-process" },
       { label: "Our Developments", href: "/developments" },
+      { label: "Land Opportunities", href: "/land-opportunities" },
       { label: "About Us", href: "/about" },
-      { label: "Contact Us", href: "/contact" }
+      { label: "Contact Us", href: "/contact" },
+      { label: "FAQ", href: "/faq" }
     ],
     newsletterTitle: "Newsletter",
     newsletterCopy: "Be the first to hear about our latest developments and news.",

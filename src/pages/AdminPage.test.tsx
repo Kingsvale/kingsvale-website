@@ -5,6 +5,7 @@ import { defaultContent } from "../data/defaultContent";
 import { AdminPage } from "./AdminPage";
 import { AdminSitesPanel } from "./AdminSitesPanel";
 import { storageKey } from "../lib/storage";
+import { studioPreviewStorageKey } from "../lib/studioPreview";
 
 const tinyPng = new File(
   [
@@ -54,10 +55,11 @@ describe("AdminPage", () => {
       target: { value: "Crafted homes for modern country living." }
     });
 
-    const preview = screen.getByLabelText(/live homepage preview/i);
     await waitFor(() => {
-      expect(preview).toHaveTextContent("Crafted homes for modern country living.");
+      const previewContent = JSON.parse(window.sessionStorage.getItem(studioPreviewStorageKey) ?? "{}");
+      expect(previewContent.hero.title).toBe("Crafted homes for modern country living.");
     });
+    expect(screen.getByTitle(/Live Homepage Desktop preview/i)).toHaveAttribute("src", expect.stringContaining("studio-preview"));
 
     fireEvent.click(screen.getByRole("button", { name: /publish/i }));
 

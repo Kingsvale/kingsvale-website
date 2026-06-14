@@ -5,6 +5,7 @@ import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
 import { ResponsiveImage } from "../components/ResponsiveImage";
 import { Reveal } from "../components/Reveal";
+import { faqItems, faqPageSeo, guidePages, type GuidePageRoute } from "../data/answerPages";
 import type { Development, FeatureItem, ImageAsset, SiteContent } from "../lib/contentTypes";
 import { postJson, type SubmitState } from "../lib/formSubmit";
 import { studioPath } from "../lib/studioRoute";
@@ -236,6 +237,58 @@ export function LandWantedPage({ content }: ContentPageProps) {
         ]}
       />
       <LandContactStrip />
+    </PublicShell>
+  );
+}
+
+export function NewHomesSouthEnglandPage({ content }: ContentPageProps) {
+  return <GuidePage content={content} route="/new-homes-south-england" />;
+}
+
+export function RealEstateDevelopmentPage({ content }: ContentPageProps) {
+  return <GuidePage content={content} route="/real-estate-development" />;
+}
+
+export function LandOpportunitiesPage({ content }: ContentPageProps) {
+  return <GuidePage content={content} route="/land-opportunities" />;
+}
+
+export function LandSellerGuidePage({ content }: ContentPageProps) {
+  return <GuidePage content={content} route="/land-seller-guide" />;
+}
+
+export function FaqPage({ content }: ContentPageProps) {
+  return (
+    <PublicShell content={content}>
+      <InnerHero
+        eyebrow="FAQ"
+        title="Questions about Kingsvale Homes."
+        body="Clear answers about our new homes, residential development work, land opportunities and design-led build services."
+        image={faqPageSeo.image}
+      />
+      <section className="content-band">
+        <div className="content-heading">
+          <p className="eyebrow">Common questions</p>
+          <h2>Direct answers for buyers, landowners and project partners.</h2>
+        </div>
+        <div className="faq-list">
+          {faqItems.map((item, index) => (
+            <details className="faq-item" key={item.question} open={index === 0}>
+              <summary>{item.question}</summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+      <RelatedLinks
+        links={[
+          { label: "New homes", href: "/new-homes-south-england" },
+          { label: "Residential development", href: "/real-estate-development" },
+          { label: "View developments", href: "/developments" },
+          { label: "Land opportunities", href: "/land-opportunities" },
+          { label: "Land seller guide", href: "/land-seller-guide" }
+        ]}
+      />
     </PublicShell>
   );
 }
@@ -541,6 +594,72 @@ function EditorialCallout({ title, body }: { title: string; body: string }) {
       <p className="eyebrow">Kingsvale standard</p>
       <h2>{title}</h2>
       <p>{body}</p>
+    </section>
+  );
+}
+
+function GuidePage({ content, route }: ContentPageProps & { route: GuidePageRoute }) {
+  const page = guidePages[route];
+
+  return (
+    <PublicShell content={content}>
+      <InnerHero
+        eyebrow={page.eyebrow}
+        title={page.title}
+        body={page.body}
+        image={page.image}
+      />
+      <section className="content-band">
+        <div className="answer-summary">
+          <p className="eyebrow">Short answer</p>
+          <h2>{page.summaryTitle}</h2>
+          <p>{page.summaryBody}</p>
+        </div>
+      </section>
+      <section className="content-band content-band--warm">
+        <div className="answer-section-grid">
+          {page.sections.map((section) => (
+            <article className="answer-section" key={section.title}>
+              <h2>{section.title}</h2>
+              <p>{section.body}</p>
+              {section.items && (
+                <ul className="answer-list">
+                  {section.items.map((item) => (
+                    <li key={item}>
+                      <CheckCircle2 aria-hidden="true" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+      <ProcessGrid
+        eyebrow="What matters"
+        title="The signals Kingsvale looks for."
+        items={page.cards}
+      />
+      <RelatedLinks links={page.relatedLinks} />
+    </PublicShell>
+  );
+}
+
+function RelatedLinks({ links }: { links: Array<{ label: string; href: string }> }) {
+  return (
+    <section className="answer-links">
+      <div>
+        <p className="eyebrow">Next step</p>
+        <h2>Explore the most relevant Kingsvale pages.</h2>
+      </div>
+      <div className="answer-links__actions">
+        {links.map((link) => (
+          <ButtonLink href={link.href} key={link.href} variant="dark">
+            {link.label}
+          </ButtonLink>
+        ))}
+      </div>
     </section>
   );
 }

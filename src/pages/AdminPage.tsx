@@ -4,23 +4,28 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   Eye,
   LogOut,
+  Monitor,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   ShieldCheck,
+  Smartphone,
+  Tablet,
   Trash2,
   UploadCloud
 } from "lucide-react";
 import {
-  lazy,
-  Suspense,
+  type CSSProperties,
   type ChangeEvent,
   type ReactNode,
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState
 } from "react";
 import { defaultContent } from "../data/defaultContent";
@@ -56,6 +61,11 @@ import {
   subscribeTrackingStorageStatus,
   uploadCmsImage
 } from "../lib/cmsApi";
+import {
+  buildStudioPreviewUrl,
+  saveStudioPreviewContent,
+  studioPreviewMessageType
+} from "../lib/studioPreview";
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
 import { AdminBackupPanel } from "./AdminBackupPanel";
 import { AdminMailingPanel } from "./AdminMailingPanel";
@@ -78,28 +88,6 @@ type RevisionSummary = {
 type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup";
 type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
 type PreviewDevice = "desktop" | "tablet" | "mobile";
-
-const HomepagePreview = lazy(() =>
-  import("./Homepage").then((module) => ({ default: module.Homepage }))
-);
-const DesignBuildPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.DesignBuildPage }))
-);
-const LandWantedPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.LandWantedPage }))
-);
-const VisionProcessPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.VisionProcessPage }))
-);
-const AboutPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.AboutPage }))
-);
-const DevelopmentsPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.DevelopmentsIndexPage }))
-);
-const ContactPreview = lazy(() =>
-  import("./ContentPages").then((module) => ({ default: module.ContactPage }))
-);
 
 type FieldProps = {
   label: string;
@@ -146,6 +134,13 @@ const previewRoutes: { value: PreviewRoute; label: string }[] = [
   { value: "/contact", label: "Contact Us" }
 ];
 
+const previewDevices = [
+  { id: "desktop", label: "Desktop", width: 1440, height: 900, icon: Monitor },
+  { id: "tablet", label: "Tablet", width: 820, height: 1080, icon: Tablet },
+  { id: "mobile", label: "Phone", width: 390, height: 844, icon: Smartphone }
+] as const;
+
+type PreviewDeviceConfig = (typeof previewDevices)[number];
 type EditorSectionId = (typeof editorSections)[number]["id"];
 
 const previewRoutePanels: Record<PreviewRoute, EditorSectionId> = {
@@ -181,6 +176,7 @@ export function AdminPage({
   const errorsByPath = useMemo(() => toErrorMap(validation.errors), [validation.errors]);
   const activePanelLabel = editorSections.find((section) => section.id === activePanel)?.label ?? "Hero";
   const previewRouteLabel = previewRoutes.find((route) => route.value === previewRoute)?.label ?? "selected page";
+  const previewDeviceConfig = previewDevices.find((device) => device.id === previewDevice) ?? previewDevices[0];
 
   useEffect(() => {
     let active = true;
@@ -841,7 +837,7 @@ export function AdminPage({
           )}
         </section>
 
-        <aside className={`admin-preview admin-preview--${previewDevice}`} aria-label={`Live ${previewRouteLabel} preview`}>
+        <aside className="admin-preview" aria-label={`Live ${previewRouteLabel} preview`}>
           <div className="admin-preview__bar">
             <div>
               <Eye aria-hidden="true" />
@@ -860,30 +856,41 @@ export function AdminPage({
               ))}
             </select>
             <div className="admin-preview__devices" aria-label="Preview device" role="group">
-              {(["desktop", "tablet", "mobile"] as const).map((device) => (
+              {previewDevices.map((device) => {
+                const Icon = device.icon;
+                return (
                 <button
-                  key={device}
+                  key={device.id}
                   type="button"
-                  aria-pressed={previewDevice === device}
-                  onClick={() => setPreviewDevice(device)}
+                  aria-pressed={previewDevice === device.id}
+                  onClick={() => setPreviewDevice(device.id)}
                 >
-                  {device}
+                  <Icon aria-hidden="true" />
+                  {device.label}
                 </button>
-              ))}
+                );
+              })}
             </div>
             <button type="button" className="admin-preview__refresh" onClick={() => setPreviewKey((key) => key + 1)}>
+              <RefreshCw aria-hidden="true" />
               Refresh
             </button>
             <a className="admin-preview__open" href={previewRoute} target="_blank" rel="noreferrer">
+              <ExternalLink aria-hidden="true" />
               Open
             </a>
           </div>
-          <div className="admin-preview__url">{previewRoute}</div>
-          <div className="admin-preview__viewport" key={`${previewRoute}-${previewDevice}-${previewKey}`}>
-            <Suspense fallback={<div className="route-loading" />}>
-              <PreviewContent route={previewRoute} content={draft} />
-            </Suspense>
+          <div className="admin-preview__url">
+            <span>{previewRoute}</span>
+            <span>{previewDeviceConfig.width} x {previewDeviceConfig.height}</span>
           </div>
+          <PreviewFrame
+            content={draft}
+            device={previewDeviceConfig}
+            refreshKey={previewKey}
+            route={previewRoute}
+            title={`Live ${previewRouteLabel} ${previewDeviceConfig.label} preview`}
+          />
         </aside>
       </main>
       )}
@@ -911,26 +918,78 @@ export function AdminPage({
   );
 }
 
-function PreviewContent({ route, content }: { route: PreviewRoute; content: SiteContent }) {
-  if (route === "/") {
-    return <HomepagePreview content={content} preview />;
+function PreviewFrame({
+  content,
+  device,
+  refreshKey,
+  route,
+  title
+}: {
+  content: SiteContent;
+  device: PreviewDeviceConfig;
+  refreshKey: number;
+  route: PreviewRoute;
+  title: string;
+}) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [scale, setScale] = useState(1);
+  const previewUrl = buildStudioPreviewUrl(route, refreshKey);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+
+    const updateScale = () => {
+      const availableWidth = Math.max(280, stage.clientWidth - 32);
+      setScale(Math.min(1, Number((availableWidth / device.width).toFixed(3))));
+    };
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScale);
+    observer?.observe(stage);
+    return () => {
+      window.removeEventListener("resize", updateScale);
+      observer?.disconnect();
+    };
+  }, [device.width]);
+
+  useEffect(() => {
+    sendPreviewContent();
+  }, [content]);
+
+  function sendPreviewContent() {
+    saveStudioPreviewContent(content);
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: studioPreviewMessageType, content },
+      window.location.origin
+    );
   }
-  if (route === "/design-build") {
-    return <DesignBuildPreview content={content} />;
-  }
-  if (route === "/land-wanted") {
-    return <LandWantedPreview content={content} />;
-  }
-  if (route === "/vision-process") {
-    return <VisionProcessPreview content={content} />;
-  }
-  if (route === "/about") {
-    return <AboutPreview content={content} />;
-  }
-  if (route === "/developments") {
-    return <DevelopmentsPreview content={content} />;
-  }
-  return <ContactPreview content={content} />;
+
+  const shellStyle = {
+    width: `${device.width * scale}px`,
+    height: `${device.height * scale}px`,
+    "--preview-width": `${device.width}px`,
+    "--preview-height": `${device.height}px`,
+    "--preview-scale": scale
+  } as CSSProperties;
+
+  return (
+    <div className="admin-preview__stage" ref={stageRef}>
+      <div className="admin-preview__device-shell" style={shellStyle}>
+        <iframe
+          ref={iframeRef}
+          className="admin-preview__frame"
+          title={title}
+          src={previewUrl}
+          onLoad={sendPreviewContent}
+        />
+      </div>
+    </div>
+  );
 }
 
 function EditorPanel({

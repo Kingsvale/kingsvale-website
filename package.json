@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "submit:indexnow": "node scripts/indexnow-submit.mjs",
     "lint": "tsc -b --pretty false",
     "lint:strict": "tsc -p tsconfig.app.json --noEmit --noUnusedLocals --noUnusedParameters --pretty false"
   },

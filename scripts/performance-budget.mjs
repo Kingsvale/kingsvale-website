@@ -7,9 +7,9 @@ const assetsDir = join(distDir, "assets");
 
 const budgets = {
   largestJavaScriptGzip: 72_000,
-  totalPublicJavaScriptGzip: 98_000,
+  totalPublicJavaScriptGzip: 101_000,
   totalCssGzip: 24_000,
-  prerenderedRoutes: 12
+  prerenderedRoutes: 22
 };
 
 const assetFiles = await listFiles(assetsDir);

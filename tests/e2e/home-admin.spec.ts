@@ -71,7 +71,10 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByText("Riverstone Mews")).toBeVisible();
 });
 
-test("creates a land interest map page and opens the generated link", async ({ page }) => {
+test("creates a land interest map page and opens the generated link", async ({ page }, testInfo) => {
+  const projectName = testInfo.project.name.replace(/[^a-z0-9]+/gi, "").toUpperCase() || "WEB";
+  const reference = `KV-${projectName}-${Date.now().toString(36).toUpperCase()}`;
+
   await page.goto(studioPath);
   await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
   await page.getByRole("button", { name: "Unlock studio" }).click();
@@ -83,6 +86,7 @@ test("creates a land interest map page and opens the generated link", async ({ p
   await setRangeValue(page, "Finder roundness", "86");
   await setRangeValue(page, "Cut corners", "34");
   await page.getByLabel("Site title").fill("Oakdene land interest");
+  await page.getByLabel("Reference").fill(reference);
   await page.getByLabel("Site address").fill("12 Meadow Lane, Wokingham");
   await expect(page.getByLabel("Folder / region")).toHaveValue("Wokingham");
   await page

@@ -1,3 +1,33 @@
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+Disallow: /studio
+
 User-agent: *
 Allow: /
 Disallow: /admin

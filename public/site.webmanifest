@@ -1,0 +1,21 @@
+{
+  "name": "Kingsvale Homes",
+  "short_name": "Kingsvale",
+  "description": "UK property developer creating luxury homes, residential communities and land development opportunities.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#22211d",
+  "theme_color": "#22211d",
+  "icons": [
+    {
+      "src": "/brand/kingsvale-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/kingsvale-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

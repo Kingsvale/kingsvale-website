@@ -84,6 +84,11 @@ await check("public sitemap includes content and legal routes", async () => {
     "/vision-process",
     "/about",
     "/land-wanted",
+    "/new-homes-south-england",
+    "/real-estate-development",
+    "/land-opportunities",
+    "/land-seller-guide",
+    "/faq",
     "/contact",
     "/privacy",
     "/terms"

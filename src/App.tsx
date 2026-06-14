@@ -3,6 +3,7 @@ import { Homepage } from "./pages/Homepage";
 import { useSiteContent } from "./hooks/useSiteContent";
 import { studioPath } from "./lib/studioRoute";
 import { usePageSeo } from "./lib/seo";
+import { isStudioPreviewRequest } from "./lib/studioPreview";
 import {
   recordAnalyticsVisit,
   shouldRecordAnalyticsVisit,
@@ -15,9 +16,14 @@ const ContactPage = lazyNamed("ContactPage");
 const DesignBuildPage = lazyNamed("DesignBuildPage");
 const DevelopmentDetailPage = lazyNamed("DevelopmentDetailPage");
 const DevelopmentsIndexPage = lazyNamed("DevelopmentsIndexPage");
+const FaqPage = lazyNamed("FaqPage");
+const LandOpportunitiesPage = lazyNamed("LandOpportunitiesPage");
+const LandSellerGuidePage = lazyNamed("LandSellerGuidePage");
 const LandWantedPage = lazyNamed("LandWantedPage");
 const LegalPage = lazyNamed("LegalPage");
+const NewHomesSouthEnglandPage = lazyNamed("NewHomesSouthEnglandPage");
 const NotFoundPage = lazyNamed("NotFoundPage");
+const RealEstateDevelopmentPage = lazyNamed("RealEstateDevelopmentPage");
 const SecurityReviewPage = lazyNamed("SecurityReviewPage");
 const VisionProcessPage = lazyNamed("VisionProcessPage");
 const AdminDecoyPage = lazy(() =>
@@ -38,6 +44,10 @@ export function App() {
   const route = window.location.pathname;
   usePageSeo(content, route);
   useEffect(() => {
+    if (isStudioPreviewRequest()) {
+      return;
+    }
+
     if (!shouldTrackRoute(route) || !shouldRecordAnalyticsVisit(route)) {
       return;
     }
@@ -136,6 +146,46 @@ export function App() {
     return (
       <RouteBoundary>
         <LandWantedPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/new-homes-south-england") {
+    return (
+      <RouteBoundary>
+        <NewHomesSouthEnglandPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/real-estate-development") {
+    return (
+      <RouteBoundary>
+        <RealEstateDevelopmentPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/land-opportunities") {
+    return (
+      <RouteBoundary>
+        <LandOpportunitiesPage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/land-seller-guide") {
+    return (
+      <RouteBoundary>
+        <LandSellerGuidePage content={content} />
+      </RouteBoundary>
+    );
+  }
+
+  if (route === "/faq") {
+    return (
+      <RouteBoundary>
+        <FaqPage content={content} />
       </RouteBoundary>
     );
   }

@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 import React from "react";
 import { renderToPipeableStream } from "react-dom/server";
 import { App } from "../src/App";
+import { answerPageRoutes } from "../src/data/answerSeo";
 import { defaultContent } from "../src/data/defaultContent";
 import {
   absolutize,
+  brandDisplayName,
   buildStructuredData,
   getRouteMetadata,
   siteOrigin
@@ -26,6 +28,7 @@ const publicRoutes = [
   "/vision-process",
   "/about",
   "/land-wanted",
+  ...answerPageRoutes,
   "/plot-lookup",
   "/contact",
   "/privacy",
@@ -58,18 +61,28 @@ function buildHtml(route: string, appHtml: string) {
 
   html = setTitle(html, metadata.title);
   html = upsertMeta(html, "name", "description", metadata.description);
+  html = upsertMeta(html, "name", "robots", "index, follow, max-image-preview:large");
   html = upsertMeta(html, "property", "og:title", metadata.title);
   html = upsertMeta(html, "property", "og:description", metadata.description);
   html = upsertMeta(html, "property", "og:type", development ? "article" : "website");
   html = upsertMeta(html, "property", "og:url", canonical);
   html = upsertMeta(html, "property", "og:image", absolutize(metadata.image));
+  html = upsertMeta(html, "property", "og:image:alt", metadata.imageAlt);
+  html = upsertMeta(html, "property", "og:site_name", brandDisplayName);
+  html = upsertMeta(html, "property", "og:locale", "en_GB");
   html = upsertMeta(html, "name", "twitter:card", "summary_large_image");
   html = upsertMeta(html, "name", "twitter:title", metadata.title);
   html = upsertMeta(html, "name", "twitter:description", metadata.description);
+  html = upsertMeta(html, "name", "twitter:image", absolutize(metadata.image));
+  html = upsertMeta(html, "name", "twitter:image:alt", metadata.imageAlt);
   html = upsertLink(html, "canonical", canonical);
+  html = upsertSizedIcon(html, "/brand/kingsvale-favicon-48.png", "48x48");
+  html = upsertSizedIcon(html, "/brand/kingsvale-favicon-96.png", "96x96");
+  html = upsertLink(html, "apple-touch-icon", "/brand/kingsvale-icon-192.png", "sizes=\"192x192\"");
+  html = upsertLink(html, "manifest", "/site.webmanifest");
   html = upsertStructuredData(
     html,
-    buildStructuredData(defaultContent, development, canonical)
+    buildStructuredData(defaultContent, development, canonical, route)
   );
 
   return html;
@@ -124,7 +137,7 @@ function installServerWindow(pathname: string) {
 
   Object.assign(globalThis, {
     window: {
-      location: { pathname },
+      location: { pathname, search: "" },
       localStorage: storage,
       sessionStorage: storage,
       addEventListener: noop,
@@ -147,9 +160,16 @@ function upsertMeta(html: string, attribute: "name" | "property", key: string, c
   return pattern.test(html) ? html.replace(pattern, tag) : html.replace("</head>", `    ${tag}\n  </head>`);
 }
 
-function upsertLink(html: string, rel: string, href: string) {
+function upsertLink(html: string, rel: string, href: string, extraAttributes = "") {
   const pattern = new RegExp(`<link\\s+rel="${escapeRegex(rel)}"[^>]*>`, "i");
-  const tag = `<link rel="${escapeAttribute(rel)}" href="${escapeAttribute(href)}" />`;
+  const attributes = extraAttributes ? ` ${extraAttributes}` : "";
+  const tag = `<link rel="${escapeAttribute(rel)}"${attributes} href="${escapeAttribute(href)}" />`;
+  return pattern.test(html) ? html.replace(pattern, tag) : html.replace("</head>", `    ${tag}\n  </head>`);
+}
+
+function upsertSizedIcon(html: string, href: string, sizes: string) {
+  const pattern = new RegExp(`<link\\s+rel="icon"[^>]*sizes="${escapeRegex(sizes)}"[^>]*>`, "i");
+  const tag = `<link rel="icon" type="image/png" sizes="${escapeAttribute(sizes)}" href="${escapeAttribute(href)}" />`;
   return pattern.test(html) ? html.replace(pattern, tag) : html.replace("</head>", `    ${tag}\n  </head>`);
 }
 
