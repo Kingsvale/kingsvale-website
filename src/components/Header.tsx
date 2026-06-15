@@ -14,7 +14,7 @@ export function Header({ brandName, brandSuffix, navLinks }: HeaderProps) {
   const currentPath = window.location.pathname;
 
   return (
-    <header className="site-header" data-testid="site-header">
+    <header className="site-header" data-testid="site-header" data-menu-open={open}>
       <div className="site-header__inner">
         <Logo brandName={brandName} brandSuffix={brandSuffix} />
         <button

@@ -4,8 +4,8 @@
   "description": "UK property developer creating luxury homes, residential communities and land development opportunities.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#22211d",
-  "theme_color": "#22211d",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
       "src": "/brand/kingsvale-icon-192.png",
