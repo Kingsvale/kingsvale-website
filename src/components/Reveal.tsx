@@ -19,6 +19,13 @@ export function Reveal({ children, className = "", delay = 0 }: RevealProps) {
       return;
     }
 
+    const rect = element.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.88 && rect.bottom > 0) {
+      setVisible(true);
+      return;
+    }
+
+    setVisible(false);
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {

@@ -38,6 +38,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Codex / OMX local workflow artifacts
+.omx/
+
 # Local archives / temporary files
 *.zip
 *.tar

@@ -14,7 +14,15 @@ import {
   ShieldCheck,
   Trash2
 } from "lucide-react";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import type { ComponentProps } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AdminColorInput,
+  AdminRangeInput,
+  AdminSelectField,
+  AdminTextInput,
+  AdminTextarea
+} from "../components/AdminFields";
 import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
@@ -48,6 +56,26 @@ import {
 
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
+
+function TrackingTextInput({ id, label, ...props }: ComponentProps<typeof AdminTextInput>) {
+  return <AdminTextInput {...props} id={id ?? toId(label)} label={label} />;
+}
+
+function TrackingTextarea({ id, label, rows = 3, ...props }: ComponentProps<typeof AdminTextarea>) {
+  return <AdminTextarea {...props} id={id ?? toId(label)} label={label} rows={rows} />;
+}
+
+function ColorInput({ id, label, ...props }: ComponentProps<typeof AdminColorInput>) {
+  return <AdminColorInput {...props} id={id ?? toId(label)} label={label} />;
+}
+
+function RangeInput({ id, label, ...props }: ComponentProps<typeof AdminRangeInput>) {
+  return <AdminRangeInput {...props} id={id ?? toId(label)} label={label} />;
+}
+
+function TrackingSelectField({ id, label, ...props }: ComponentProps<typeof AdminSelectField>) {
+  return <AdminSelectField {...props} id={id ?? toId(label)} label={label} />;
+}
 
 export function AdminSitesPanel() {
   const [sites, setSites] = useState<TrackingSite[]>([]);
@@ -519,22 +547,14 @@ export function AdminSitesPanel() {
                   />
                 </div>
                 <div className="admin-grid admin-grid--two">
-                  <label className="admin-field" htmlFor="contact-priority">
-                    <span className="admin-field__label">Contact priority</span>
-                    <select
-                      id="contact-priority"
-                      value={draft.contactPriority}
-                      onChange={(event) =>
-                        updateDraft((site) => { site.contactPriority = event.target.value as ContactPriority; })
-                      }
-                    >
-                      {contactPriorities.map((priority) => (
-                        <option key={priority} value={priority}>
-                          {contactPriorityLabels[priority]}
-                        </option>
-                      ))} 
-                    </select>
-                  </label>
+                  <TrackingSelectField
+                    label="Contact priority"
+                    value={draft.contactPriority}
+                    options={contactPriorities.map((priority) => [priority, contactPriorityLabels[priority]] as const)}
+                    onChange={(value) =>
+                      updateDraft((site) => { site.contactPriority = value as ContactPriority; })
+                    }
+                  />
                   <TrackingTextInput
                     label="Reference"
                     value={draft.reference}
@@ -587,6 +607,7 @@ export function AdminSitesPanel() {
                   onChange={(value) => updateDraft((site) => { site.statusNote = value; })}
                 />
                 <TrackingTextarea
+                  id="google-my-maps-embed-url-or-iframe"
                   label="Google My Maps embed URL or iframe"
                   value={draft.mapEmbedUrl}
                   maxLength={trackingFieldLimits.mapEmbedUrl}
@@ -688,24 +709,17 @@ export function AdminSitesPanel() {
                           </button>
                         </div>
                         <div className="admin-grid admin-grid--two">
-                          <label className="admin-field" htmlFor={`resource-type-${index}`}>
-                            <span className="admin-field__label">Type</span>
-                            <select
-                              id={`resource-type-${index}`}
-                              value={resource.type}
-                              onChange={(event) =>
-                                updateDraft((site) => {
-                                  site.resources[index].type = event.target.value as TrackingResourceType;
-                                })
-                              }
-                            >
-                              {resourceTypes.map((type) => (
-                                <option key={type} value={type}>
-                                  {trackingResourceLabels[type]}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
+                          <TrackingSelectField
+                            id={`resource-type-${index}`}
+                            label="Type"
+                            value={resource.type}
+                            options={resourceTypes.map((type) => [type, trackingResourceLabels[type]] as const)}
+                            onChange={(value) =>
+                              updateDraft((site) => {
+                                site.resources[index].type = value as TrackingResourceType;
+                              })
+                            }
+                          />
                           <TrackingTextInput
                             label={`Resource ${index + 1} title`}
                             value={resource.title}
@@ -778,133 +792,6 @@ export function AdminSitesPanel() {
   );
 }
 
-function TrackingTextInput({
-  label,
-  value,
-  maxLength,
-  onChange,
-  error,
-  type = "text"
-}: {
-  label: string;
-  value: string;
-  maxLength: number;
-  onChange: (value: string) => void;
-  error?: string;
-  type?: "text" | "url";
-}) {
-  const id = toId(label);
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{value.length}/{maxLength}</span>
-      </span>
-      <input
-        id={id}
-        aria-label={label}
-        type={type}
-        value={value}
-        maxLength={maxLength}
-        aria-invalid={Boolean(error)}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
-      />
-      {error && <span className="admin-field__error">{error}</span>}
-    </label>
-  );
-}
-
-function ColorInput({
-  label,
-  value,
-  onChange
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const id = toId(label);
-  return (
-    <label className="admin-field color-field" htmlFor={id}>
-      <span className="admin-field__label">{label}</span>
-      <span className="color-field__control">
-        <input
-          id={id}
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <span>{value}</span>
-      </span>
-    </label>
-  );
-}
-
-function RangeInput({
-  label,
-  value,
-  onChange
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  const id = toId(label);
-  const safeValue = Number.isFinite(value) ? value : 0;
-  return (
-    <label className="admin-field range-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{Math.round(safeValue)}%</span>
-      </span>
-      <input
-        id={id}
-        aria-label={label}
-        type="range"
-        min="0"
-        max="100"
-        step="1"
-        value={safeValue}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function TrackingTextarea({
-  label,
-  value,
-  maxLength,
-  onChange,
-  error
-}: {
-  label: string;
-  value: string;
-  maxLength: number;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  const id = toId(label);
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{value.length}/{maxLength}</span>
-      </span>
-      <textarea
-        id={id}
-        aria-label={label}
-        value={value}
-        rows={3}
-        maxLength={maxLength}
-        aria-invalid={Boolean(error)}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)}
-      />
-      {error && <span className="admin-field__error">{error}</span>}
-    </label>
-  );
-}
-
 function buildPublicLink(token: string) {
   if (typeof window === "undefined") {
     return `/track/${token}`;
@@ -959,6 +846,10 @@ function normalizeReference(reference: string) {
   return reference.trim().toUpperCase();
 }
 
+function toId(label: string) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 function isAllowedLetterFile(file: File) {
   const allowedTypes = new Set([
     "application/pdf",
@@ -985,8 +876,4 @@ function toTrackingErrorMap(errors: TrackingValidationError[]) {
     map[error.path] = error.message;
     return map;
   }, {});
-}
-
-function toId(label: string) {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

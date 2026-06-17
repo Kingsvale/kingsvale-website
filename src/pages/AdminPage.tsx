@@ -23,12 +23,16 @@ import {
   type ChangeEvent,
   type ReactNode,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState
 } from "react";
 import { defaultContent } from "../data/defaultContent";
+import {
+  AdminSelectField as SelectField,
+  AdminTextInput as TextInput,
+  AdminTextarea as Textarea
+} from "../components/AdminFields";
 import { iconOptions } from "../components/IconRenderer";
 import type {
   Development,
@@ -88,17 +92,6 @@ type RevisionSummary = {
 type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup";
 type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
 type PreviewDevice = "desktop" | "tablet" | "mobile";
-
-type FieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  maxLength: number;
-  helper?: string;
-  error?: string;
-  type?: "text" | "url" | "email" | "tel";
-  placeholder?: string;
-};
 
 const emptyLink: NavLink = { label: "New link", href: "#" };
 
@@ -1009,72 +1002,6 @@ function EditorPanel({
   );
 }
 
-function TextInput({
-  label,
-  value,
-  onChange,
-  maxLength,
-  helper,
-  error,
-  type = "text",
-  placeholder
-}: FieldProps) {
-  const generatedId = useId();
-  const id = `${toId(label)}-${generatedId}`;
-
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{value.length}/{maxLength}</span>
-      </span>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {helper && <span className="admin-field__helper">{helper}</span>}
-      {error && <span className="admin-field__error">{error}</span>}
-    </label>
-  );
-}
-
-function Textarea({
-  label,
-  value,
-  onChange,
-  maxLength,
-  rows = 4,
-  helper,
-  error
-}: FieldProps & { rows?: number }) {
-  const generatedId = useId();
-  const id = `${toId(label)}-${generatedId}`;
-
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{value.length}/{maxLength}</span>
-      </span>
-      <textarea
-        id={id}
-        value={value}
-        rows={rows}
-        maxLength={maxLength}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {helper && <span className="admin-field__helper">{helper}</span>}
-      {error && <span className="admin-field__error">{error}</span>}
-    </label>
-  );
-}
-
 function ImageEditor({
   title,
   image,
@@ -1179,22 +1106,13 @@ function FeatureEditor({
         canMoveDown={canMoveDown}
         onMove={onMove}
       />
-      <label className="admin-field" htmlFor={`feature-icon-${index}`}>
-        <span className="admin-field__label">Icon</span>
-        <select
-          id={`feature-icon-${index}`}
-          value={feature.icon}
-          onChange={(event) =>
-            onChange({ ...feature, icon: event.target.value as IconKey })
-          }
-        >
-          {iconOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <SelectField
+        id={`feature-icon-${index}`}
+        label="Icon"
+        value={feature.icon}
+        options={iconOptions.map((option) => [option.value, option.label] as const)}
+        onChange={(value) => onChange({ ...feature, icon: value as IconKey })}
+      />
       <TextInput
         label={`Feature ${index + 1} title`}
         value={feature.title}

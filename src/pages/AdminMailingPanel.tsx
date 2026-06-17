@@ -1,5 +1,11 @@
 import { Clock, ExternalLink, FileText, Mail, RefreshCw, Save, Search } from "lucide-react";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AdminDateField as DateField,
+  AdminSelectField as SelectField,
+  AdminTextInput as TextInput,
+  AdminTextarea as Textarea
+} from "../components/AdminFields";
 import {
   checkMailingTrackingStatus,
   listTrackingSites,
@@ -249,18 +255,21 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
           </div>
           <div className="mailing-filters">
             <SelectField
+              id="priority"
               label="Priority"
               value={priorityFilter}
               onChange={(value) => setPriorityFilter(value as ContactPriority | "all")}
               options={[["all", "All priorities"], ...contactPriorities.map((item) => [item, contactPriorityLabels[item]] as const)]}
             />
             <SelectField
+              id="status"
               label="Status"
               value={statusFilter}
               onChange={(value) => setStatusFilter(value as MailingStatus | "all")}
               options={[["all", "All statuses"], ...mailingStatuses.map((item) => [item, mailingStatusLabels[item]] as const)]}
             />
             <SelectField
+              id="sort"
               label="Sort"
               value={sortMode}
               onChange={(value) => setSortMode(value as SortMode)}
@@ -317,6 +326,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               </div>
 
               <SelectField
+                id="contact-priority"
                 label="Contact priority"
                 value={draft.contactPriority}
                 onChange={(value) => updateDraft((site) => { site.contactPriority = value as ContactPriority; })}
@@ -325,12 +335,14 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
               <div className="admin-grid admin-grid--two">
                 <SelectField
+                  id="mailing-status"
                   label="Mailing status"
                   value={draft.mailingStatus}
                   onChange={(value) => updateDraft((site) => { site.mailingStatus = value as MailingStatus; })}
                   options={mailingStatuses.map((item) => [item, mailingStatusLabels[item]] as const)}
                 />
                 <TextInput
+                  id="royal-mail-tracking-number"
                   label="Royal Mail tracking number"
                   value={draft.royalMailTrackingNumber}
                   maxLength={trackingFieldLimits.royalMailTrackingNumber}
@@ -340,6 +352,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
               <div className="admin-grid admin-grid--three">
                 <DateField
+                  id="date-first-mailed"
                   label="Date first mailed"
                   value={draft.firstMailedAt}
                   onChange={(value) =>
@@ -352,6 +365,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                   }
                 />
                 <DateField
+                  id="last-mailed"
                   label="Last mailed"
                   value={draft.lastMailedAt}
                   onChange={(value) => updateDraft((site) => { site.lastMailedAt = value; })}
@@ -375,6 +389,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               </div>
 
               <DateField
+                id="re-mailing-reminder-date"
                 label="Re-mailing reminder date"
                 value={draft.remailReminderDate}
                 onChange={(value) => updateDraft((site) => { site.remailReminderDate = value; })}
@@ -429,19 +444,14 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                 </div>
               </div>
 
-              <label className="admin-field" htmlFor="mailing-notes">
-                <span className="admin-field__label">
-                  Notes
-                  <span aria-hidden="true">{draft.mailingNotes.length}/{trackingFieldLimits.mailingNotes}</span>
-                </span>
-                <textarea
-                  id="mailing-notes"
-                  value={draft.mailingNotes}
-                  rows={5}
-                  maxLength={trackingFieldLimits.mailingNotes}
-                  onChange={(event) => updateDraft((site) => { site.mailingNotes = event.target.value; })}
-                />
-              </label>
+              <Textarea
+                id="mailing-notes"
+                label="Notes"
+                value={draft.mailingNotes}
+                rows={5}
+                maxLength={trackingFieldLimits.mailingNotes}
+                onChange={(value) => updateDraft((site) => { site.mailingNotes = value; })}
+              />
 
               <div className="sites-admin__actions">
                 <span className="analytics-admin__subtle">
@@ -466,86 +476,6 @@ function Metric({ label, value, tone = "normal" }: { label: string; value: numbe
       <span>{label}</span>
       <strong>{value.toLocaleString()}</strong>
     </article>
-  );
-}
-
-function TextInput({
-  label,
-  value,
-  maxLength,
-  onChange
-}: {
-  label: string;
-  value: string;
-  maxLength: number;
-  onChange: (value: string) => void;
-}) {
-  const id = toId(label);
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">
-        {label}
-        <span aria-hidden="true">{value.length}/{maxLength}</span>
-      </span>
-      <input
-        id={id}
-        value={value}
-        maxLength={maxLength}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-  overdue = false
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  overdue?: boolean;
-}) {
-  const id = toId(label);
-  return (
-    <label className={overdue ? "admin-field admin-field--overdue" : "admin-field"} htmlFor={id}>
-      <span className="admin-field__label">{label}</span>
-      <input
-        id={id}
-        type="date"
-        value={value}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
-      />
-      {overdue && <span className="admin-field__error">Reminder overdue</span>}
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange
-}: {
-  label: string;
-  value: string;
-  options: readonly (readonly [string, string])[];
-  onChange: (value: string) => void;
-}) {
-  const id = toId(label);
-  return (
-    <label className="admin-field" htmlFor={id}>
-      <span className="admin-field__label">{label}</span>
-      <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map(([optionValue, label]) => (
-          <option key={optionValue} value={optionValue}>
-            {label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
@@ -597,8 +527,4 @@ function readFileAsDataUrl(file: File) {
     reader.addEventListener("error", () => reject(reader.error ?? new Error("File could not be read.")));
     reader.readAsDataURL(file);
   });
-}
-
-function toId(label: string) {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

@@ -515,6 +515,14 @@ button:disabled {
   color: var(--ivory);
   padding: 0 0.95rem;
   font: inherit;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.plot-lookup__form input:focus {
+  outline: 0;
+  border-color: rgba(247, 243, 235, 0.64);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(173, 149, 118, 0.22);
 }
 
 .plot-lookup__form button {
@@ -526,6 +534,13 @@ button:disabled {
   font-weight: 900;
   text-transform: uppercase;
   cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.plot-lookup__form button:hover,
+.plot-lookup__form button:focus-visible {
+  background: var(--warm-stone);
+  transform: translateY(-1px);
 }
 
 .plot-lookup__form p {
@@ -875,13 +890,13 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-[data-reveal] {
+html[data-reveal-motion="enabled"] [data-reveal] {
   opacity: 0;
   transform: translateY(24px);
   transition: opacity 560ms ease var(--reveal-delay), transform 560ms ease var(--reveal-delay);
 }
 
-[data-reveal][data-visible="true"] {
+html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   opacity: 1;
   transform: translateY(0);
 }
@@ -1341,6 +1356,12 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.admin-grid > .admin-field,
+.admin-stack > .admin-field,
+.admin-panel > .admin-field:last-child {
+  margin-bottom: 0;
+}
+
 .admin-field__label {
   display: flex;
   justify-content: space-between;
@@ -1364,6 +1385,20 @@ button:disabled {
   background: rgba(255, 255, 255, 0.78);
   color: var(--ink);
   padding: 12px 13px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.admin-field:focus-within .admin-field__label {
+  color: var(--taupe-dark);
+}
+
+.admin-field input:focus,
+.admin-field textarea:focus,
+.admin-field select:focus {
+  outline: 0;
+  border-color: rgba(117, 97, 77, 0.5);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 3px rgba(173, 149, 118, 0.16);
 }
 
 .admin-field textarea {
@@ -1373,6 +1408,11 @@ button:disabled {
 .admin-field input[aria-invalid="true"],
 .admin-field textarea[aria-invalid="true"] {
   border-color: rgba(138, 59, 48, 0.7);
+}
+
+.admin-field input[aria-invalid="true"]:focus,
+.admin-field textarea[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(138, 59, 48, 0.13);
 }
 
 .admin-field__helper {
@@ -1443,6 +1483,14 @@ button:disabled {
   background: rgba(255, 255, 255, 0.48);
   border: 1px solid rgba(70, 59, 48, 0.16);
   border-radius: 4px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.admin-subcard:focus-within,
+.admin-link-row:focus-within {
+  border-color: rgba(173, 149, 118, 0.34);
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 12px 34px rgba(34, 33, 29, 0.07);
 }
 
 .admin-section-heading,
@@ -1525,6 +1573,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -1620,6 +1669,13 @@ button:disabled {
   padding: 0 12px;
   border: 1px solid rgba(70, 59, 48, 0.16);
   background: rgba(255, 255, 255, 0.62);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.sites-admin__search:focus-within {
+  border-color: rgba(117, 97, 77, 0.42);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 3px rgba(173, 149, 118, 0.14);
 }
 
 .sites-admin__search svg {
@@ -1696,11 +1752,20 @@ button:disabled {
   background: rgba(255, 255, 255, 0.5);
   color: var(--ink);
   text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background 180ms ease;
 }
 
 .site-row--active {
   border-color: rgba(54, 94, 126, 0.42);
   background: rgba(237, 244, 248, 0.78);
+}
+
+.site-row:hover,
+.site-row:focus-visible {
+  border-color: rgba(173, 149, 118, 0.34);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 30px rgba(34, 33, 29, 0.07);
+  transform: translateY(-1px);
 }
 
 .site-row__title {
@@ -1861,6 +1926,14 @@ button:disabled {
   background: var(--ivory-2);
   color: var(--ink);
   padding: 11px 12px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.tracking-link-box input:focus {
+  outline: 0;
+  border-color: rgba(54, 94, 126, 0.44);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(54, 94, 126, 0.12);
 }
 
 .letter-upload {
@@ -1942,6 +2015,12 @@ button:disabled {
   list-style: none;
   margin-bottom: 0;
   background: rgba(237, 244, 248, 0.62);
+  transition: background 180ms ease;
+}
+
+.qr-designer__summary:hover,
+.qr-designer__summary:focus-visible {
+  background: rgba(237, 244, 248, 0.86);
 }
 
 .qr-designer__summary span {
@@ -3068,6 +3147,14 @@ button:disabled {
   background: var(--ivory);
   border: 1px solid rgba(70, 59, 48, 0.13);
   box-shadow: 0 16px 48px rgba(34, 33, 29, 0.07);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+
+.listing-card:hover,
+.listing-card:focus-within {
+  border-color: rgba(173, 149, 118, 0.32);
+  box-shadow: 0 22px 56px rgba(34, 33, 29, 0.1);
+  transform: translateY(-2px);
 }
 
 .listing-card__media {
@@ -3081,6 +3168,15 @@ button:disabled {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.listing-card__media img {
+  transition: transform 700ms ease;
+}
+
+.listing-card:hover .listing-card__media img,
+.listing-card:focus-within .listing-card__media img {
+  transform: scale(1.025);
 }
 
 .listing-card__body {
@@ -3223,6 +3319,14 @@ button:disabled {
   padding: 28px;
   background: var(--ivory);
   border: 1px solid rgba(70, 59, 48, 0.13);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.process-card:hover,
+.security-card:hover {
+  border-color: rgba(173, 149, 118, 0.3);
+  box-shadow: 0 16px 42px rgba(34, 33, 29, 0.07);
+  transform: translateY(-2px);
 }
 
 .process-card span {
@@ -3425,6 +3529,16 @@ button:disabled {
   border: 1px solid var(--line);
   background: var(--ivory-2);
   padding: 13px 14px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus,
+.contact-form select:focus {
+  outline: 0;
+  border-color: rgba(117, 97, 77, 0.5);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(173, 149, 118, 0.16);
 }
 
 .form-status {

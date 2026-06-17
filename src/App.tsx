@@ -10,6 +10,7 @@ import {
   shouldTrackRoute,
   type AnalyticsRouteType
 } from "./lib/analytics";
+import type { SiteContent } from "./lib/contentTypes";
 
 const AboutPage = lazyNamed("AboutPage");
 const ContactPage = lazyNamed("ContactPage");
@@ -38,6 +39,22 @@ const TrackingPage = lazy(() =>
 const PlotLookupPage = lazy(() =>
   import("./pages/PlotLookupPage").then((module) => ({ default: module.PlotLookupPage }))
 );
+
+const staticContentRoutes = new Map<string, (content: SiteContent) => ReactNode>([
+  ["/plot-lookup", (content) => <PlotLookupPage content={content} />],
+  ["/developments", (content) => <DevelopmentsIndexPage content={content} />],
+  ["/design-build", (content) => <DesignBuildPage content={content} />],
+  ["/vision-process", (content) => <VisionProcessPage content={content} />],
+  ["/about", (content) => <AboutPage content={content} />],
+  ["/land-wanted", (content) => <LandWantedPage content={content} />],
+  ["/new-homes-south-england", (content) => <NewHomesSouthEnglandPage content={content} />],
+  ["/real-estate-development", (content) => <RealEstateDevelopmentPage content={content} />],
+  ["/land-opportunities", (content) => <LandOpportunitiesPage content={content} />],
+  ["/land-seller-guide", (content) => <LandSellerGuidePage content={content} />],
+  ["/faq", (content) => <FaqPage content={content} />],
+  ["/contact", (content) => <ContactPage content={content} />],
+  ["/security-review", (content) => <SecurityReviewPage content={content} />]
+]);
 
 export function App() {
   const content = useSiteContent();
@@ -88,22 +105,6 @@ export function App() {
     );
   }
 
-  if (route === "/plot-lookup") {
-    return (
-      <RouteBoundary>
-        <PlotLookupPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/developments") {
-    return (
-      <RouteBoundary>
-        <DevelopmentsIndexPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
   if (route.startsWith("/developments/")) {
     const developmentId = route.split("/").filter(Boolean)[1];
     const development = content.developments.find((item) => item.id === developmentId);
@@ -118,82 +119,11 @@ export function App() {
     );
   }
 
-  if (route === "/design-build") {
+  const renderStaticPage = staticContentRoutes.get(route);
+  if (renderStaticPage) {
     return (
       <RouteBoundary>
-        <DesignBuildPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/vision-process") {
-    return (
-      <RouteBoundary>
-        <VisionProcessPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/about") {
-    return (
-      <RouteBoundary>
-        <AboutPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/land-wanted") {
-    return (
-      <RouteBoundary>
-        <LandWantedPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/new-homes-south-england") {
-    return (
-      <RouteBoundary>
-        <NewHomesSouthEnglandPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/real-estate-development") {
-    return (
-      <RouteBoundary>
-        <RealEstateDevelopmentPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/land-opportunities") {
-    return (
-      <RouteBoundary>
-        <LandOpportunitiesPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/land-seller-guide") {
-    return (
-      <RouteBoundary>
-        <LandSellerGuidePage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/faq") {
-    return (
-      <RouteBoundary>
-        <FaqPage content={content} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/contact") {
-    return (
-      <RouteBoundary>
-        <ContactPage content={content} />
+        {renderStaticPage(content)}
       </RouteBoundary>
     );
   }
@@ -202,14 +132,6 @@ export function App() {
     return (
       <RouteBoundary>
         <LegalPage content={content} kind={route === "/privacy" ? "privacy" : "terms"} />
-      </RouteBoundary>
-    );
-  }
-
-  if (route === "/security-review") {
-    return (
-      <RouteBoundary>
-        <SecurityReviewPage content={content} />
       </RouteBoundary>
     );
   }
