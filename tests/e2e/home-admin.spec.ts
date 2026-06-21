@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { studioPath } from "../../src/lib/studioRoute";
 
@@ -83,6 +84,16 @@ test("creates a land interest map page and opens the generated link", async ({ p
   await page.getByRole("tab", { name: "Sites" }).click();
   await page.getByRole("button", { name: "Create site" }).click();
   await expect(page.getByLabel("QR code preview")).toBeVisible();
+  const qrDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: /download png/i }).click();
+  const download = await qrDownload;
+  expect(download.suggestedFilename()).toMatch(/-qr\.png$/);
+  const qrPath = await download.path();
+  expect(qrPath).toBeTruthy();
+  const qrBytes = await readFile(qrPath as string);
+  expect(qrBytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+  expect(qrBytes.readUInt32BE(16)).toBe(1155);
+  expect(qrBytes.readUInt32BE(20)).toBe(1155);
   await setRangeValue(page, "Finder roundness", "86");
   await setRangeValue(page, "Cut corners", "34");
   await page.getByLabel("Site title").fill("Oakdene land interest");

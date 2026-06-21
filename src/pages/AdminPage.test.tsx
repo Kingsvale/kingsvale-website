@@ -101,6 +101,8 @@ describe("AdminPage", () => {
     });
     expect(screen.getByLabelText("Reference")).toHaveValue("KV0001");
     expect(screen.getByLabelText("QR code preview")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download png/i })).toBeInTheDocument();
+    expect(screen.getByText(/1155px PNG for Word letters/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Dot roundness")).toHaveValue("48");
     expect(screen.getByLabelText("Finder roundness")).toHaveValue("24");
     expect(screen.getByLabelText("Frame roundness")).toHaveValue("42");

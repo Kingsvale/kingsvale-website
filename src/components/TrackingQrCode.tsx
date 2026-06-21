@@ -1,7 +1,10 @@
+import { useState } from "react";
 import QRCode from "qrcode";
 import { Download } from "lucide-react";
 import { boundedPercent } from "../lib/qrStyle";
 import type { TrackingQrStyle } from "../lib/trackingTypes";
+
+const WORD_QR_EXPORT_SIZE = 1155;
 
 type TrackingQrCodeProps = {
   value: string;
@@ -10,16 +13,29 @@ type TrackingQrCodeProps = {
 };
 
 export function TrackingQrCode({ value, style, title }: TrackingQrCodeProps) {
-  const svg = buildStyledQrSvg(value, style, title);
+  const [downloadState, setDownloadState] = useState<"idle" | "busy" | "error">("idle");
+  const previewSvg = buildStyledQrSvg(value, style, title);
 
-  function downloadSvg() {
-    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${toFileName(title)}-qr.svg`;
-    link.click();
-    URL.revokeObjectURL(url);
+  async function downloadPng() {
+    if (downloadState === "busy") {
+      return;
+    }
+
+    setDownloadState("busy");
+    try {
+      const documentSvg = buildStyledQrSvg(value, style, title, { includeCaption: false });
+      const blob = await svgToPngBlob(
+        documentSvg,
+        WORD_QR_EXPORT_SIZE,
+        WORD_QR_EXPORT_SIZE,
+        safeColor(style.background, "#fbf8f2")
+      );
+      downloadBlob(blob, `${toFileName(title)}-qr.png`);
+      setDownloadState("idle");
+    } catch (error) {
+      console.error("QR PNG export failed", error);
+      setDownloadState("error");
+    }
   }
 
   return (
@@ -27,24 +43,40 @@ export function TrackingQrCode({ value, style, title }: TrackingQrCodeProps) {
       <div
         className="qr-designer__svg"
         aria-label="QR code preview"
-        dangerouslySetInnerHTML={{ __html: svg }}
+        dangerouslySetInnerHTML={{ __html: previewSvg }}
       />
-      <button type="button" className="admin-ghost" onClick={downloadSvg}>
+      <button
+        type="button"
+        className="admin-ghost"
+        onClick={downloadPng}
+        disabled={downloadState === "busy"}
+      >
         <Download aria-hidden="true" />
-        Download SVG
+        {downloadState === "busy" ? "Preparing PNG..." : "Download PNG"}
       </button>
+      <small className="qr-designer__download-note">Exports a square 1155px PNG for Word letters.</small>
+      {downloadState === "error" ? (
+        <small className="qr-designer__download-error" role="alert">
+          PNG export failed. Please try again.
+        </small>
+      ) : null}
     </div>
   );
 }
 
-function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string) {
+type QrSvgOptions = {
+  includeCaption?: boolean;
+};
+
+function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string, options: QrSvgOptions = {}) {
   const qr = QRCode.create(value || "https://www.kingsvalehomes.co.uk", {
     errorCorrectionLevel: "H"
   });
+  const includeCaption = options.includeCaption ?? true;
   const moduleCount = qr.modules.size;
   const quiet = 3;
   const moduleSize = 10;
-  const labelHeight = 42;
+  const labelHeight = includeCaption ? 42 : 0;
   const size = (moduleCount + quiet * 2) * moduleSize;
   const totalHeight = size + labelHeight;
   const foreground = safeColor(style.foreground, "#22211d");
@@ -77,6 +109,10 @@ function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string) 
   );
   const label = escapeText(style.frameLabel || "Scan for project updates");
   const brand = escapeText(title.slice(0, 28));
+  const caption = includeCaption
+    ? `<text x="${size / 2}" y="${size + 22}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="${foreground}">${label}</text>
+  <text x="${size / 2}" y="${size + 37}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700" fill="${accent}">${brand}</text>`
+    : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${totalHeight}" role="img" aria-label="${escapeAttribute(label)}" data-qr-svg="true">
   ${frameShape(0, 0, size, totalHeight, frameRoundness, frameCut, background)}
@@ -84,9 +120,65 @@ function buildStyledQrSvg(value: string, style: TrackingQrStyle, title: string) 
   ${modules.join("\n  ")}
   ${finders.join("\n  ")}
   ${style.includeLogo ? logoMark(size, moduleSize, background, foreground, accent) : ""}
-  <text x="${size / 2}" y="${size + 22}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" fill="${foreground}">${label}</text>
-  <text x="${size / 2}" y="${size + 37}" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700" fill="${accent}">${brand}</text>
+  ${caption}
 </svg>`;
+}
+
+function svgToPngBlob(svg: string, width: number, height: number, background: string) {
+  return new Promise<Blob>((resolve, reject) => {
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+          URL.revokeObjectURL(svgUrl);
+          reject(new Error("Canvas is not available for QR PNG export."));
+          return;
+        }
+
+        context.fillStyle = background;
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        URL.revokeObjectURL(svgUrl);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error("Browser could not create a PNG QR code."));
+            return;
+          }
+          resolve(blob);
+        }, "image/png");
+      } catch (error) {
+        URL.revokeObjectURL(svgUrl);
+        reject(error);
+      }
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl);
+      reject(new Error("Browser could not render the QR code before PNG export."));
+    };
+
+    image.src = svgUrl;
+  });
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function moduleShape(x: number, y: number, size: number, radius: number, color: string) {

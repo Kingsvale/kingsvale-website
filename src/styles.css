@@ -2083,6 +2083,20 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   display: block;
 }
 
+.qr-designer__download-note,
+.qr-designer__download-error {
+  max-width: 260px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.qr-designer__download-error {
+  color: #8d2c21;
+}
+
 .color-field__control {
   min-height: 45px;
   display: grid;

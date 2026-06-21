@@ -453,7 +453,7 @@ export function AdminSitesPanel() {
                 <details className="qr-designer qr-designer--folded" open>
                   <summary className="qr-designer__summary">
                     <span><Palette aria-hidden="true" /> QR Code Design</span>
-                    <small>Colours, module shape, frame shape and download</small>
+                    <small>Colours, shape and Word-ready PNG export</small>
                   </summary>
                   <div className="qr-designer__controls">
                     <div className="admin-grid admin-grid--two">
