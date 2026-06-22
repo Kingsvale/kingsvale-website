@@ -50,3 +50,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger Portainer redeploy
+        env:
+          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+        run: |
+          if [ -z "$PORTAINER_WEBHOOK_URL" ]; then
+            echo "::notice::PORTAINER_WEBHOOK_URL is not configured; the image was published but Portainer was not triggered."
+            exit 0
+          fi
+
+          curl --fail --silent --show-error --location \
+            --retry 3 \
+            --retry-delay 5 \
+            --request POST \
+            "$PORTAINER_WEBHOOK_URL"

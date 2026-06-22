@@ -67,7 +67,7 @@ Optional hardening:
 
 ```bash
 $env:STUDIO_TOTP_SECRET="BASE32-TOTP-SECRET"
-$env:CMS_MAX_REVISIONS="25"
+$env:CMS_MAX_REVISIONS="5"
 $env:CMS_MAX_BACKUPS="30"
 $env:BACKUP_IMPORT_MAX_MB="25"
 ```
@@ -145,7 +145,7 @@ Optional variables:
 
 ```bash
 STUDIO_TOTP_SECRET=
-CMS_MAX_REVISIONS=25
+CMS_MAX_REVISIONS=5
 CMS_MAX_BACKUPS=30
 BACKUP_IMPORT_MAX_MB=25
 ROYAL_MAIL_TRACKING_API_URL=
@@ -190,29 +190,26 @@ Move local Studio data to the deployed instance:
 
 The Docker image and the editable Studio data are intentionally separate. The image carries code and default placeholders; the backup JSON carries website edits, Sites/QR pages, mailing workflow data, analytics and lead logs. Keep the `kingsvale_data` Docker volume and `CMS_ENCRYPTION_KEY` stable between redeploys so existing production data remains readable.
 
-Portainer Git deployment with automatic image rebuilds:
+Portainer GHCR deployment:
 
-1. Push this project to `https://github.com/Kingsvale/kingsvale-website`.
+1. Make sure the GitHub Container Registry package `ghcr.io/kingsvale/kingsvale-website` is public, or configure GHCR credentials in Portainer.
 2. In Portainer, go to `Stacks` -> `Add stack`.
-3. Choose `Git repository`, enter the repository URL and branch.
-4. Set `Compose path` to `docker-compose.portainer.yml`.
-5. Add the environment variables above in the Stack environment section.
-6. Deploy the stack. Portainer will build `kingsvale-luxury-real-estate:latest` from the Git checkout because the compose file includes a `build:` block.
+3. Choose `Git repository` or `Web editor`.
+4. Use `docker-compose.portainer.yml` as the compose file.
+5. Add the required environment variables above in the Stack environment section.
+6. Deploy the stack. Portainer pulls `ghcr.io/kingsvale/kingsvale-website:latest`.
 7. Open `http://SERVER_IP:8095/` or the host port you set with `HOST_PORT`.
 8. Open Studio at `/studio`.
 
 Automatic redeploy from GitHub:
 
-1. Edit the Git-backed stack in Portainer.
-2. Enable `GitOps updates`.
-3. Choose either `Polling` or `Webhook`.
-   - `Polling`: set a fetch interval, for example every 5 minutes.
-   - `Webhook`: copy the Portainer webhook URL.
-4. If using `Webhook`, in GitHub open `Kingsvale/kingsvale-website` -> `Settings` -> `Webhooks` -> `Add webhook`.
-5. Paste the Portainer webhook URL as the payload URL, set content type to `application/json`, and select push events.
-6. Save. Each pushed change can now trigger Portainer to pull the latest commit, rebuild the local image from the repo and redeploy the stack.
+1. In GitHub, open `Kingsvale/kingsvale-website` -> `Settings` -> `Secrets and variables` -> `Actions`.
+2. Add a repository secret named `PORTAINER_WEBHOOK_URL` containing the Portainer stack webhook URL.
+3. Push to `main`, or run the `Publish Docker image` workflow manually.
+4. The workflow builds and pushes `ghcr.io/kingsvale/kingsvale-website:latest`.
+5. After the image push succeeds, the workflow posts to the Portainer webhook so the stack redeploys and pulls the new image.
 
-The repository also includes `.github/workflows/docker-image.yml` for an optional GHCR image workflow. Do not point `docker-compose.portainer.yml` at `ghcr.io/kingsvale/kingsvale-website:latest` unless the GitHub Container Registry package is public or Portainer has valid `ghcr.io` registry credentials. Keep the `kingsvale_data` volume attached so redeploys keep Studio data.
+Keep the `kingsvale_data` volume attached so redeploys keep Studio data. Do not commit Portainer webhook URLs, Studio passwords, CMS encryption keys or GHCR tokens to this public repository.
 
 If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, or Cloudflare Tunnel, point the proxy to container port `4173` and keep HTTPS enabled.
 
