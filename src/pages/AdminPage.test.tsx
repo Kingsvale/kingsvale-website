@@ -112,6 +112,15 @@ describe("AdminPage", () => {
     expect(screen.getByLabelText("Dot roundness")).toHaveValue("48");
     expect(screen.getByLabelText("Finder roundness")).toHaveValue("24");
     expect(screen.getByLabelText("Frame roundness")).toHaveValue("42");
+    fireEvent.change(screen.getByLabelText("Address line 1"), {
+      target: { value: "12 Meadow Lane" }
+    });
+    fireEvent.change(screen.getByLabelText("Town / city"), {
+      target: { value: "Wokingham" }
+    });
+    fireEvent.change(screen.getByLabelText("Postcode"), {
+      target: { value: "RG40 1AA" }
+    });
     fireEvent.change(screen.getByLabelText("Finder roundness"), {
       target: { value: "86" }
     });
@@ -142,8 +151,14 @@ describe("AdminPage", () => {
     expect(screen.getByRole("button", { name: /open letter generation in mailing/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /generate letter/i })).not.toBeInTheDocument();
 
-    fireEvent.change(document.querySelector("#site-address") as HTMLInputElement, {
-      target: { value: "12 Meadow Lane, Wokingham" }
+    fireEvent.change(screen.getByLabelText("Address line 1"), {
+      target: { value: "12 Meadow Lane" }
+    });
+    fireEvent.change(screen.getByLabelText("Town / city"), {
+      target: { value: "Wokingham" }
+    });
+    fireEvent.change(screen.getByLabelText("Postcode"), {
+      target: { value: "RG40 1AA" }
     });
     expect(document.querySelector("#folder-region")).toHaveValue("Wokingham");
 

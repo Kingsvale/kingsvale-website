@@ -54,6 +54,14 @@ export type TrackingResource = {
   note: string;
 };
 
+export type TrackingAddressParts = {
+  line1: string;
+  line2: string;
+  town: string;
+  county: string;
+  postcode: string;
+};
+
 export type TrackingMilestone = {
   id: string;
   label: string;
@@ -68,6 +76,7 @@ export type TrackingSite = {
   title: string;
   customerName: string;
   siteAddress: string;
+  siteAddressParts: TrackingAddressParts;
   ownerAddress: string;
   titleNumber: string;
   plotDescription: string;

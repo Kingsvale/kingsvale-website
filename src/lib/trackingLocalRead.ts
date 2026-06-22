@@ -26,6 +26,13 @@ export function findPublicLocalTrackingSiteByToken(token: string): TrackingSite 
 
 export function normalizePublicTrackingSite(site: Partial<TrackingSite>): TrackingSite {
   const updatedAt = typeof site.updatedAt === "string" && site.updatedAt ? site.updatedAt : new Date().toISOString();
+  const siteAddressParts = {
+    line1: stringValue(site.siteAddressParts?.line1),
+    line2: stringValue(site.siteAddressParts?.line2),
+    town: stringValue(site.siteAddressParts?.town),
+    county: stringValue(site.siteAddressParts?.county),
+    postcode: stringValue(site.siteAddressParts?.postcode).toUpperCase()
+  };
   const {
     ownerAddress,
     titleNumber,
@@ -87,6 +94,7 @@ export function normalizePublicTrackingSite(site: Partial<TrackingSite>): Tracki
     title: stringValue(site.title, "Private plot map"),
     customerName: stringValue(site.customerName),
     siteAddress: stringValue(site.siteAddress),
+    siteAddressParts,
     reference: stringValue(site.reference),
     summary: stringValue(site.summary, "View the plot information Kingsvale has shared."),
     mapEmbedUrl: stringValue(site.mapEmbedUrl),

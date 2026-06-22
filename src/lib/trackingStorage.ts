@@ -12,7 +12,9 @@ import { defaultQrStyle, normalizeTrackingSite } from "./trackingNormalize";
 
 export {
   defaultQrStyle,
+  buildAddressFromParts,
   detectSiteRegion,
+  normalizeAddressParts,
   normalizeMapEmbedInput,
   normalizeTrackingSite,
   suggestRemailReminderDate
@@ -118,7 +120,14 @@ export function createTrackingSite(): TrackingSite {
     token: generateTrackingToken(),
     title: "New customer tracking page",
     customerName: "",
-    siteAddress: "Site address",
+    siteAddress: "Address line 1, Town, AA1 1AA",
+    siteAddressParts: {
+      line1: "Address line 1",
+      line2: "",
+      town: "Town",
+      county: "",
+      postcode: "AA1 1AA"
+    },
     ownerAddress: "",
     titleNumber: "",
     plotDescription: "",

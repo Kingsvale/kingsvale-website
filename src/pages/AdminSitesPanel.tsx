@@ -39,8 +39,10 @@ import { defaultStudioSettings, type StudioSettings } from "../lib/studioSetting
 import {
   createTrackingResource,
   createTrackingSite,
+  buildAddressFromParts,
   detectSiteRegion,
   mailingStatusClass,
+  normalizeAddressParts,
   normalizeMapEmbedInput,
   priorityClass,
 } from "../lib/trackingStorage";
@@ -322,6 +324,20 @@ export function AdminSitesPanel() {
       const next = structuredClone(current);
       recipe(next);
       return next;
+    });
+  }
+
+  function updateAddressPart(part: keyof TrackingSite["siteAddressParts"], value: string) {
+    updateDraft((site) => {
+      const nextParts = normalizeAddressParts({
+        ...site.siteAddressParts,
+        [part]: value
+      }, site.siteAddress);
+      site.siteAddressParts = nextParts;
+      site.siteAddress = buildAddressFromParts(nextParts);
+      if (!site.region || site.region === "Uncategorised" || part === "town" || part === "county") {
+        site.region = nextParts.county || detectSiteRegion(site.siteAddress) || nextParts.town || "Uncategorised";
+      }
     });
   }
 
@@ -628,19 +644,42 @@ export function AdminSitesPanel() {
                   </p>
                 )}
                 <TrackingTextInput
-                  label="Site address"
-                  value={draft.siteAddress}
-                  maxLength={trackingFieldLimits.siteAddress}
-                  error={errorsByPath.siteAddress}
-                  onChange={(value) =>
-                    updateDraft((site) => {
-                      site.siteAddress = value;
-                      if (!site.region || site.region === "Uncategorised") {
-                        site.region = detectSiteRegion(value) || "Uncategorised";
-                      }
-                    })
-                  }
+                  label="Address line 1"
+                  value={draft.siteAddressParts.line1}
+                  maxLength={trackingFieldLimits.addressLine1}
+                  error={errorsByPath["siteAddressParts.line1"]}
+                  onChange={(value) => updateAddressPart("line1", value)}
                 />
+                <TrackingTextInput
+                  label="Address line 2"
+                  value={draft.siteAddressParts.line2}
+                  maxLength={trackingFieldLimits.addressLine2}
+                  error={errorsByPath["siteAddressParts.line2"]}
+                  onChange={(value) => updateAddressPart("line2", value)}
+                />
+                <div className="admin-grid admin-grid--three">
+                  <TrackingTextInput
+                    label="Town / city"
+                    value={draft.siteAddressParts.town}
+                    maxLength={trackingFieldLimits.addressTown}
+                    error={errorsByPath["siteAddressParts.town"]}
+                    onChange={(value) => updateAddressPart("town", value)}
+                  />
+                  <TrackingTextInput
+                    label="County"
+                    value={draft.siteAddressParts.county}
+                    maxLength={trackingFieldLimits.addressCounty}
+                    error={errorsByPath["siteAddressParts.county"]}
+                    onChange={(value) => updateAddressPart("county", value)}
+                  />
+                  <TrackingTextInput
+                    label="Postcode"
+                    value={draft.siteAddressParts.postcode}
+                    maxLength={trackingFieldLimits.addressPostcode}
+                    error={errorsByPath["siteAddressParts.postcode"]}
+                    onChange={(value) => updateAddressPart("postcode", value.toUpperCase())}
+                  />
+                </div>
                 <TrackingTextInput
                   label="Title number"
                   value={draft.titleNumber}

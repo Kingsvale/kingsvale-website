@@ -6,6 +6,7 @@ import {
   ChevronUp,
   ExternalLink,
   Eye,
+  History,
   LogOut,
   Monitor,
   Plus,
@@ -166,6 +167,7 @@ export function AdminPage({
   const [trackingStorageStatus, setTrackingStorageStatus] = useState(() => getTrackingStorageStatus());
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState("");
+  const [showRevisionHistory, setShowRevisionHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const validation = useMemo(() => validateSiteContent(draft), [draft]);
   const errorsByPath = useMemo(() => toErrorMap(validation.errors), [validation.errors]);
@@ -296,6 +298,7 @@ export function AdminPage({
       setDraft(cloneContent(payload.content));
       setRevisions(await listCmsRevisions());
       setSelectedRevision("");
+      setShowRevisionHistory(false);
       window.dispatchEvent(new Event("kingsvale-content-updated"));
       setStatus("Revision restored and published.");
     } catch {
@@ -351,35 +354,16 @@ export function AdminPage({
             )}
             <span>{trackingStorageStatus.label}</span>
           </div>
-          {activeRootTab === "website" && serverMode && revisions.length > 0 && (
-            <details className="admin-versioning">
-              <summary>Recovery</summary>
-              <div className="admin-versioning__controls">
-                <label className="sr-only" htmlFor="revision-select">
-                  Restore revision
-                </label>
-                <select
-                  id="revision-select"
-                  value={selectedRevision}
-                  onChange={(event) => setSelectedRevision(event.target.value)}
-                >
-                  <option value="">Revision history</option>
-                  {revisions.map((revision) => (
-                    <option key={revision.id} value={revision.id}>
-                      {new Date(revision.createdAt).toLocaleString()} - {revision.title}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="admin-ghost"
-                  disabled={!selectedRevision || busy}
-                  onClick={restoreSelectedRevision}
-                >
-                  Restore
-                </button>
-              </div>
-            </details>
+          {activeRootTab === "website" && serverMode && (
+            <button
+              type="button"
+              className="admin-ghost"
+              disabled={busy || revisions.length === 0}
+              onClick={() => setShowRevisionHistory(true)}
+            >
+              <History aria-hidden="true" />
+              Revision history
+            </button>
           )}
           {activeRootTab === "website" && (
             <>
@@ -410,6 +394,61 @@ export function AdminPage({
           )}
         </div>
       </header>
+
+      {showRevisionHistory && (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section
+            className="admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revision-history-title"
+          >
+            <div className="admin-modal__heading">
+              <div>
+                <h2 id="revision-history-title">Revision history</h2>
+                <p>Restore the version that was live before a previous publish.</p>
+              </div>
+              <button type="button" className="admin-ghost" onClick={() => setShowRevisionHistory(false)}>
+                Close
+              </button>
+            </div>
+            <div className="revision-list">
+              {revisions.map((revision) => (
+                <label
+                  className={selectedRevision === revision.id ? "revision-row revision-row--selected" : "revision-row"}
+                  key={revision.id}
+                >
+                  <input
+                    type="radio"
+                    name="cms-revision"
+                    value={revision.id}
+                    checked={selectedRevision === revision.id}
+                    onChange={(event) => setSelectedRevision(event.target.value)}
+                  />
+                  <span>
+                    <strong>{new Date(revision.createdAt).toLocaleString()}</strong>
+                    <small>{revision.title} - saved by {revision.user}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="admin-modal__actions">
+              <button type="button" className="admin-ghost" onClick={() => setShowRevisionHistory(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-save"
+                disabled={!selectedRevision || busy}
+                onClick={restoreSelectedRevision}
+              >
+                <RotateCcw aria-hidden="true" />
+                Restore selected revision
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {activeRootTab === "website" && (
       <main className="admin-layout" id="admin-root-panel-website" role="tabpanel">

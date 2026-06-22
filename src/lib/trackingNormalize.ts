@@ -12,9 +12,13 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
   const defaultStyle = defaultQrStyle();
   const firstMailedAt = site.firstMailedAt ?? "";
   const remailReminderDays = boundedReminderDays(site.remailReminderDays);
+  const siteAddressParts = normalizeAddressParts(site.siteAddressParts, site.siteAddress);
+  const siteAddress = buildAddressFromParts(siteAddressParts) || site.siteAddress || "";
   return {
     ...site,
-    region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
+    siteAddress,
+    siteAddressParts,
+    region: site.region || detectSiteRegion(siteAddress) || siteAddressParts.county || siteAddressParts.town || "Uncategorised",
     ownerAddress: site.ownerAddress ?? "",
     titleNumber: site.titleNumber ?? "",
     plotDescription: site.plotDescription ?? "",
@@ -166,6 +170,57 @@ function normalizeMailingStatus(value: MailingStatus | undefined): MailingStatus
     : "not-mailed";
 }
 
+export function buildAddressFromParts(parts: Partial<TrackingSite["siteAddressParts"]> | undefined) {
+  if (!parts) {
+    return "";
+  }
+
+  return [
+    parts.line1,
+    parts.line2,
+    parts.town,
+    parts.county,
+    parts.postcode?.toUpperCase()
+  ]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+export function normalizeAddressParts(
+  parts: Partial<TrackingSite["siteAddressParts"]> | undefined,
+  fallbackAddress = ""
+): TrackingSite["siteAddressParts"] {
+  const parsed = parseAddressParts(fallbackAddress);
+  return {
+    line1: stringValue(parts?.line1, parsed.line1),
+    line2: stringValue(parts?.line2, parsed.line2),
+    town: stringValue(parts?.town, parsed.town),
+    county: stringValue(parts?.county, parsed.county),
+    postcode: stringValue(parts?.postcode, parsed.postcode).toUpperCase()
+  };
+}
+
+function parseAddressParts(value: string): TrackingSite["siteAddressParts"] {
+  const text = String(value ?? "").trim();
+  const postcode = text.toUpperCase().match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/)?.[0] ?? "";
+  const withoutPostcode = postcode
+    ? text.replace(new RegExp(`${escapeRegExp(postcode)}\\s*$`, "i"), "").trim()
+    : text;
+  const parts = withoutPostcode
+    .split(/\s*,\s*|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return {
+    line1: parts[0] ?? text,
+    line2: parts.length > 3 ? parts.slice(1, -2).join(", ") : parts.length === 3 ? parts[1] ?? "" : "",
+    town: parts.length > 3 ? parts.at(-2) ?? "" : parts.length > 1 ? parts.at(-1) ?? "" : "",
+    county: parts.length > 3 ? parts.at(-1) ?? "" : "",
+    postcode
+  };
+}
+
 function normalizeLetterRecipientMode(value: LetterRecipientMode | undefined): LetterRecipientMode {
   return ["legal-owner", "title-owner", "plot-land"].includes(value ?? "")
     ? value as LetterRecipientMode
@@ -174,4 +229,12 @@ function normalizeLetterRecipientMode(value: LetterRecipientMode | undefined): L
 
 function boundedReminderDays(value: number | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(120, Math.max(1, Math.trunc(value))) : 14;
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

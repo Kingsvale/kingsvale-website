@@ -73,11 +73,12 @@ export function buildLetterTokens(site, publicLink) {
   const targetAddress = mode === "plot-land"
     ? cleanText(site?.plotDescription) || cleanText(site?.siteAddress)
     : cleanText(site?.siteAddress);
-  const address = parseAddress(targetAddress);
+  const address = normalizeAddressParts(site?.siteAddressParts, targetAddress);
   const titledOwnerName = cleanText(site?.customerName) || cleanText(site?.ownerContactName) || "The Legal Owner";
   const legalName = mode === "title-owner" ? titledOwnerName : "The Legal Owner";
   const council = cleanText(site?.council?.councilName) || cleanText(site?.region);
-  const allAddress = targetAddress.replace(/\s*,\s*/g, ", ");
+  const streetAddress = [address.line1, address.line2].filter(Boolean).join(", ");
+  const allAddress = buildAddressFromParts(address) || targetAddress.replace(/\s*,\s*/g, ", ");
   const siteAddress = cleanText(site?.siteAddress).replace(/\s*,\s*/g, ", ");
   const generatedDate = formatLetterDate(new Date());
 
@@ -85,15 +86,17 @@ export function buildLetterTokens(site, publicLink) {
     ["{{legal_name}}", legalName],
     ["{{owner_name}}", legalName],
     ["{{customer_name}}", legalName],
-    ["{{address}}", allAddress],
+    ["{{address}}", streetAddress],
     ["{{full_address}}", allAddress],
     ["{{site_address}}", siteAddress],
     ["{{plot_description}}", cleanText(site?.plotDescription) || siteAddress],
     ["{{street}}", address.line1],
     ["{{address_line_1}}", address.line1],
     ["{{address_line_2}}", address.line2],
+    ["{{address_line_3}}", address.county],
     ["{{town}}", address.town],
     ["{{city}}", address.town],
+    ["{{county}}", address.county],
     ["{{postal_code}}", address.postcode],
     ["{{postcode}}", address.postcode],
     ["{{council}}", council],
@@ -429,8 +432,9 @@ function parseAddress(value) {
 
   return {
     line1: parts[0] ?? "",
-    line2: parts.length > 2 ? parts.slice(1, -1).join(", ") : parts[1] ?? "",
-    town: parts.length > 1 ? parts.at(-1) ?? "" : "",
+    line2: parts.length > 3 ? parts.slice(1, -2).join(", ") : parts.length === 3 ? parts[1] ?? "" : "",
+    town: parts.length > 3 ? parts.at(-2) ?? "" : parts.length > 1 ? parts.at(-1) ?? "" : "",
+    county: parts.length > 3 ? parts.at(-1) ?? "" : "",
     postcode
   };
 }
@@ -441,6 +445,30 @@ function extractPostcode(value) {
 
 function cleanText(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeAddressParts(parts = {}, fallbackAddress = "") {
+  const parsed = parseAddress(fallbackAddress);
+  return {
+    line1: cleanText(parts?.line1) || parsed.line1,
+    line2: cleanText(parts?.line2) || parsed.line2,
+    town: cleanText(parts?.town) || parsed.town,
+    county: cleanText(parts?.county) || parsed.county,
+    postcode: (cleanText(parts?.postcode) || parsed.postcode).toUpperCase()
+  };
+}
+
+function buildAddressFromParts(parts = {}) {
+  return [
+    parts.line1,
+    parts.line2,
+    parts.town,
+    parts.county,
+    parts.postcode
+  ]
+    .map((part) => cleanText(part))
+    .filter(Boolean)
+    .join(", ");
 }
 
 function formatLetterDate(date) {

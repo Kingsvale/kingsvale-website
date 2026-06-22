@@ -25,6 +25,11 @@ export const trackingFieldLimits = {
   title: 72,
   customerName: 80,
   siteAddress: 160,
+  addressLine1: 90,
+  addressLine2: 90,
+  addressTown: 70,
+  addressCounty: 70,
+  addressPostcode: 12,
   ownerAddress: 220,
   titleNumber: 80,
   plotDescription: 220,
@@ -103,6 +108,44 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     "Site address",
     trackingFieldLimits.siteAddress
   );
+  addRequiredTextError(
+    errors,
+    "siteAddressParts.line1",
+    site.siteAddressParts?.line1,
+    "Address line 1",
+    trackingFieldLimits.addressLine1
+  );
+  addOptionalTextError(
+    errors,
+    "siteAddressParts.line2",
+    site.siteAddressParts?.line2,
+    "Address line 2",
+    trackingFieldLimits.addressLine2
+  );
+  addRequiredTextError(
+    errors,
+    "siteAddressParts.town",
+    site.siteAddressParts?.town,
+    "Town or city",
+    trackingFieldLimits.addressTown
+  );
+  addOptionalTextError(
+    errors,
+    "siteAddressParts.county",
+    site.siteAddressParts?.county,
+    "County",
+    trackingFieldLimits.addressCounty
+  );
+  addRequiredTextError(
+    errors,
+    "siteAddressParts.postcode",
+    site.siteAddressParts?.postcode,
+    "Postcode",
+    trackingFieldLimits.addressPostcode
+  );
+  if (site.siteAddressParts?.postcode && !/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(site.siteAddressParts.postcode.trim())) {
+    errors.push({ path: "siteAddressParts.postcode", message: "Use a valid UK postcode." });
+  }
   addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
   addOptionalTextError(errors, "region", site.region, "Region", trackingFieldLimits.region);
   addOptionalTextError(

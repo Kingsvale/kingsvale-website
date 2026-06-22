@@ -36,11 +36,15 @@ const defaultReminderStorageKey = "kingsvale-mailing-default-reminder-days-v1";
 const letterTokens = [
   "{{legal_name}}",
   "{{address}}",
+  "{{address_line_1}}",
+  "{{address_line_2}}",
   "{{site_address}}",
   "{{plot_description}}",
   "{{title_number}}",
   "{{reference}}",
   "{{date}}",
+  "{{town}}",
+  "{{county}}",
   "{{postal_code}}",
   "{{tracking_link}}"
 ];

@@ -1021,6 +1021,84 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   font-size: 13px;
 }
 
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(34, 33, 29, 0.42);
+}
+
+.admin-modal {
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid rgba(70, 59, 48, 0.18);
+  background: var(--ivory);
+  box-shadow: 0 24px 70px rgba(34, 33, 29, 0.22);
+}
+
+.admin-modal__heading,
+.admin-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid rgba(70, 59, 48, 0.12);
+}
+
+.admin-modal__heading h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.admin-modal__heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-modal__actions {
+  border-top: 1px solid rgba(70, 59, 48, 0.12);
+  border-bottom: 0;
+}
+
+.revision-list {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.revision-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(70, 59, 48, 0.12);
+  background: rgba(255, 255, 255, 0.48);
+  cursor: pointer;
+}
+
+.revision-row--selected {
+  border-color: rgba(74, 94, 78, 0.44);
+  background: rgba(74, 94, 78, 0.1);
+}
+
+.revision-row span {
+  display: grid;
+  gap: 3px;
+}
+
+.revision-row small {
+  color: var(--muted);
+}
+
 .admin-save {
   background: var(--charcoal);
   color: var(--ivory);

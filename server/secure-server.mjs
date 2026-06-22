@@ -1653,6 +1653,14 @@ function validateTrackingSite(site) {
 
   validateText(errors, "title", site.title, "Site title", 72);
   validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
+  validateText(errors, "siteAddressParts.line1", site.siteAddressParts?.line1, "Address line 1", 90);
+  validateOptionalText(errors, "siteAddressParts.line2", site.siteAddressParts?.line2 ?? "", "Address line 2", 90);
+  validateText(errors, "siteAddressParts.town", site.siteAddressParts?.town, "Town or city", 70);
+  validateOptionalText(errors, "siteAddressParts.county", site.siteAddressParts?.county ?? "", "County", 70);
+  validateText(errors, "siteAddressParts.postcode", site.siteAddressParts?.postcode, "Postcode", 12);
+  if (site.siteAddressParts?.postcode && !/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(String(site.siteAddressParts.postcode).trim())) {
+    errors.push({ path: "siteAddressParts.postcode", message: "Use a valid UK postcode." });
+  }
   validateText(errors, "statusNote", site.statusNote, "Status note", 320);
   validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
   validateOptionalText(errors, "ownerAddress", site.ownerAddress, "Owner postal address", 220);
@@ -1927,9 +1935,13 @@ function normalizeTrackingSite(site) {
   const council = site.council ?? {};
   const firstMailedAt = site.firstMailedAt ?? "";
   const remailReminderDays = boundedReminderDays(site.remailReminderDays);
+  const siteAddressParts = normalizeAddressParts(site.siteAddressParts, site.siteAddress);
+  const siteAddress = buildAddressFromParts(siteAddressParts) || site.siteAddress || "";
   return {
     ...site,
-    region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
+    siteAddress,
+    siteAddressParts,
+    region: site.region || detectSiteRegion(siteAddress) || siteAddressParts.county || siteAddressParts.town || "Uncategorised",
     ownerAddress: site.ownerAddress ?? "",
     titleNumber: site.titleNumber ?? "",
     plotDescription: site.plotDescription ?? "",
@@ -2089,6 +2101,54 @@ function detectSiteRegion(address = "") {
   return knownRegions.find((region) => text.includes(region.toLowerCase())) ?? "";
 }
 
+function buildAddressFromParts(parts = {}) {
+  return [
+    parts.line1,
+    parts.line2,
+    parts.town,
+    parts.county,
+    String(parts.postcode ?? "").toUpperCase()
+  ]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function normalizeAddressParts(parts = {}, fallbackAddress = "") {
+  const parsed = parseAddressParts(fallbackAddress);
+  return {
+    line1: stringValue(parts.line1, parsed.line1),
+    line2: stringValue(parts.line2, parsed.line2),
+    town: stringValue(parts.town, parsed.town),
+    county: stringValue(parts.county, parsed.county),
+    postcode: stringValue(parts.postcode, parsed.postcode).toUpperCase()
+  };
+}
+
+function stringValue(value, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function parseAddressParts(value = "") {
+  const text = String(value ?? "").trim();
+  const postcode = extractPostcode(text);
+  const withoutPostcode = postcode
+    ? text.replace(new RegExp(`${escapeRegExp(postcode)}\\s*$`, "i"), "").trim()
+    : text;
+  const parts = withoutPostcode
+    .split(/\s*,\s*|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return {
+    line1: parts[0] ?? text,
+    line2: parts.length > 3 ? parts.slice(1, -2).join(", ") : parts.length === 3 ? parts[1] ?? "" : "",
+    town: parts.length > 3 ? parts.at(-2) ?? "" : parts.length > 1 ? parts.at(-1) ?? "" : "",
+    county: parts.length > 3 ? parts.at(-1) ?? "" : "",
+    postcode
+  };
+}
+
 function extractPostcode(address = "") {
   const match = String(address).toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
   return match ? normalizePostcode(match[1]) : "";
@@ -2096,6 +2156,10 @@ function extractPostcode(address = "") {
 
 function normalizePostcode(value = "") {
   return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normalizeLookupText(value = "") {

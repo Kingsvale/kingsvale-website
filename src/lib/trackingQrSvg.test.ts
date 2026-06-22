@@ -36,6 +36,33 @@ describe("styled tracking QR renderer", () => {
     expect(pngView.getUint32(20, false)).toBe(WORD_QR_EXPORT_SIZE);
     expect(png.length).toBeGreaterThan(100_000);
   });
+
+  it("keeps street, town and postcode letter tokens separate", async () => {
+    const letterGeneratorPath = "../../server/letter-generator.mjs";
+    const { buildLetterTokens } = await import(/* @vite-ignore */ letterGeneratorPath);
+
+    const tokens = buildLetterTokens({
+      customerName: "Faris Awan",
+      siteAddress: "6 Petworth Court Helston Lane, Windsor, SL4 5HS",
+      siteAddressParts: {
+        line1: "6 Petworth Court",
+        line2: "Helston Lane",
+        town: "Windsor",
+        county: "",
+        postcode: "SL4 5HS"
+      },
+      letterRecipientMode: "title-owner",
+      council: {},
+      reference: "KV0111",
+      titleNumber: "BK255156"
+    }, "https://example.com/track");
+
+    expect(tokens.get("{{address}}")).toBe("6 Petworth Court, Helston Lane");
+    expect(tokens.get("{{town}}")).toBe("Windsor");
+    expect(tokens.get("{{county}}")).toBe("");
+    expect(tokens.get("{{postal_code}}")).toBe("SL4 5HS");
+    expect(tokens.get("{{full_address}}")).toBe("6 Petworth Court, Helston Lane, Windsor, SL4 5HS");
+  });
 });
 
 function toHex(bytes: Uint8Array) {
