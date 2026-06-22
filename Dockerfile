@@ -22,6 +22,7 @@ RUN npm ci --omit=dev --include=optional --no-audit --no-fund \
   && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/src/lib/trackingQrSvg.js ./src/lib/trackingQrSvg.js
 COPY server ./server
 COPY public ./public
 
