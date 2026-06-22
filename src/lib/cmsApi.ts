@@ -543,16 +543,22 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   try {
     const response = await fetch("/api/analytics/summary", {
       credentials: "same-origin",
-      headers: { Accept: "application/json" }
+      headers: authHeaders({ Accept: "application/json" })
     });
 
     if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        throw new Error("Analytics summary requires an active server session.");
+      }
       return buildAnalyticsSummary(loadLocalAnalyticsVisits());
     }
 
     const payload = (await response.json()) as { summary: AnalyticsSummary };
     return payload.summary;
   } catch {
+    if (!isLocalDemoRuntime()) {
+      throw new Error("Analytics summary requires the secure server API.");
+    }
     return buildAnalyticsSummary(loadLocalAnalyticsVisits());
   }
 }
