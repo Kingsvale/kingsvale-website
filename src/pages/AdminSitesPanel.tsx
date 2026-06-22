@@ -27,13 +27,15 @@ import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
   deleteTrackingSite,
-  generateLetterFromTemplate,
+  fetchStudioSettings,
   getTrackingStorageStatus,
   listTrackingSites,
   saveTrackingSite,
   subscribeTrackingStorageStatus,
+  unarchiveTrackingSite,
   uploadLetterFile
 } from "../lib/cmsApi";
+import { defaultStudioSettings, type StudioSettings } from "../lib/studioSettings";
 import {
   createTrackingResource,
   createTrackingSite,
@@ -58,20 +60,6 @@ import {
 
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
-const letterTokens = [
-  "{{legal_name}}",
-  "{{address}}",
-  "{{street}}",
-  "{{address_line_2}}",
-  "{{town}}",
-  "{{postal_code}}",
-  "{{council}}",
-  "{{tracking_link}}"
-];
-const starterLetterTemplates = [
-  ["/templates/kingsvale-initial-letter-template.docx", "Initial letter template"],
-  ["/templates/kingsvale-follow-up-letter-template.docx", "Follow-up letter template"]
-] as const;
 
 function TrackingTextInput({ id, label, ...props }: ComponentProps<typeof AdminTextInput>) {
   return <AdminTextInput {...props} id={id ?? toId(label)} label={label} />;
@@ -101,6 +89,7 @@ export function AdminSitesPanel() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Create QR-ready land interest map pages.");
   const [storageStatus, setStorageStatus] = useState(() => getTrackingStorageStatus());
+  const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
 
   useEffect(() => {
     let active = true;
@@ -135,6 +124,26 @@ export function AdminSitesPanel() {
   }, []);
 
   useEffect(() => subscribeTrackingStorageStatus(setStorageStatus), []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      try {
+        const loaded = await fetchStudioSettings();
+        if (active) {
+          setSettings(loaded);
+        }
+      } catch {
+        // Site editing still works without Studio settings.
+      }
+    }
+
+    void loadSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visibleSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -171,6 +180,7 @@ export function AdminSitesPanel() {
     try {
       const siteDraft = createTrackingSite();
       siteDraft.reference = nextTrackingReference(sites);
+      siteDraft.contactPriority = settings.defaultContactPriority;
       const site = await saveTrackingSite(siteDraft);
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
@@ -224,14 +234,37 @@ export function AdminSitesPanel() {
         return;
       }
 
-      setSites((current) =>
-        sortSites(current.map((site) => (site.id === archived.id ? archived : site)))
-      );
-      const next = sites.find((site) => site.id !== archived.id && !site.archived) ?? null;
-      setDraft(next);
+      const nextSites = replaceSite(sites, archived);
+      setSites(nextSites);
+      setDraft(nextSites.find((site) => site.id === archived.id) ?? archived);
+      setShowArchived(true);
       setStatus("Map page archived. Its public link is now unavailable.");
     } catch {
       setStatus("Map page could not be archived.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUnarchive() {
+    if (!draft) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const restored = await unarchiveTrackingSite(draft.id);
+      if (!restored) {
+        setStatus("Map page could not be unarchived.");
+        return;
+      }
+
+      const nextSites = replaceSite(sites, restored);
+      setSites(nextSites);
+      setDraft(nextSites.find((site) => site.id === restored.id) ?? restored);
+      setStatus("Map page restored. Its public link is available again.");
+    } catch {
+      setStatus("Map page could not be unarchived.");
     } finally {
       setBusy(false);
     }
@@ -257,8 +290,8 @@ export function AdminSitesPanel() {
         return;
       }
 
-      const remainingSites = sites.filter((site) => site.id !== draft.id);
-      setSites(sortSites(remainingSites));
+      const remainingSites = sortSites(sites.filter((site) => site.id !== draft.id));
+      setSites(remainingSites);
       setDraft(remainingSites.find((site) => !site.archived) ?? remainingSites[0] ?? null);
       setStatus("Map page deleted.");
     } catch {
@@ -292,14 +325,14 @@ export function AdminSitesPanel() {
     });
   }
 
-  async function handleLetterTemplateUpload(files: FileList | null) {
+  async function handleTitleDeedUpload(files: FileList | null) {
     const file = files?.[0];
     if (!file) {
       return;
     }
 
-    if (!isAllowedLetterTemplateFile(file)) {
-      setStatus("Letter template must be a DOCX Word document under 8MB.");
+    if (!isAllowedTitleDeedFile(file)) {
+      setStatus("Title deed upload must be a PDF, image or Word document under 8MB.");
       return;
     }
 
@@ -307,103 +340,26 @@ export function AdminSitesPanel() {
     try {
       const upload = await uploadLetterFile(file);
       if (!upload) {
-        setStatus("Template could not be uploaded to the server. Generation needs server storage.");
+        setStatus("Title deed could not be uploaded to the server.");
         return;
       }
 
       updateDraft((site) => {
-        site.letterTemplateName = upload.name;
-        site.letterTemplateUrl = upload.url;
+        site.titleDeedFileName = upload.name;
+        site.titleDeedFileUrl = upload.url;
       });
-      setStatus("Letter template uploaded to server. Save the site, or generate a letter now.");
+      setStatus("Title deed uploaded. Save the site to keep it.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleGenerateLetter() {
-    if (!draft) {
-      return;
-    }
-
-    if (!draft.letterTemplateUrl) {
-      setStatus("Upload a DOCX letter template before generating.");
-      return;
-    }
-
-    const result = validateTrackingSite(draft);
-    if (!result.valid) {
-      setStatus("Resolve the site guardrails before generating a letter.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const generated = await generateLetterFromTemplate(draft, publicLink);
-      if (!generated) {
-        setStatus("Letter could not be generated. Check the template is a server-uploaded DOCX.");
-        return;
-      }
-
-      const nextDraft = {
-        ...draft,
-        letterFileName: generated.name,
-        letterFileUrl: generated.url
-      };
-      const saved = await saveTrackingSite(nextDraft);
-      setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
-      setDraft(saved);
-      setStatus("Letter generated with the site details and tracked QR code.");
-    } catch {
-      setStatus("Letter could not be generated.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleLetterUpload(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) {
-      return;
-    }
-
-    if (!isAllowedLetterFile(file)) {
-      setStatus("Letter upload must be a PDF, image or Word document under 8MB.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const upload = await uploadLetterFile(file);
-      if (!upload) {
-        setStatus("Letter could not be uploaded to the server.");
-        return;
-      }
-
-      updateDraft((site) => {
-        site.letterFileName = upload.name;
-        site.letterFileUrl = upload.url;
-      });
-      setStatus("Letter uploaded to server. Save the site to keep it.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function clearLetterTemplate() {
+  function clearTitleDeedUpload() {
     updateDraft((site) => {
-      site.letterTemplateName = "";
-      site.letterTemplateUrl = "";
+      site.titleDeedFileName = "";
+      site.titleDeedFileUrl = "";
     });
-    setStatus("Letter template removed. Save the site to keep this change.");
-  }
-
-  function clearLetterUpload() {
-    updateDraft((site) => {
-      site.letterFileName = "";
-      site.letterFileUrl = "";
-    });
-    setStatus("Letter removed. Save the site to keep this change.");
+    setStatus("Title deed removed. Save the site to keep this change.");
   }
 
   function openInMailing() {
@@ -685,6 +641,51 @@ export function AdminSitesPanel() {
                     })
                   }
                 />
+                <TrackingTextInput
+                  label="Title number"
+                  value={draft.titleNumber}
+                  maxLength={trackingFieldLimits.titleNumber}
+                  error={errorsByPath.titleNumber}
+                  onChange={(value) => updateDraft((site) => { site.titleNumber = value; })}
+                />
+                <TrackingTextarea
+                  label="Plot description"
+                  value={draft.plotDescription}
+                  maxLength={trackingFieldLimits.plotDescription}
+                  error={errorsByPath.plotDescription}
+                  onChange={(value) => updateDraft((site) => { site.plotDescription = value; })}
+                />
+                <div className="letter-upload">
+                  <div>
+                    <FileText aria-hidden="true" />
+                    <span>
+                      <strong>{draft.titleDeedFileName || "No title deed uploaded"}</strong>
+                      <small>Private title deed file for Studio mailing and site records.</small>
+                    </span>
+                  </div>
+                  <div className="letter-upload__actions">
+                    {draft.titleDeedFileUrl && (
+                      <a href={draft.titleDeedFileUrl} download={draft.titleDeedFileName || "title-deed"} className="admin-open">
+                        <ExternalLink aria-hidden="true" />
+                        Open
+                      </a>
+                    )}
+                    <label className="admin-small">
+                      Upload title deed
+                      <input
+                        className="sr-only"
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event) => void handleTitleDeedUpload(event.target.files)}
+                      />
+                    </label>
+                    {draft.titleDeedFileUrl && (
+                      <button type="button" className="admin-ghost" onClick={clearTitleDeedUpload}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
                     label="Folder / region"
@@ -723,7 +724,7 @@ export function AdminSitesPanel() {
 
               <section className="admin-panel" aria-labelledby="site-private-title">
                 <div className="admin-section-heading">
-                  <h2 id="site-private-title">Editor-only notes and letters</h2>
+                  <h2 id="site-private-title">Editor-only notes</h2>
                 </div>
                 <TrackingTextarea
                   label="Private notes"
@@ -732,106 +733,10 @@ export function AdminSitesPanel() {
                   error={errorsByPath.privateNotes}
                   onChange={(value) => updateDraft((site) => { site.privateNotes = value; })}
                 />
-                <div className="letter-template">
-                  <div className="letter-template__intro">
-                    <div>
-                      <FileText aria-hidden="true" />
-                      <span>
-                        <strong>Template placeholders</strong>
-                        <small>
-                          Replace only owner/address/legal fields in Word. The QR image already positioned in the
-                          template will be swapped for this site&apos;s tracking QR.
-                        </small>
-                      </span>
-                    </div>
-                    <div className="letter-template__tokens" aria-label="Supported letter placeholders">
-                      {letterTokens.map((token) => (
-                        <code key={token}>{token}</code>
-                      ))}
-                    </div>
-                    <div className="letter-template__links" aria-label="Starter letter templates">
-                      {starterLetterTemplates.map(([href, label]) => (
-                        <a key={href} href={href} download>
-                          {label}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="letter-upload">
-                  <div>
-                    <FileText aria-hidden="true" />
-                    <span>
-                      <strong>{draft.letterTemplateName || "No template uploaded"}</strong>
-                      <small>Upload a DOCX with placeholders like {"{{legal_name}}"} and {"{{postal_code}}"}.</small>
-                    </span>
-                  </div>
-                  <div className="letter-upload__actions">
-                    {draft.letterTemplateUrl && (
-                      <a href={draft.letterTemplateUrl} download={draft.letterTemplateName || "letter-template.docx"} className="admin-open">
-                        <ExternalLink aria-hidden="true" />
-                        Open
-                      </a>
-                    )}
-                    <label className="admin-small">
-                      Upload template
-                      <input
-                        className="sr-only"
-                        type="file"
-                        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={(event) => void handleLetterTemplateUpload(event.target.files)}
-                      />
-                    </label>
-                    {draft.letterTemplateUrl && (
-                      <button type="button" className="admin-ghost" onClick={clearLetterTemplate}>
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="letter-generator-actions">
-                  <button
-                    type="button"
-                    className="admin-save"
-                    onClick={handleGenerateLetter}
-                    disabled={busy || !validation.valid || !draft.letterTemplateUrl}
-                  >
-                    <FileText aria-hidden="true" />
-                    {busy ? "Generating" : "Generate letter"}
-                  </button>
-                  <small>Creates a DOCX from the template, fills legal/address placeholders, and inserts the tracked QR.</small>
-                </div>
-                <div className="letter-upload">
-                  <div>
-                    <FileText aria-hidden="true" />
-                    <span>
-                      <strong>{draft.letterFileName || "No generated letter"}</strong>
-                      <small>Generated or manually attached letter. Visible in Studio and Mailing only.</small>
-                    </span>
-                  </div>
-                  <div className="letter-upload__actions">
-                    {draft.letterFileUrl && (
-                      <a href={draft.letterFileUrl} download={draft.letterFileName || "letter"} className="admin-open">
-                        <ExternalLink aria-hidden="true" />
-                        Open
-                      </a>
-                    )}
-                    <label className="admin-small">
-                      Upload final letter
-                      <input
-                        className="sr-only"
-                        type="file"
-                        accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={(event) => void handleLetterUpload(event.target.files)}
-                      />
-                    </label>
-                    {draft.letterFileUrl && (
-                      <button type="button" className="admin-ghost" onClick={clearLetterUpload}>
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <button type="button" className="admin-ghost" onClick={openInMailing}>
+                  <Mail aria-hidden="true" />
+                  Open letter generation in Mailing
+                </button>
                 {draft.searchlandUrl && (
                   <a className="admin-open" href={draft.searchlandUrl} target="_blank" rel="noreferrer">
                     <ExternalLink aria-hidden="true" />
@@ -937,15 +842,27 @@ export function AdminSitesPanel() {
                   <Save aria-hidden="true" />
                   {busy ? "Working" : "Save site"}
                 </button>
-                <button
-                  type="button"
-                  className="admin-ghost"
-                  onClick={handleArchive}
-                  disabled={busy || draft.archived}
-                >
-                  <Archive aria-hidden="true" />
-                  Archive
-                </button>
+                {draft.archived ? (
+                  <button
+                    type="button"
+                    className="admin-ghost"
+                    onClick={handleUnarchive}
+                    disabled={busy}
+                  >
+                    <Archive aria-hidden="true" />
+                    Unarchive
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="admin-ghost"
+                    onClick={handleArchive}
+                    disabled={busy}
+                  >
+                    <Archive aria-hidden="true" />
+                    Archive
+                  </button>
+                )}
                 <button
                   type="button"
                   className="admin-danger"
@@ -974,6 +891,15 @@ function buildPublicLink(token: string) {
 
 function sortSites(sites: TrackingSite[]) {
   return [...sites].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function replaceSite(sites: TrackingSite[], nextSite: TrackingSite) {
+  const replaced = sites.some((site) => site.id === nextSite.id);
+  return sortSites(
+    replaced
+      ? sites.map((site) => (site.id === nextSite.id ? nextSite : site))
+      : [nextSite, ...sites]
+  );
 }
 
 function groupSitesByRegion(sites: TrackingSite[]) {
@@ -1022,7 +948,7 @@ function toId(label: string) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function isAllowedLetterFile(file: File) {
+function isAllowedTitleDeedFile(file: File) {
   const allowedTypes = new Set([
     "application/pdf",
     "image/png",
@@ -1032,13 +958,6 @@ function isAllowedLetterFile(file: File) {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   ]);
   return file.size <= 8_000_000 && (allowedTypes.has(file.type) || /\.(pdf|png|jpe?g|webp|docx?)$/i.test(file.name));
-}
-
-function isAllowedLetterTemplateFile(file: File) {
-  return file.size <= 8_000_000 && (
-    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    /\.docx$/i.test(file.name)
-  );
 }
 
 function toTrackingErrorMap(errors: TrackingValidationError[]) {

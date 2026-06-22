@@ -1,4 +1,4 @@
-import type { ContactPriority, MailingStatus, TrackingQrStyle, TrackingSite } from "./trackingTypes";
+import type { ContactPriority, LetterRecipientMode, MailingStatus, TrackingQrStyle, TrackingSite } from "./trackingTypes";
 import { boundedPercent, presetRoundness } from "./qrStyle";
 
 type LegacyQrStyle = Partial<TrackingQrStyle> & {
@@ -15,10 +15,17 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
   return {
     ...site,
     region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
+    ownerAddress: site.ownerAddress ?? "",
+    titleNumber: site.titleNumber ?? "",
+    plotDescription: site.plotDescription ?? "",
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     privateNotes: site.privateNotes ?? "",
+    letterPresetId: site.letterPresetId ?? "",
+    letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),
+    titleDeedFileName: site.titleDeedFileName ?? "",
+    titleDeedFileUrl: site.titleDeedFileUrl ?? "",
     letterTemplateName: site.letterTemplateName ?? "",
     letterTemplateUrl: site.letterTemplateUrl ?? "",
     letterFileName: site.letterFileName ?? "",
@@ -157,6 +164,12 @@ function normalizeMailingStatus(value: MailingStatus | undefined): MailingStatus
   ].includes(value ?? "")
     ? value as MailingStatus
     : "not-mailed";
+}
+
+function normalizeLetterRecipientMode(value: LetterRecipientMode | undefined): LetterRecipientMode {
+  return ["legal-owner", "title-owner", "plot-land"].includes(value ?? "")
+    ? value as LetterRecipientMode
+    : "legal-owner";
 }
 
 function boundedReminderDays(value: number | undefined) {

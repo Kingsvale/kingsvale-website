@@ -8,10 +8,13 @@ import {
 } from "../components/AdminFields";
 import {
   checkMailingTrackingStatus,
+  fetchStudioSettings,
+  generateLetterFromTemplate,
   listTrackingSites,
   saveTrackingSite,
   uploadLetterFile
 } from "../lib/cmsApi";
+import { defaultStudioSettings, type StudioSettings } from "../lib/studioSettings";
 import {
   isRemailReminderOverdue,
   mailingStatusClass,
@@ -30,6 +33,21 @@ import { trackingFieldLimits, validateTrackingSite } from "../lib/trackingValida
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 const mailingStatuses = Object.keys(mailingStatusLabels) as MailingStatus[];
 const defaultReminderStorageKey = "kingsvale-mailing-default-reminder-days-v1";
+const letterTokens = [
+  "{{legal_name}}",
+  "{{address}}",
+  "{{site_address}}",
+  "{{plot_description}}",
+  "{{title_number}}",
+  "{{reference}}",
+  "{{date}}",
+  "{{postal_code}}",
+  "{{tracking_link}}"
+];
+const starterLetterTemplates = [
+  ["/templates/kingsvale-initial-letter-template.docx", "Initial letter template"],
+  ["/templates/kingsvale-follow-up-letter-template.docx", "Follow-up letter template"]
+] as const;
 
 type SortMode = "priority" | "reminder" | "updated";
 
@@ -41,6 +59,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
   const [statusFilter, setStatusFilter] = useState<MailingStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [defaultReminderDays, setDefaultReminderDays] = useState(() => readDefaultReminderDays());
+  const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Manage postal contact and re-mailing reminders.");
 
@@ -52,7 +71,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       if (active) {
         const ordered = sortMailingSites(loaded, sortMode);
         setSites(ordered);
-        setDraft(ordered[0] ?? null);
+        setDraft(ordered.find((site) => !site.archived) ?? ordered[0] ?? null);
       }
     }
 
@@ -61,6 +80,30 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       active = false;
     };
   }, [sortMode]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      try {
+        const loaded = await fetchStudioSettings();
+        if (!active) {
+          return;
+        }
+        setSettings(loaded);
+        setDefaultReminderDays(loaded.defaultReminderDays);
+      } catch {
+        if (active) {
+          setStatus("Mailing settings could not be loaded.");
+        }
+      }
+    }
+
+    void loadSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visibleSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -106,6 +149,13 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     () => visibleSites.filter((site) => isRemailReminderOverdue(site)),
     [visibleSites]
   );
+  const selectedPreset = useMemo(() => {
+    if (!draft) {
+      return null;
+    }
+    return settings.letterPresets.find((preset) => preset.id === draft.letterPresetId) ?? null;
+  }, [draft, settings.letterPresets]);
+  const publicLink = draft ? buildPublicLink(draft.token) : "";
 
   function updateDraft(recipe: (site: TrackingSite) => void) {
     setDraft((current) => {
@@ -206,6 +256,54 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       site.letterFileUrl = "";
     });
     setStatus("Letter removed. Save mailing to keep this change.");
+  }
+
+  async function generateLetter() {
+    if (!draft) {
+      return;
+    }
+
+    const templateUrl = selectedPreset?.templateUrl || draft.letterTemplateUrl;
+    if (!templateUrl) {
+      setStatus("Upload a letter preset in Settings before generating.");
+      return;
+    }
+
+    const generationDraft: TrackingSite = {
+      ...draft,
+      letterPresetId: selectedPreset?.id ?? draft.letterPresetId,
+      letterRecipientMode: selectedPreset?.recipientMode ?? draft.letterRecipientMode,
+      letterTemplateName: selectedPreset?.templateName ?? draft.letterTemplateName,
+      letterTemplateUrl: templateUrl
+    };
+
+    const validation = validateTrackingSite(generationDraft);
+    if (!validation.valid) {
+      setStatus("Resolve mailing validation issues before generating a letter.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const generated = await generateLetterFromTemplate(generationDraft, publicLink, templateUrl);
+      if (!generated) {
+        setStatus("Letter could not be generated. Check the preset is a server-uploaded DOCX.");
+        return;
+      }
+
+      const saved = await saveTrackingSite({
+        ...generationDraft,
+        letterFileName: generated.name,
+        letterFileUrl: generated.url
+      });
+      setSites((current) => sortMailingSites(current.map((site) => (site.id === saved.id ? saved : site)), sortMode));
+      setDraft(saved);
+      setStatus("Letter generated from the selected preset.");
+    } catch {
+      setStatus("Letter could not be generated.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -423,12 +521,82 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                 </button>
               </div>
 
+              <div className="letter-template">
+                <div className="letter-template__intro">
+                  <div>
+                    <FileText aria-hidden="true" />
+                    <span>
+                      <strong>Letter generation</strong>
+                      <small>
+                        Presets are uploaded in Settings and use the site details already saved in Sites.
+                      </small>
+                    </span>
+                  </div>
+                  <div className="letter-template__tokens" aria-label="Supported letter placeholders">
+                    {letterTokens.map((token) => (
+                      <code key={token}>{token}</code>
+                    ))}
+                  </div>
+                  <div className="letter-template__links" aria-label="Starter letter templates">
+                    {starterLetterTemplates.map(([href, label]) => (
+                      <a key={href} href={href} download>
+                        {label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-grid admin-grid--two">
+                <SelectField
+                  id="letter-preset"
+                  label="Letter preset"
+                  value={selectedPreset?.id ?? ""}
+                  onChange={(value) =>
+                    updateDraft((site) => {
+                      const preset = settings.letterPresets.find((item) => item.id === value);
+                      site.letterPresetId = preset?.id ?? "";
+                      site.letterRecipientMode = preset?.recipientMode ?? site.letterRecipientMode;
+                      site.letterTemplateName = preset?.templateName ?? "";
+                      site.letterTemplateUrl = preset?.templateUrl ?? "";
+                    })
+                  }
+                  options={[
+                    ["", "No preset selected"],
+                    ...settings.letterPresets.map((preset) => [preset.id, preset.name] as const)
+                  ]}
+                />
+                <div className="mailing-site-details">
+                  <span>{draft.reference || "No reference"}</span>
+                  <strong>{draft.siteAddress}</strong>
+                  <small>
+                    {draft.titleNumber ? `Title ${draft.titleNumber}` : "No title number saved"}
+                    {draft.plotDescription ? ` - ${draft.plotDescription}` : ""}
+                  </small>
+                </div>
+              </div>
+
+              <div className="letter-generator-actions">
+                <button
+                  type="button"
+                  className="admin-save"
+                  onClick={generateLetter}
+                  disabled={busy || !selectedPreset || !validateTrackingSite(draft).valid}
+                >
+                  <FileText aria-hidden="true" />
+                  {busy ? "Generating" : "Generate letter"}
+                </button>
+                <small>
+                  Creates a DOCX, fills the legal/address placeholders, and inserts this site&apos;s tracked QR code.
+                </small>
+              </div>
+
               <div className="letter-upload">
                 <div>
                   <FileText aria-hidden="true" />
                   <span>
                     <strong>{draft.letterFileName || "No letter uploaded"}</strong>
-                    <small>Shared with the Sites editor only, not the public map page.</small>
+                    <small>Generated or manually attached letter. Not visible on the public map page.</small>
                   </span>
                 </div>
                 <div className="letter-upload__actions">
@@ -517,6 +685,14 @@ function readDefaultReminderDays() {
   }
   const parsed = Number(window.localStorage.getItem(defaultReminderStorageKey));
   return Number.isFinite(parsed) && parsed >= 1 && parsed <= 120 ? Math.trunc(parsed) : 14;
+}
+
+function buildPublicLink(token: string) {
+  if (typeof window === "undefined") {
+    return `/track/${token}`;
+  }
+
+  return `${window.location.origin}/track/${token}`;
 }
 
 function isAllowedLetterFile(file: File) {

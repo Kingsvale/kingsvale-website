@@ -67,10 +67,19 @@ export function replaceDocxText(templateBuffer, replacements) {
 }
 
 export function buildLetterTokens(site, publicLink) {
-  const address = parseAddress(site?.siteAddress ?? "");
-  const legalName = cleanText(site?.customerName) || cleanText(site?.ownerContactName) || "The Legal Owner";
+  const mode = ["legal-owner", "title-owner", "plot-land"].includes(site?.letterRecipientMode)
+    ? site.letterRecipientMode
+    : "legal-owner";
+  const targetAddress = mode === "plot-land"
+    ? cleanText(site?.plotDescription) || cleanText(site?.siteAddress)
+    : cleanText(site?.siteAddress);
+  const address = parseAddress(targetAddress);
+  const titledOwnerName = cleanText(site?.customerName) || cleanText(site?.ownerContactName) || "The Legal Owner";
+  const legalName = mode === "title-owner" ? titledOwnerName : "The Legal Owner";
   const council = cleanText(site?.council?.councilName) || cleanText(site?.region);
-  const allAddress = cleanText(site?.siteAddress).replace(/\s*,\s*/g, ", ");
+  const allAddress = targetAddress.replace(/\s*,\s*/g, ", ");
+  const siteAddress = cleanText(site?.siteAddress).replace(/\s*,\s*/g, ", ");
+  const generatedDate = formatLetterDate(new Date());
 
   return new Map([
     ["{{legal_name}}", legalName],
@@ -78,6 +87,8 @@ export function buildLetterTokens(site, publicLink) {
     ["{{customer_name}}", legalName],
     ["{{address}}", allAddress],
     ["{{full_address}}", allAddress],
+    ["{{site_address}}", siteAddress],
+    ["{{plot_description}}", cleanText(site?.plotDescription) || siteAddress],
     ["{{street}}", address.line1],
     ["{{address_line_1}}", address.line1],
     ["{{address_line_2}}", address.line2],
@@ -86,7 +97,10 @@ export function buildLetterTokens(site, publicLink) {
     ["{{postal_code}}", address.postcode],
     ["{{postcode}}", address.postcode],
     ["{{council}}", council],
+    ["{{title_number}}", cleanText(site?.titleNumber)],
     ["{{reference}}", cleanText(site?.reference)],
+    ["{{date}}", generatedDate],
+    ["{{letter_date}}", generatedDate],
     ["{{tracking_link}}", publicLink || ""]
   ]);
 }
@@ -427,6 +441,15 @@ function extractPostcode(value) {
 
 function cleanText(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function formatLetterDate(date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/London"
+  }).format(date);
 }
 
 function encodeXml(value) {

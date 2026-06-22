@@ -44,6 +44,8 @@ export type MailingStatus =
   | "second-letter-needed"
   | "do-not-contact";
 
+export type LetterRecipientMode = "legal-owner" | "title-owner" | "plot-land";
+
 export type TrackingResource = {
   id: string;
   type: TrackingResourceType;
@@ -66,6 +68,9 @@ export type TrackingSite = {
   title: string;
   customerName: string;
   siteAddress: string;
+  ownerAddress: string;
+  titleNumber: string;
+  plotDescription: string;
   reference: string;
   region: string;
   ownerContactName: string;
@@ -73,6 +78,10 @@ export type TrackingSite = {
   summary: string;
   mapEmbedUrl: string;
   privateNotes: string;
+  letterPresetId: string;
+  letterRecipientMode: LetterRecipientMode;
+  titleDeedFileName: string;
+  titleDeedFileUrl: string;
   letterTemplateName: string;
   letterTemplateUrl: string;
   letterFileName: string;
@@ -139,4 +148,10 @@ export const mailingStatusLabels: Record<MailingStatus, string> = {
   "no-response": "No response",
   "second-letter-needed": "Second letter needed",
   "do-not-contact": "Do not contact"
+};
+
+export const letterRecipientModeLabels: Record<LetterRecipientMode, string> = {
+  "legal-owner": "Legal owner",
+  "title-owner": "Title deed details",
+  "plot-land": "Plot of land"
 };

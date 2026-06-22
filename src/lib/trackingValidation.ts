@@ -1,6 +1,7 @@
 import type {
   ContactPriority,
   MailingStatus,
+  LetterRecipientMode,
   TrackingMilestone,
   TrackingMilestoneState,
   TrackingResource,
@@ -24,10 +25,16 @@ export const trackingFieldLimits = {
   title: 72,
   customerName: 80,
   siteAddress: 160,
+  ownerAddress: 220,
+  titleNumber: 80,
+  plotDescription: 220,
   reference: 64,
   region: 80,
   mapEmbedUrl: 1200,
   privateNotes: 1200,
+  letterPresetId: 120,
+  titleDeedFileName: 160,
+  titleDeedFileUrl: 7_000_000,
   letterTemplateName: 160,
   letterTemplateUrl: 7_000_000,
   letterFileName: 160,
@@ -71,6 +78,7 @@ const mailingStatuses: MailingStatus[] = [
   "second-letter-needed",
   "do-not-contact"
 ];
+const letterRecipientModes: LetterRecipientMode[] = ["legal-owner", "title-owner", "plot-land"];
 
 export function validateTrackingSite(site: TrackingSite): TrackingValidationResult {
   const errors: TrackingValidationError[] = [];
@@ -97,6 +105,21 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
   );
   addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
   addOptionalTextError(errors, "region", site.region, "Region", trackingFieldLimits.region);
+  addOptionalTextError(
+    errors,
+    "ownerAddress",
+    site.ownerAddress,
+    "Owner postal address",
+    trackingFieldLimits.ownerAddress
+  );
+  addOptionalTextError(errors, "titleNumber", site.titleNumber, "Title number", trackingFieldLimits.titleNumber);
+  addOptionalTextError(
+    errors,
+    "plotDescription",
+    site.plotDescription,
+    "Plot description",
+    trackingFieldLimits.plotDescription
+  );
   if (!contactPriorities.includes(site.contactPriority)) {
     errors.push({ path: "contactPriority", message: "Choose an approved contact priority." });
   }
@@ -108,6 +131,23 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     });
   }
   addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private note", trackingFieldLimits.privateNotes);
+  addOptionalTextError(
+    errors,
+    "letterPresetId",
+    site.letterPresetId,
+    "Letter preset",
+    trackingFieldLimits.letterPresetId
+  );
+  if (!letterRecipientModes.includes(site.letterRecipientMode)) {
+    errors.push({ path: "letterRecipientMode", message: "Choose an approved letter recipient mode." });
+  }
+  addOptionalTextError(errors, "titleDeedFileName", site.titleDeedFileName, "Title deed filename", trackingFieldLimits.titleDeedFileName);
+  if (site.titleDeedFileUrl && (site.titleDeedFileUrl.length > trackingFieldLimits.titleDeedFileUrl || !isValidLetterUrl(site.titleDeedFileUrl))) {
+    errors.push({
+      path: "titleDeedFileUrl",
+      message: "Title deed upload must be a PDF, image or Word document under the upload limit."
+    });
+  }
   addOptionalTextError(
     errors,
     "letterTemplateName",

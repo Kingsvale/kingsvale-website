@@ -73,6 +73,7 @@ import {
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
 import { AdminBackupPanel } from "./AdminBackupPanel";
 import { AdminMailingPanel } from "./AdminMailingPanel";
+import { AdminSettingsPanel } from "./AdminSettingsPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
 
 type AdminPageProps = {
@@ -89,7 +90,7 @@ type RevisionSummary = {
   title: string;
 };
 
-type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup";
+type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup" | "settings";
 type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 
@@ -114,7 +115,8 @@ const adminRootTabs: { id: AdminRootTab; label: string }[] = [
   { id: "sites", label: "Sites" },
   { id: "mailing", label: "Mailing" },
   { id: "analytics", label: "Analytics" },
-  { id: "backup", label: "Backup" }
+  { id: "backup", label: "Backup" },
+  { id: "settings", label: "Settings" }
 ];
 
 const previewRoutes: { value: PreviewRoute; label: string }[] = [
@@ -905,6 +907,11 @@ export function AdminPage({
       {activeRootTab === "backup" && (
       <main className="admin-root-main" id="admin-root-panel-backup" role="tabpanel">
         <AdminBackupPanel />
+      </main>
+      )}
+      {activeRootTab === "settings" && (
+      <main className="admin-root-main" id="admin-root-panel-settings" role="tabpanel">
+        <AdminSettingsPanel />
       </main>
       )}
     </div>

@@ -223,6 +223,30 @@ async function handleDevTrackingRequest(request: IncomingMessage, response: Serv
     return;
   }
 
+  if (action === "unarchive" && request.method === "POST") {
+    const restoredSite = await updateDevTrackingSite(decodedIdOrToken, (site) => ({
+      ...site,
+      archived: false
+    }));
+    sendDevJson(response, restoredSite ? 200 : 404, restoredSite ? { ok: true, site: restoredSite, storage: "dev-file" } : { error: "Tracking site not found." });
+    return;
+  }
+
+  if (action === "delete" && request.method === "POST") {
+    const store = await readDevTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendDevJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    store.sites = store.sites.filter((site) => site.id !== target.id);
+    store.updatedAt = new Date().toISOString();
+    await writeDevTrackingStore(store);
+    sendDevJson(response, 200, { ok: true, site: target, storage: "dev-file" });
+    return;
+  }
+
   if (action === "sync" && request.method === "POST") {
     const synced = await updateDevTrackingSite(decodedIdOrToken, (site) => ({
       ...site,

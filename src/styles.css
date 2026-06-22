@@ -2243,6 +2243,67 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   gap: 18px;
 }
 
+.settings-admin {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.7fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.settings-preset-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.settings-upload {
+  margin-bottom: 18px;
+}
+
+.settings-presets {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-preset {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.settings-preset svg {
+  width: 20px;
+  height: 20px;
+  color: #365e7e;
+}
+
+.settings-preset span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-preset strong,
+.settings-preset small {
+  overflow-wrap: anywhere;
+}
+
+.settings-preset small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .backup-admin {
   display: grid;
   gap: 18px;
@@ -2469,6 +2530,28 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   margin: 4px 0;
   color: var(--ink);
   font-size: 15px;
+}
+
+.mailing-site-details {
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid rgba(70, 59, 48, 0.14);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.mailing-site-details span,
+.mailing-site-details small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mailing-site-details strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .admin-field--overdue input {
@@ -4070,6 +4153,8 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   .qr-designer,
   .mailing-layout,
   .mailing-summary,
+  .settings-grid,
+  .settings-preset-form,
   .tracking-link-box,
   .tracking-current {
     grid-template-columns: 1fr;

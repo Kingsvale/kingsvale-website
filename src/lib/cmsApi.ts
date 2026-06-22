@@ -8,6 +8,7 @@ import {
   loadLocalTrackingSites,
   normalizeTrackingSite,
   saveLocalTrackingSites,
+  unarchiveLocalTrackingSite,
   upsertLocalTrackingSite
 } from "./trackingStorage";
 import { isLocalDemoRuntime } from "./runtimeMode";
@@ -15,6 +16,12 @@ import { loadPublishedContent, savePublishedContent } from "./storage";
 import { normalizeSiteContent } from "./contentNormalize";
 import { validateSiteContent } from "./contentValidation";
 import { validateTrackingSite } from "./trackingValidation";
+import {
+  loadLocalStudioSettings,
+  normalizeStudioSettings,
+  saveLocalStudioSettings,
+  type StudioSettings
+} from "./studioSettings";
 
 type StudioSession = {
   authenticated: boolean;
@@ -241,7 +248,8 @@ export async function uploadLetterFile(file: File): Promise<UploadedLetterFile |
 
 export async function generateLetterFromTemplate(
   site: TrackingSite,
-  publicLink: string
+  publicLink: string,
+  templateUrl = site.letterTemplateUrl
 ): Promise<UploadedLetterFile | null> {
   try {
     const generationSite = {
@@ -254,7 +262,7 @@ export async function generateLetterFromTemplate(
       headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
       body: JSON.stringify({
         site: generationSite,
-        templateUrl: generationSite.letterTemplateUrl,
+        templateUrl,
         publicLink
       })
     });
@@ -267,6 +275,57 @@ export async function generateLetterFromTemplate(
     return payload.file;
   } catch {
     return null;
+  }
+}
+
+export async function fetchStudioSettings(): Promise<StudioSettings> {
+  try {
+    const response = await fetch("/api/studio-settings", {
+      credentials: "same-origin",
+      headers: authHeaders({ Accept: "application/json" })
+    });
+
+    if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        throw new Error("Studio settings require the secure server API.");
+      }
+      return loadLocalStudioSettings();
+    }
+
+    const payload = (await response.json()) as { settings: StudioSettings };
+    return normalizeStudioSettings(payload.settings);
+  } catch {
+    if (!isLocalDemoRuntime()) {
+      throw new Error("Studio settings require the secure server API.");
+    }
+    return loadLocalStudioSettings();
+  }
+}
+
+export async function saveStudioSettings(settings: StudioSettings): Promise<StudioSettings> {
+  const normalized = normalizeStudioSettings(settings);
+  try {
+    const response = await fetch("/api/studio-settings", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+      body: JSON.stringify({ settings: normalized })
+    });
+
+    if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        throw new Error("Studio settings could not be saved.");
+      }
+      return saveLocalStudioSettings(normalized);
+    }
+
+    const payload = (await response.json()) as { settings: StudioSettings };
+    return normalizeStudioSettings(payload.settings);
+  } catch {
+    if (!isLocalDemoRuntime()) {
+      throw new Error("Studio settings could not be saved.");
+    }
+    return saveLocalStudioSettings(normalized);
   }
 }
 
@@ -357,6 +416,36 @@ export async function archiveTrackingSite(id: string): Promise<TrackingSite | nu
     }
     markTrackingStorageLocal();
     return archiveLocalTrackingSite(id);
+  }
+}
+
+export async function unarchiveTrackingSite(id: string): Promise<TrackingSite | null> {
+  try {
+    const response = await fetch(`/api/tracking-sites/${encodeURIComponent(id)}/unarchive`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders()
+    });
+
+    if (!response.ok) {
+      if (!isLocalDemoRuntime()) {
+        markTrackingStorageUnavailable();
+        throw new Error("Tracking site could not be unarchived on the secure server.");
+      }
+      markTrackingStorageLocal();
+      return unarchiveLocalTrackingSite(id);
+    }
+
+    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    markTrackingStorageServer(payload.storage);
+    return normalizeTrackingSite(payload.site);
+  } catch {
+    if (!isLocalDemoRuntime()) {
+      markTrackingStorageUnavailable();
+      throw new Error("Tracking site could not be unarchived on the secure server.");
+    }
+    markTrackingStorageLocal();
+    return unarchiveLocalTrackingSite(id);
   }
 }
 
@@ -472,10 +561,11 @@ export type KingsvaleBackup = {
   kind: "kingsvale-full-backup";
   version: number;
   exportedAt: string;
-  stores: {
-    cms: unknown;
-    tracking: { sites: TrackingSite[]; updatedAt: string | null };
-    analytics: unknown;
+    stores: {
+      cms: unknown;
+      tracking: { sites: TrackingSite[]; updatedAt: string | null };
+      settings?: StudioSettings;
+      analytics: unknown;
     leads: { contact: string; newsletter: string };
   };
 };
@@ -557,6 +647,7 @@ async function buildLocalFullBackup(): Promise<KingsvaleBackup> {
   const now = new Date().toISOString();
   const published = loadPublishedContent();
   const trackingSites = await listTrackingSites();
+  const settings = loadLocalStudioSettings();
 
   return {
     kind: "kingsvale-full-backup",
@@ -573,6 +664,7 @@ async function buildLocalFullBackup(): Promise<KingsvaleBackup> {
         sites: trackingSites,
         updatedAt: now
       },
+      settings,
       analytics: {
         visits: loadLocalAnalyticsVisits(),
         updatedAt: now
@@ -589,8 +681,10 @@ async function importLocalFullBackup(backup: KingsvaleBackup, mode: "replace" | 
   const content = extractBackupContent(backup);
   const importedSites = extractBackupTrackingSites(backup);
   const importedVisits = extractBackupAnalyticsVisits(backup);
+  const settings = normalizeStudioSettings(backup.stores.settings);
 
   await importLocalTrackingBackup(backup, importedSites, mode);
+  saveLocalStudioSettings(settings);
   savePublishedContent(content);
   saveLocalAnalyticsVisits(
     mode === "merge"

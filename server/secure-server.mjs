@@ -34,6 +34,7 @@ const backupDir = resolve(dataDir, "backups");
 const auditDir = dataDir;
 const cmsStoreFile = join(cmsDir, "content.json");
 const trackingStoreFile = join(trackingDir, "sites.json");
+const studioSettingsFile = join(dataDir, "studio-settings.json");
 const analyticsStoreFile = join(analyticsDir, "visits.json");
 const studioPath = "/studio";
 const port = Number(process.env.PORT ?? 4173);
@@ -246,6 +247,11 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/backup") {
     await handleBackup(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/studio-settings") {
+    await handleStudioSettings(request, response);
     return;
   }
 
@@ -766,6 +772,27 @@ async function handleTrackingSiteItem(request, response, url) {
     return;
   }
 
+  if (action === "unarchive" && request.method === "POST") {
+    const store = await readTrackingStore();
+    const target = store.sites.find((site) => site.id === decodedIdOrToken);
+    if (!target) {
+      sendJson(response, 404, { error: "Tracking site not found." });
+      return;
+    }
+
+    const restoredSite = {
+      ...target,
+      archived: false,
+      updatedAt: new Date().toISOString()
+    };
+    store.sites = store.sites.map((site) => (site.id === restoredSite.id ? restoredSite : site));
+    store.updatedAt = restoredSite.updatedAt;
+    await writeTrackingStore(store);
+    await writeAudit("tracking_site_unarchived", request, { user: session.user, siteId: restoredSite.id });
+    sendJson(response, 200, { ok: true, site: restoredSite });
+    return;
+  }
+
   if (action === "delete" && request.method === "POST") {
     const store = await readTrackingStore();
     const target = store.sites.find((site) => site.id === decodedIdOrToken);
@@ -912,6 +939,42 @@ async function handleBackup(request, response) {
     await applyFullBackup(backup, mode);
     await writeAudit("backup_imported", request, { user: session.user, mode });
     sendJson(response, 200, { ok: true, importedAt: new Date().toISOString(), mode });
+    return;
+  }
+
+  sendJson(response, 405, { error: "Method not allowed." });
+}
+
+async function handleStudioSettings(request, response) {
+  const session = requireSession(request, response);
+  if (!session) {
+    return;
+  }
+
+  if (request.method === "GET") {
+    sendJson(response, 200, { settings: await readStudioSettings() });
+    return;
+  }
+
+  if (request.method === "PUT") {
+    const payload = await readJsonBody(request, 8_000_000);
+    const settings = normalizeStudioSettings(payload.settings ?? {});
+    const validation = validateStudioSettings(settings);
+    if (!validation.valid) {
+      sendJson(response, 400, { errors: validation.errors });
+      return;
+    }
+
+    const saved = {
+      ...settings,
+      updatedAt: new Date().toISOString()
+    };
+    await writeStudioSettings(saved);
+    await writeAudit("studio_settings_saved", request, {
+      user: session.user,
+      letterPresetCount: saved.letterPresets.length
+    });
+    sendJson(response, 200, { ok: true, settings: saved });
     return;
   }
 
@@ -1261,6 +1324,20 @@ async function writeTrackingStore(store) {
   await writeFile(trackingStoreFile, encodeCmsStore(store));
 }
 
+async function readStudioSettings() {
+  try {
+    const raw = await readFile(studioSettingsFile, "utf8");
+    return normalizeStudioSettings(decodeCmsStore(raw));
+  } catch {
+    return defaultStudioSettings();
+  }
+}
+
+async function writeStudioSettings(settings) {
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(studioSettingsFile, encodeCmsStore(normalizeStudioSettings(settings)));
+}
+
 async function readAnalyticsStore() {
   try {
     const raw = await readFile(analyticsStoreFile, "utf8");
@@ -1287,6 +1364,7 @@ async function buildFullBackup() {
     stores: {
       cms: await readCmsStore(),
       tracking: await readTrackingStore(),
+      settings: await readStudioSettings(),
       analytics: await readAnalyticsStore(),
       leads: await readLeadStores()
     }
@@ -1311,6 +1389,7 @@ async function applyFullBackup(backup, mode) {
     await writeAnalyticsStore({ visits: mergedVisits.filter(isAnalyticsVisit), updatedAt: now });
     await appendLeadStores(stores.leads);
     await writeCmsStore({ ...stores.cms, updatedAt: now });
+    await writeStudioSettings(mergeStudioSettings(await readStudioSettings(), stores.settings));
     return;
   }
 
@@ -1323,6 +1402,7 @@ async function applyFullBackup(backup, mode) {
     visits: stores.analytics.visits.filter(isAnalyticsVisit),
     updatedAt: now
   });
+  await writeStudioSettings(normalizeStudioSettings(stores.settings));
   await writeLeadStores(stores.leads);
 }
 
@@ -1575,6 +1655,9 @@ function validateTrackingSite(site) {
   validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
   validateText(errors, "statusNote", site.statusNote, "Status note", 320);
   validateOptionalText(errors, "customerName", site.customerName, "Customer name", 80);
+  validateOptionalText(errors, "ownerAddress", site.ownerAddress, "Owner postal address", 220);
+  validateOptionalText(errors, "titleNumber", site.titleNumber, "Title number", 80);
+  validateOptionalText(errors, "plotDescription", site.plotDescription, "Plot description", 220);
   validateOptionalText(errors, "reference", site.reference, "Reference", 64);
   validateOptionalText(errors, "region", site.region, "Region", 80);
   validateOptionalText(errors, "mapEmbedUrl", site.mapEmbedUrl, "Google My Maps embed URL", 1200);
@@ -1582,6 +1665,14 @@ function validateTrackingSite(site) {
     errors.push({ path: "mapEmbedUrl", message: "Google My Maps embed must be a safe Google map URL." });
   }
   validateOptionalText(errors, "privateNotes", site.privateNotes, "Private note", 1200);
+  validateOptionalText(errors, "letterPresetId", site.letterPresetId, "Letter preset", 120);
+  if (!["legal-owner", "title-owner", "plot-land"].includes(site.letterRecipientMode)) {
+    errors.push({ path: "letterRecipientMode", message: "Choose an approved letter recipient mode." });
+  }
+  validateOptionalText(errors, "titleDeedFileName", site.titleDeedFileName, "Title deed filename", 160);
+  if (site.titleDeedFileUrl && (site.titleDeedFileUrl.length > 7_000_000 || !isSafeLetterUrl(site.titleDeedFileUrl))) {
+    errors.push({ path: "titleDeedFileUrl", message: "Title deed upload must be a PDF, image or Word document under the upload limit." });
+  }
   validateOptionalText(errors, "letterTemplateName", site.letterTemplateName, "Letter template filename", 160);
   if (site.letterTemplateUrl && (site.letterTemplateUrl.length > 7_000_000 || !isSafeLetterTemplateUrl(site.letterTemplateUrl))) {
     errors.push({ path: "letterTemplateUrl", message: "Letter template must be a DOCX file stored on the server." });
@@ -1696,12 +1787,50 @@ function validateBackupPayload(backup) {
       });
     });
   }
+  if (stores.settings) {
+    const settingsValidation = validateStudioSettings(normalizeStudioSettings(stores.settings));
+    settingsValidation.errors.forEach((error) => {
+      errors.push({ path: `stores.settings.${error.path}`, message: error.message });
+    });
+  }
   if (!stores.analytics || !Array.isArray(stores.analytics.visits)) {
     errors.push({ path: "stores.analytics", message: "Analytics store is missing." });
   }
   if (!stores.leads || typeof stores.leads !== "object") {
     errors.push({ path: "stores.leads", message: "Lead store is missing." });
   }
+  return { valid: errors.length === 0, errors };
+}
+
+function validateStudioSettings(settings) {
+  const errors = [];
+  if (!settings || typeof settings !== "object") {
+    return { valid: false, errors: [{ path: "settings", message: "Studio settings are required." }] };
+  }
+
+  if (!Array.isArray(settings.letterPresets) || settings.letterPresets.length > 20) {
+    errors.push({ path: "letterPresets", message: "Use up to 20 letter presets." });
+  } else {
+    settings.letterPresets.forEach((preset, index) => {
+      validateText(errors, `letterPresets.${index}.name`, preset.name, "Preset name", 80);
+      validateText(errors, `letterPresets.${index}.templateName`, preset.templateName, "Template filename", 160);
+      if (typeof preset.templateUrl !== "string" || preset.templateUrl.length > 7_000_000 || !isSafeLetterTemplateUrl(preset.templateUrl)) {
+        errors.push({ path: `letterPresets.${index}.templateUrl`, message: "Letter preset must use a safe DOCX template." });
+      }
+      if (!["legal-owner", "title-owner", "plot-land"].includes(preset.recipientMode)) {
+        errors.push({ path: `letterPresets.${index}.recipientMode`, message: "Choose an approved recipient mode." });
+      }
+    });
+  }
+
+  if (!Number.isFinite(settings.defaultReminderDays) || settings.defaultReminderDays < 1 || settings.defaultReminderDays > 120) {
+    errors.push({ path: "defaultReminderDays", message: "Default reminder days must be between 1 and 120." });
+  }
+
+  if (!["high", "medium", "low", "do-not-contact", "unknown"].includes(settings.defaultContactPriority)) {
+    errors.push({ path: "defaultContactPriority", message: "Choose an approved default priority." });
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -1738,6 +1867,61 @@ function validateMailing(errors, site) {
   }
 }
 
+function defaultStudioSettings() {
+  return {
+    letterPresets: [],
+    defaultReminderDays: 14,
+    defaultContactPriority: "unknown",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function normalizeStudioSettings(settings = {}) {
+  const fallback = defaultStudioSettings();
+  return {
+    letterPresets: Array.isArray(settings.letterPresets)
+      ? settings.letterPresets.map(normalizeLetterPreset).filter(Boolean)
+      : [],
+    defaultReminderDays: boundedReminderDays(settings.defaultReminderDays),
+    defaultContactPriority: normalizeContactPriority(settings.defaultContactPriority),
+    updatedAt: typeof settings.updatedAt === "string" && settings.updatedAt ? settings.updatedAt : fallback.updatedAt
+  };
+}
+
+function normalizeLetterPreset(preset = {}) {
+  const name = cleanText(preset.name).slice(0, 80);
+  const templateName = cleanText(preset.templateName).slice(0, 160);
+  const templateUrl = cleanText(preset.templateUrl);
+  if (!name || !templateName || !isSafeLetterTemplateUrl(templateUrl)) {
+    return null;
+  }
+
+  return {
+    id: cleanText(preset.id).slice(0, 120) || `letter-preset-${Date.now()}-${randomBytes(3).toString("hex")}`,
+    name,
+    templateName,
+    templateUrl,
+    recipientMode: normalizeLetterRecipientMode(preset.recipientMode),
+    createdAt: cleanText(preset.createdAt) || new Date().toISOString()
+  };
+}
+
+function mergeStudioSettings(current, imported) {
+  const currentSettings = normalizeStudioSettings(current);
+  const importedSettings = normalizeStudioSettings(imported);
+  return {
+    ...currentSettings,
+    ...importedSettings,
+    letterPresets: [
+      ...importedSettings.letterPresets,
+      ...currentSettings.letterPresets.filter(
+        (preset) => !importedSettings.letterPresets.some((item) => item.id === preset.id)
+      )
+    ],
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function normalizeTrackingSite(site) {
   const qrStyle = site.qrStyle ?? {};
   const council = site.council ?? {};
@@ -1746,10 +1930,17 @@ function normalizeTrackingSite(site) {
   return {
     ...site,
     region: site.region || detectSiteRegion(site.siteAddress) || "Uncategorised",
+    ownerAddress: site.ownerAddress ?? "",
+    titleNumber: site.titleNumber ?? "",
+    plotDescription: site.plotDescription ?? "",
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     privateNotes: site.privateNotes ?? "",
+    letterPresetId: site.letterPresetId ?? "",
+    letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),
+    titleDeedFileName: site.titleDeedFileName ?? "",
+    titleDeedFileUrl: site.titleDeedFileUrl ?? "",
     letterTemplateName: site.letterTemplateName ?? "",
     letterTemplateUrl: site.letterTemplateUrl ?? "",
     letterFileName: site.letterFileName ?? "",
@@ -1791,6 +1982,9 @@ function normalizeTrackingSite(site) {
 function publicTrackingSite(site) {
   const {
     ownerContactName,
+    ownerAddress,
+    titleNumber,
+    plotDescription,
     contactPriority,
     mailingStatus,
     firstMailedAt,
@@ -1799,6 +1993,10 @@ function publicTrackingSite(site) {
     trackingStatus,
     trackingLastCheckedAt,
     privateNotes,
+    letterPresetId,
+    letterRecipientMode,
+    titleDeedFileName,
+    titleDeedFileUrl,
     letterTemplateName,
     letterTemplateUrl,
     letterFileName,
@@ -1811,6 +2009,9 @@ function publicTrackingSite(site) {
     ...publicSite
   } = site;
   void ownerContactName;
+  void ownerAddress;
+  void titleNumber;
+  void plotDescription;
   void contactPriority;
   void mailingStatus;
   void firstMailedAt;
@@ -1819,6 +2020,10 @@ function publicTrackingSite(site) {
   void trackingStatus;
   void trackingLastCheckedAt;
   void privateNotes;
+  void letterPresetId;
+  void letterRecipientMode;
+  void titleDeedFileName;
+  void titleDeedFileUrl;
   void letterTemplateName;
   void letterTemplateUrl;
   void letterFileName;
@@ -1949,8 +2154,16 @@ function normalizeMailingStatus(value) {
     : "not-mailed";
 }
 
+function normalizeLetterRecipientMode(value) {
+  return ["legal-owner", "title-owner", "plot-land"].includes(value) ? value : "legal-owner";
+}
+
 function boundedReminderDays(value) {
   return Number.isFinite(value) ? Math.min(120, Math.max(1, Math.trunc(value))) : 14;
+}
+
+function cleanText(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
 }
 
 function suggestRemailReminderDate(firstMailedAt, reminderDays = 14) {

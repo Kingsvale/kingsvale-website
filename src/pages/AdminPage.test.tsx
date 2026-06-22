@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { defaultContent } from "../data/defaultContent";
 import { AdminPage } from "./AdminPage";
 import { AdminSitesPanel } from "./AdminSitesPanel";
@@ -21,7 +21,7 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
-  it("exposes Website, Sites, Mailing, Analytics and Backup studio tabs", async () => {
+  it("exposes Website, Sites, Mailing, Analytics, Backup and Settings studio tabs", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     expect(screen.getByRole("tab", { name: "Website" })).toHaveAttribute("aria-selected", "true");
@@ -29,6 +29,7 @@ describe("AdminPage", () => {
     expect(screen.getByRole("tab", { name: "Mailing" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Analytics" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Backup" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Content editor" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Mailing" }));
@@ -45,6 +46,11 @@ describe("AdminPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "Backup and restore" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Export full backup/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Studio settings" })).toBeInTheDocument();
     });
   });
 
@@ -129,14 +135,12 @@ describe("AdminPage", () => {
     expect(document.querySelector("#summary")).not.toBeInTheDocument();
     expect(document.querySelector("#private-notes")).toBeInTheDocument();
     expect(document.querySelector("#searchland-url")).toBeInTheDocument();
-    expect(screen.getByText("No template uploaded")).toBeInTheDocument();
-    expect(screen.getByText("No generated letter")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate letter/i })).toBeDisabled();
-    expect(screen.getByText("{{legal_name}}")).toBeInTheDocument();
-    expect(screen.getByText("Initial letter template")).toHaveAttribute(
-      "href",
-      "/templates/kingsvale-initial-letter-template.docx"
-    );
+    expect(document.querySelector("#title-number")).toBeInTheDocument();
+    expect(document.querySelector("#plot-description")).toBeInTheDocument();
+    expect(screen.getByText("No title deed uploaded")).toBeInTheDocument();
+    expect(screen.getByText("Upload title deed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open letter generation in mailing/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /generate letter/i })).not.toBeInTheDocument();
 
     fireEvent.change(document.querySelector("#site-address") as HTMLInputElement, {
       target: { value: "12 Meadow Lane, Wokingham" }
@@ -174,6 +178,49 @@ describe("AdminPage", () => {
       .find((button) => button.textContent?.includes("Save site"));
     expect(saveSiteButton).toBeEnabled();
     expect([...sitesPanel.querySelectorAll("button")].some((button) => button.textContent?.includes("Delete"))).toBe(true);
+    expect([...sitesPanel.querySelectorAll("button")].some((button) => button.textContent?.includes("Archive"))).toBe(true);
+  });
+
+  it("cycles site archive state and deletes the selected site", async () => {
+    const confirmDelete = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AdminSitesPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create site/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^archive$/i })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^archive$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^unarchive$/i })).toBeEnabled();
+    });
+    expect(screen.queryByRole("button", { name: /^archive$/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^unarchive$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^archive$/i })).toBeEnabled();
+    });
+    expect(screen.queryByRole("button", { name: /^unarchive$/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^archive$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^unarchive$/i })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^unarchive$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^archive$/i })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => {
+      expect(screen.getByText("No map pages yet.")).toBeInTheDocument();
+    });
+
+    expect(confirmDelete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("generated-tracking-link")).not.toBeInTheDocument();
+    confirmDelete.mockRestore();
   });
 
   it("passes automated accessibility checks for the structured editor", async () => {

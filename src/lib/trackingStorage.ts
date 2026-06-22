@@ -84,6 +84,18 @@ export function archiveLocalTrackingSite(id: string): TrackingSite | null {
   return nextSite;
 }
 
+export function unarchiveLocalTrackingSite(id: string): TrackingSite | null {
+  const sites = loadLocalTrackingSites();
+  const target = sites.find((site) => site.id === id);
+  if (!target) {
+    return null;
+  }
+
+  const nextSite = { ...target, archived: false, updatedAt: new Date().toISOString() };
+  saveLocalTrackingSites(sites.map((site) => (site.id === id ? nextSite : site)));
+  return nextSite;
+}
+
 export function deleteLocalTrackingSite(id: string): TrackingSite | null {
   const sites = loadLocalTrackingSites();
   const target = sites.find((site) => site.id === id);
@@ -107,6 +119,9 @@ export function createTrackingSite(): TrackingSite {
     title: "New customer tracking page",
     customerName: "",
     siteAddress: "Site address",
+    ownerAddress: "",
+    titleNumber: "",
+    plotDescription: "",
     reference: "",
     region: "Uncategorised",
     ownerContactName: "",
@@ -114,6 +129,10 @@ export function createTrackingSite(): TrackingSite {
     summary: "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
     mapEmbedUrl: "",
     privateNotes: "",
+    letterPresetId: "",
+    letterRecipientMode: "legal-owner",
+    titleDeedFileName: "",
+    titleDeedFileUrl: "",
     letterTemplateName: "",
     letterTemplateUrl: "",
     letterFileName: "",
