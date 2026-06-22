@@ -42,7 +42,6 @@ import {
   buildAddressFromParts,
   detectSiteRegion,
   mailingStatusClass,
-  normalizeAddressParts,
   normalizeMapEmbedInput,
   priorityClass,
 } from "../lib/trackingStorage";
@@ -329,14 +328,14 @@ export function AdminSitesPanel() {
 
   function updateAddressPart(part: keyof TrackingSite["siteAddressParts"], value: string) {
     updateDraft((site) => {
-      const nextParts = normalizeAddressParts({
+      const nextParts = {
         ...site.siteAddressParts,
-        [part]: value
-      }, site.siteAddress);
+        [part]: part === "postcode" ? value.toUpperCase() : value
+      };
       site.siteAddressParts = nextParts;
       site.siteAddress = buildAddressFromParts(nextParts);
       if (!site.region || site.region === "Uncategorised" || part === "town" || part === "county") {
-        site.region = nextParts.county || detectSiteRegion(site.siteAddress) || nextParts.town || "Uncategorised";
+        site.region = nextParts.county.trim() || detectSiteRegion(site.siteAddress) || nextParts.town.trim() || "Uncategorised";
       }
     });
   }
@@ -525,7 +524,7 @@ export function AdminSitesPanel() {
                   </button>
                 </div>
 
-                <details className="qr-designer qr-designer--folded" open>
+                <details className="qr-designer qr-designer--folded">
                   <summary className="qr-designer__summary">
                     <span><Palette aria-hidden="true" /> QR Code Design</span>
                     <small>Colours, shape and Word-ready PNG export</small>
@@ -666,7 +665,7 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateAddressPart("town", value)}
                   />
                   <TrackingTextInput
-                    label="County"
+                    label="Council"
                     value={draft.siteAddressParts.county}
                     maxLength={trackingFieldLimits.addressCounty}
                     error={errorsByPath["siteAddressParts.county"]}
@@ -677,7 +676,7 @@ export function AdminSitesPanel() {
                     value={draft.siteAddressParts.postcode}
                     maxLength={trackingFieldLimits.addressPostcode}
                     error={errorsByPath["siteAddressParts.postcode"]}
-                    onChange={(value) => updateAddressPart("postcode", value.toUpperCase())}
+                    onChange={(value) => updateAddressPart("postcode", value)}
                   />
                 </div>
                 <TrackingTextInput

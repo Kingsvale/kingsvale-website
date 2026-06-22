@@ -76,7 +76,7 @@ export function buildLetterTokens(site, publicLink) {
   const address = normalizeAddressParts(site?.siteAddressParts, targetAddress);
   const titledOwnerName = cleanText(site?.customerName) || cleanText(site?.ownerContactName) || "The Legal Owner";
   const legalName = mode === "title-owner" ? titledOwnerName : "The Legal Owner";
-  const council = cleanText(site?.council?.councilName) || cleanText(site?.region);
+  const council = cleanText(site?.siteAddressParts?.county) || cleanText(site?.council?.councilName) || cleanText(site?.region);
   const streetAddress = [address.line1, address.line2].filter(Boolean).join(", ");
   const allAddress = buildAddressFromParts(address) || targetAddress.replace(/\s*,\s*/g, ", ");
   const siteAddress = cleanText(site?.siteAddress).replace(/\s*,\s*/g, ", ");

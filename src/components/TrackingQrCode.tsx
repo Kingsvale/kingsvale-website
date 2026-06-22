@@ -63,8 +63,6 @@ export function TrackingQrCode({ value, style, title }: TrackingQrCodeProps) {
 
 function svgToPngBlob(svg: string, width: number, height: number, background: string) {
   return new Promise<Blob>((resolve, reject) => {
-    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const svgUrl = URL.createObjectURL(svgBlob);
     const image = new Image();
 
     image.onload = () => {
@@ -75,7 +73,6 @@ function svgToPngBlob(svg: string, width: number, height: number, background: st
 
         const context = canvas.getContext("2d");
         if (!context) {
-          URL.revokeObjectURL(svgUrl);
           reject(new Error("Canvas is not available for QR PNG export."));
           return;
         }
@@ -83,7 +80,6 @@ function svgToPngBlob(svg: string, width: number, height: number, background: st
         context.fillStyle = background;
         context.fillRect(0, 0, width, height);
         context.drawImage(image, 0, 0, width, height);
-        URL.revokeObjectURL(svgUrl);
 
         canvas.toBlob((blob) => {
           if (!blob) {
@@ -93,18 +89,28 @@ function svgToPngBlob(svg: string, width: number, height: number, background: st
           resolve(blob);
         }, "image/png");
       } catch (error) {
-        URL.revokeObjectURL(svgUrl);
         reject(error);
       }
     };
 
     image.onerror = () => {
-      URL.revokeObjectURL(svgUrl);
       reject(new Error("Browser could not render the QR code before PNG export."));
     };
 
-    image.src = svgUrl;
+    image.src = svgToDataUrl(svg);
   });
+}
+
+function svgToDataUrl(svg: string) {
+  const bytes = new TextEncoder().encode(svg);
+  const chunks: string[] = [];
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    chunks.push(String.fromCharCode(...bytes.slice(index, index + chunkSize)));
+  }
+
+  return `data:image/svg+xml;base64,${btoa(chunks.join(""))}`;
 }
 
 function downloadBlob(blob: Blob, fileName: string) {

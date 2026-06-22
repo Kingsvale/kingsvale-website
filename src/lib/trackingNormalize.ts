@@ -72,7 +72,7 @@ export function defaultQrStyle(): TrackingQrStyle {
   return {
     foreground: "#22211d",
     background: "#fbf8f2",
-    accent: "#ad9576",
+    accent: "#008000",
     dotRoundness: 48,
     finderRoundness: 24,
     frameRoundness: 42,

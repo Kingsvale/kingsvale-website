@@ -13,18 +13,14 @@ import {
 } from "../lib/studioSettings";
 import {
   contactPriorityLabels,
-  letterRecipientModeLabels,
-  type ContactPriority,
-  type LetterRecipientMode
+  type ContactPriority
 } from "../lib/trackingTypes";
 
-const recipientModes = Object.keys(letterRecipientModeLabels) as LetterRecipientMode[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 
 export function AdminSettingsPanel() {
   const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
   const [presetName, setPresetName] = useState("");
-  const [presetMode, setPresetMode] = useState<LetterRecipientMode>("legal-owner");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Manage reusable Studio defaults.");
   const sortedPresets = useMemo(
@@ -93,12 +89,43 @@ export function AdminSettingsPanel() {
           name,
           templateName: upload.name,
           templateUrl: upload.url,
-          recipientMode: presetMode,
+          recipientMode: "legal-owner",
           createdAt: new Date().toISOString()
         });
       });
       setPresetName("");
       setStatus("Preset uploaded. Save settings to keep it.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePresetReplacement(presetId: string, files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!isAllowedLetterTemplateFile(file)) {
+      setStatus("Preset template must be a DOCX Word document under 8MB.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const upload = await uploadLetterFile(file);
+      if (!upload) {
+        setStatus("Preset template could not be replaced.");
+        return;
+      }
+
+      updateSettings((draft) => {
+        const preset = draft.letterPresets.find((item) => item.id === presetId);
+        if (preset) {
+          preset.templateName = upload.name;
+          preset.templateUrl = upload.url;
+        }
+      });
+      setStatus("Preset template replaced. Save settings to keep it.");
     } finally {
       setBusy(false);
     }
@@ -143,13 +170,6 @@ export function AdminSettingsPanel() {
               maxLength={80}
               onChange={setPresetName}
             />
-            <SelectField
-              id="letter-preset-mode"
-              label="Recipient mode"
-              value={presetMode}
-              onChange={(value) => setPresetMode(value as LetterRecipientMode)}
-              options={recipientModes.map((mode) => [mode, letterRecipientModeLabels[mode]] as const)}
-            />
             <label className="admin-small settings-upload">
               <Plus aria-hidden="true" />
               Upload DOCX
@@ -168,12 +188,32 @@ export function AdminSettingsPanel() {
               sortedPresets.map((preset) => (
                 <article className="settings-preset" key={preset.id}>
                   <FileText aria-hidden="true" />
-                  <span>
-                    <strong>{preset.name}</strong>
-                    <small>
-                      {letterRecipientModeLabels[preset.recipientMode]} - {preset.templateName}
-                    </small>
-                  </span>
+                  <div className="settings-preset__content">
+                    <TextInput
+                      label="Preset name"
+                      value={preset.name}
+                      maxLength={80}
+                      onChange={(value) =>
+                        updateSettings((draft) => {
+                          const target = draft.letterPresets.find((item) => item.id === preset.id);
+                          if (target) {
+                            target.name = value;
+                          }
+                        })
+                      }
+                    />
+                    <small>{preset.templateName}</small>
+                  </div>
+                  <label className="admin-small settings-upload">
+                    <Plus aria-hidden="true" />
+                    Replace DOCX
+                    <input
+                      className="sr-only"
+                      type="file"
+                      accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) => void handlePresetReplacement(preset.id, event.target.files)}
+                    />
+                  </label>
                   <button
                     type="button"
                     className="admin-danger"

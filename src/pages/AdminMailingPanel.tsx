@@ -44,7 +44,7 @@ const letterTokens = [
   "{{reference}}",
   "{{date}}",
   "{{town}}",
-  "{{county}}",
+  "{{council}}",
   "{{postal_code}}",
   "{{tracking_link}}"
 ];
@@ -276,7 +276,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     const generationDraft: TrackingSite = {
       ...draft,
       letterPresetId: selectedPreset?.id ?? draft.letterPresetId,
-      letterRecipientMode: selectedPreset?.recipientMode ?? draft.letterRecipientMode,
       letterTemplateName: selectedPreset?.templateName ?? draft.letterTemplateName,
       letterTemplateUrl: templateUrl
     };
@@ -560,7 +559,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                     updateDraft((site) => {
                       const preset = settings.letterPresets.find((item) => item.id === value);
                       site.letterPresetId = preset?.id ?? "";
-                      site.letterRecipientMode = preset?.recipientMode ?? site.letterRecipientMode;
                       site.letterTemplateName = preset?.templateName ?? "";
                       site.letterTemplateUrl = preset?.templateUrl ?? "";
                     })

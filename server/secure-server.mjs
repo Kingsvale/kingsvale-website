@@ -46,10 +46,13 @@ const cmsEncryptionKey = process.env.CMS_ENCRYPTION_KEY ?? "";
 const leadWebhookSecret = process.env.LEAD_WEBHOOK_HMAC_SECRET ?? "";
 const royalMailTrackingApiUrl = process.env.ROYAL_MAIL_TRACKING_API_URL ?? "";
 const royalMailTrackingApiKey = process.env.ROYAL_MAIL_TRACKING_API_KEY ?? "";
-const maxCmsRevisions = clampNumber(process.env.CMS_MAX_REVISIONS, 25, 5, 100);
+const maxCmsRevisions = 5;
 const maxCmsBackups = clampNumber(process.env.CMS_MAX_BACKUPS, 30, 5, 120);
 const backupImportMaxBytes = clampNumber(process.env.BACKUP_IMPORT_MAX_MB, 25, 5, 100) * 1_000_000;
 const requestBuckets = new Map();
+const recentAnalyticsVisits = new Map();
+const analyticsDuplicateWindowMs = 2_000;
+const transparentPixel = Buffer.from("R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==", "base64");
 
 const mimeTypes = {
   ".avif": "image/avif",
@@ -237,6 +240,11 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/analytics/visit") {
     await handleAnalyticsVisit(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/analytics/pixel.gif") {
+    await handleAnalyticsPixel(request, response);
     return;
   }
 
@@ -884,11 +892,33 @@ async function handleAnalyticsVisit(request, response) {
     return;
   }
 
-  const store = await readAnalyticsStore();
-  store.visits = [visit, ...store.visits].slice(0, 5_000);
-  store.updatedAt = new Date().toISOString();
-  await writeAnalyticsStore(store);
+  await recordServerAnalyticsVisit(request, visit);
   sendJson(response, 202, { ok: true });
+}
+
+async function handleAnalyticsPixel(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    sendJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const path = analyticsPathFromRequest(request);
+  const visit = normalizeAnalyticsVisit({
+    path,
+    title: analyticsTitleFromPath(path),
+    routeType: path.startsWith("/track/") ? "tracking" : "website"
+  });
+
+  if (visit && request.method === "GET") {
+    await recordServerAnalyticsVisit(request, visit);
+  }
+
+  response.writeHead(200, {
+    "Content-Type": "image/gif",
+    "Cache-Control": "no-store, max-age=0",
+    "Content-Length": transparentPixel.length
+  });
+  response.end(request.method === "HEAD" ? undefined : transparentPixel);
 }
 
 async function handleAnalyticsSummary(request, response) {
@@ -1290,7 +1320,7 @@ async function readCmsStore() {
     return {
       published: parsed.published ?? null,
       draft: parsed.draft ?? null,
-      revisions: Array.isArray(parsed.revisions) ? parsed.revisions : [],
+      revisions: Array.isArray(parsed.revisions) ? parsed.revisions.slice(0, maxCmsRevisions) : [],
       updatedAt: parsed.updatedAt ?? null
     };
   } catch {
@@ -1300,7 +1330,10 @@ async function readCmsStore() {
 
 async function writeCmsStore(store) {
   await mkdir(cmsDir, { recursive: true });
-  await writeFile(cmsStoreFile, encodeCmsStore(store));
+  await writeFile(cmsStoreFile, encodeCmsStore({
+    ...store,
+    revisions: Array.isArray(store.revisions) ? store.revisions.slice(0, maxCmsRevisions) : []
+  }));
 }
 
 async function readTrackingStore() {
@@ -1656,7 +1689,7 @@ function validateTrackingSite(site) {
   validateText(errors, "siteAddressParts.line1", site.siteAddressParts?.line1, "Address line 1", 90);
   validateOptionalText(errors, "siteAddressParts.line2", site.siteAddressParts?.line2 ?? "", "Address line 2", 90);
   validateText(errors, "siteAddressParts.town", site.siteAddressParts?.town, "Town or city", 70);
-  validateOptionalText(errors, "siteAddressParts.county", site.siteAddressParts?.county ?? "", "County", 70);
+  validateOptionalText(errors, "siteAddressParts.county", site.siteAddressParts?.county ?? "", "Council", 70);
   validateText(errors, "siteAddressParts.postcode", site.siteAddressParts?.postcode, "Postcode", 12);
   if (site.siteAddressParts?.postcode && !/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(String(site.siteAddressParts.postcode).trim())) {
     errors.push({ path: "siteAddressParts.postcode", message: "Use a valid UK postcode." });
@@ -1825,9 +1858,6 @@ function validateStudioSettings(settings) {
       if (typeof preset.templateUrl !== "string" || preset.templateUrl.length > 7_000_000 || !isSafeLetterTemplateUrl(preset.templateUrl)) {
         errors.push({ path: `letterPresets.${index}.templateUrl`, message: "Letter preset must use a safe DOCX template." });
       }
-      if (!["legal-owner", "title-owner", "plot-land"].includes(preset.recipientMode)) {
-        errors.push({ path: `letterPresets.${index}.recipientMode`, message: "Choose an approved recipient mode." });
-      }
     });
   }
 
@@ -1962,7 +1992,7 @@ function normalizeTrackingSite(site) {
     qrStyle: {
       foreground: qrStyle.foreground ?? "#22211d",
       background: qrStyle.background ?? "#fbf8f2",
-      accent: qrStyle.accent ?? "#ad9576",
+      accent: qrStyle.accent ?? "#008000",
       dotRoundness: numberOrFallback(qrStyle.dotRoundness, presetRoundness(qrStyle.dotStyle)),
       finderRoundness: numberOrFallback(qrStyle.finderRoundness, presetRoundness(qrStyle.finderStyle)),
       frameRoundness: numberOrFallback(qrStyle.frameRoundness, qrStyle.frameStyle === "square" ? 0 : 42),
@@ -2273,7 +2303,14 @@ function normalizeAnalyticsVisit(input) {
 
   const path = typeof input.path === "string" ? input.path.trim().slice(0, 160) : "";
   const routeType = input.routeType === "tracking" ? "tracking" : "website";
-  if (!path || path === "/admin" || path.startsWith(studioPath) || path.startsWith("/api/")) {
+  if (
+    !path ||
+    path === "/admin" ||
+    path.startsWith(studioPath) ||
+    path.startsWith("/api/") ||
+    path.startsWith("/assets/") ||
+    path.startsWith("/media/")
+  ) {
     return null;
   }
 
@@ -2284,6 +2321,72 @@ function normalizeAnalyticsVisit(input) {
     routeType,
     visitedAt: new Date().toISOString()
   };
+}
+
+async function recordServerAnalyticsVisit(request, visit) {
+  if (!shouldRecordServerAnalyticsVisit(request, visit)) {
+    return;
+  }
+
+  const store = await readAnalyticsStore();
+  store.visits = [visit, ...store.visits].slice(0, 5_000);
+  store.updatedAt = new Date().toISOString();
+  await writeAnalyticsStore(store);
+}
+
+function shouldRecordServerAnalyticsVisit(request, visit) {
+  const now = Date.now();
+  for (const [key, expiresAt] of recentAnalyticsVisits.entries()) {
+    if (expiresAt <= now) {
+      recentAnalyticsVisits.delete(key);
+    }
+  }
+
+  const visitor = createHash("sha256")
+    .update(`${request.socket.remoteAddress ?? "unknown"}:${request.headers["user-agent"] ?? ""}`)
+    .digest("hex")
+    .slice(0, 16);
+  const key = `${visitor}:${visit.routeType}:${visit.path}`;
+  if (recentAnalyticsVisits.has(key)) {
+    return false;
+  }
+
+  recentAnalyticsVisits.set(key, now + analyticsDuplicateWindowMs);
+  return true;
+}
+
+function analyticsPathFromRequest(request) {
+  const referer = request.headers.referer ?? request.headers.referrer ?? "";
+  if (typeof referer !== "string" || !referer) {
+    return "/";
+  }
+
+  try {
+    const parsed = new URL(referer, `http://${request.headers.host ?? "localhost"}`);
+    return parsed.pathname.slice(0, 160) || "/";
+  } catch {
+    return "/";
+  }
+}
+
+function analyticsTitleFromPath(path) {
+  const cleanPath = String(path).split("?")[0];
+  if (cleanPath === "/") {
+    return "Homepage";
+  }
+  if (cleanPath.startsWith("/track/")) {
+    return "Plot map page";
+  }
+  if (cleanPath === "/plot-lookup") {
+    return "Plot lookup";
+  }
+
+  return cleanPath
+    .split("/")
+    .filter(Boolean)
+    .map((part) => part.replaceAll("-", " "))
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join(" / ") || "Website page";
 }
 
 function buildAnalyticsSummary(visits, updatedAt = null) {
@@ -2581,7 +2684,7 @@ async function serveStatic(pathname, response) {
   return sendStaticFile(filePath, response);
 }
 
-function sendStaticFile(filePath, response) {
+async function sendStaticFile(filePath, response) {
   response.setHeader("Content-Type", mimeTypes[extname(filePath)] ?? "application/octet-stream");
   if (basename(filePath) === "app.html") {
     response.setHeader("Cache-Control", "no-store");
@@ -2593,7 +2696,24 @@ function sendStaticFile(filePath, response) {
     response.setHeader("Cache-Control", "public, max-age=3600");
   }
 
+  if (extname(filePath) === ".html") {
+    const html = await readFile(filePath, "utf8");
+    response.end(injectAnalyticsPixel(html));
+    return;
+  }
+
   createReadStream(filePath).pipe(response);
+}
+
+function injectAnalyticsPixel(html) {
+  if (html.includes("/api/analytics/pixel.gif")) {
+    return html;
+  }
+
+  const pixel = '<img src="/api/analytics/pixel.gif" alt="" width="1" height="1" loading="eager" decoding="async" referrerpolicy="same-origin" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" />';
+  return html.includes("</body>")
+    ? html.replace("</body>", `    ${pixel}\n  </body>`)
+    : `${html}\n${pixel}`;
 }
 
 function resolveStaticPath(pathname) {

@@ -12,8 +12,9 @@ describe("styled tracking QR renderer", () => {
     );
 
     expect(svg).toContain('data-qr-svg="true"');
-    expect(svg).toContain("#ad9576");
-    expect(svg).toContain(">K</text>");
+    expect(svg).toContain("#008000");
+    expect(svg).toContain('data-logo-mark="kingsvale"');
+    expect(svg).not.toContain(">K</text>");
     expect(svg).toContain('rx="');
     expect(svg).not.toContain("Scan to view the plot</text>");
   });

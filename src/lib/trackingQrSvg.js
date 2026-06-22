@@ -15,7 +15,7 @@ export function buildStyledQrSvg(value, style = {}, title = "", options = {}) {
   const totalHeight = size + labelHeight;
   const foreground = safeColor(style.foreground, "#22211d");
   const background = safeColor(style.background, "#fbf8f2");
-  const accent = safeColor(style.accent, "#ad9576");
+  const accent = safeColor(style.accent, "#008000");
   const dotRoundness = boundedPercent(style.dotRoundness, 48);
   const finderRoundness = boundedPercent(style.finderRoundness, 24);
   const frameRoundness = boundedPercent(style.frameRoundness, 42);
@@ -106,8 +106,23 @@ function logoMark(size, moduleSize, background, foreground, accent) {
   const box = moduleSize * 6;
   const left = (size - box) / 2;
   const top = (size - box) / 2;
+  const stemX = left + box * 0.28;
+  const stemY = top + box * 0.2;
+  const stemWidth = box * 0.13;
+  const stemHeight = box * 0.6;
+  const jointX = left + box * 0.43;
+  const jointY = top + box * 0.5;
+  const armLeft = left + box * 0.5;
+  const armRight = left + box * 0.78;
+  const armTop = top + box * 0.2;
+  const armBottom = top + box * 0.8;
+  const armWidth = box * 0.16;
   return `<rect x="${left}" y="${top}" width="${box}" height="${box}" rx="10" fill="${background}" stroke="${accent}" stroke-width="2"/>
-  <text x="${size / 2}" y="${top + box / 2 + 9}" text-anchor="middle" font-family="Georgia, serif" font-size="28" font-weight="700" fill="${foreground}">K</text>`;
+  <g data-logo-mark="kingsvale" fill="${foreground}">
+    <rect x="${stemX}" y="${stemY}" width="${stemWidth}" height="${stemHeight}" rx="${stemWidth / 2}"/>
+    <path d="M ${armLeft} ${jointY} L ${armRight} ${armTop} H ${armRight - armWidth} L ${jointX} ${jointY} Z"/>
+    <path d="M ${jointX} ${jointY} L ${armRight - armWidth} ${armBottom} H ${armRight} L ${armLeft} ${jointY} Z"/>
+  </g>`;
 }
 
 function isFinderModule(x, y, moduleCount) {

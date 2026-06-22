@@ -133,7 +133,7 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     errors,
     "siteAddressParts.county",
     site.siteAddressParts?.county,
-    "County",
+    "Council",
     trackingFieldLimits.addressCounty
   );
   addRequiredTextError(
