@@ -19,6 +19,8 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     privateNotes: site.privateNotes ?? "",
+    letterTemplateName: site.letterTemplateName ?? "",
+    letterTemplateUrl: site.letterTemplateUrl ?? "",
     letterFileName: site.letterFileName ?? "",
     letterFileUrl: site.letterFileUrl ?? "",
     searchlandUrl: site.searchlandUrl ?? "",

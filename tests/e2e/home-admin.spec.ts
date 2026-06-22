@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { studioPath } from "../../src/lib/studioRoute";
 
@@ -72,7 +73,7 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByText("Riverstone Mews")).toBeVisible();
 });
 
-test("creates a land interest map page and opens the generated link", async ({ page }, testInfo) => {
+test("creates a land interest map page and opens the generated link", async ({ page, request }, testInfo) => {
   const projectName = testInfo.project.name.replace(/[^a-z0-9]+/gi, "").toUpperCase() || "WEB";
   const reference = `KV-${projectName}-${Date.now().toString(36).toUpperCase()}`;
 
@@ -97,9 +98,22 @@ test("creates a land interest map page and opens the generated link", async ({ p
   await setRangeValue(page, "Finder roundness", "86");
   await setRangeValue(page, "Cut corners", "34");
   await page.getByLabel("Site title").fill("Oakdene land interest");
+  await page.getByLabel(/customer name/i).fill("Alex Oakdene");
   await page.getByLabel("Reference").fill(reference);
   await page.getByLabel("Site address").fill("12 Meadow Lane, Wokingham");
   await expect(page.getByLabel("Folder / region")).toHaveValue("Wokingham");
+  await page
+    .locator('input[accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"]')
+    .setInputFiles(resolve("public/templates/kingsvale-initial-letter-template.docx"));
+  await expect(page.getByText("Letter template uploaded to server.")).toBeVisible();
+  await page.getByRole("button", { name: "Generate letter" }).click();
+  await expect(page.getByText("Letter generated with the site details and tracked QR code.")).toBeVisible();
+  const generatedLetter = page.locator(".letter-upload").filter({ hasText: /-letter\.docx/ });
+  const generatedHref = await generatedLetter.getByRole("link", { name: "Open" }).getAttribute("href");
+  expect(generatedHref).toMatch(/^\/media\/.+\.docx$/);
+  const generatedResponse = await request.get(generatedHref as string);
+  expect(generatedResponse.ok()).toBe(true);
+  expect((await generatedResponse.body()).subarray(0, 2).toString("utf8")).toBe("PK");
   await page
     .getByLabel("Google My Maps embed URL or iframe")
     .fill("https://www.google.com/maps/d/embed?mid=abc123");

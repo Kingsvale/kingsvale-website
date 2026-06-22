@@ -114,6 +114,8 @@ export function createTrackingSite(): TrackingSite {
     summary: "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
     mapEmbedUrl: "",
     privateNotes: "",
+    letterTemplateName: "",
+    letterTemplateUrl: "",
     letterFileName: "",
     letterFileUrl: "",
     searchlandUrl: "",

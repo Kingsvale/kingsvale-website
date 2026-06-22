@@ -28,6 +28,8 @@ export const trackingFieldLimits = {
   region: 80,
   mapEmbedUrl: 1200,
   privateNotes: 1200,
+  letterTemplateName: 160,
+  letterTemplateUrl: 7_000_000,
   letterFileName: 160,
   letterFileUrl: 7_000_000,
   searchlandUrl: 1200,
@@ -106,8 +108,27 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     });
   }
   addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private note", trackingFieldLimits.privateNotes);
+  addOptionalTextError(
+    errors,
+    "letterTemplateName",
+    site.letterTemplateName,
+    "Letter template filename",
+    trackingFieldLimits.letterTemplateName
+  );
+  if (
+    site.letterTemplateUrl &&
+    (
+      site.letterTemplateUrl.length > trackingFieldLimits.letterTemplateUrl ||
+      !isValidLetterTemplateUrl(site.letterTemplateUrl)
+    )
+  ) {
+    errors.push({
+      path: "letterTemplateUrl",
+      message: "Letter template must be a safe Word document upload."
+    });
+  }
   addOptionalTextError(errors, "letterFileName", site.letterFileName, "Letter filename", trackingFieldLimits.letterFileName);
-  if (site.letterFileUrl && (site.letterFileUrl.length > trackingFieldLimits.letterFileUrl || !isValidLetterDataUrl(site.letterFileUrl))) {
+  if (site.letterFileUrl && (site.letterFileUrl.length > trackingFieldLimits.letterFileUrl || !isValidLetterUrl(site.letterFileUrl))) {
     errors.push({
       path: "letterFileUrl",
       message: "Letter upload must be a PDF, image or Word document under the upload limit."
@@ -423,8 +444,20 @@ function isValidMapEmbedUrl(value: string) {
   }
 }
 
-function isValidLetterDataUrl(value: string) {
+function isValidLetterUrl(value: string) {
+  if (value.startsWith("/media/")) {
+    return /\.(pdf|png|jpe?g|webp|docx?)$/i.test(value);
+  }
+
   return /^data:(application\/pdf|image\/png|image\/jpeg|image\/webp|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document);base64,[a-zA-Z0-9+/=]+$/.test(value);
+}
+
+function isValidLetterTemplateUrl(value: string) {
+  if (value.startsWith("/media/")) {
+    return /\.docx$/i.test(value);
+  }
+
+  return /^data:application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document;base64,[a-zA-Z0-9+/=]+$/.test(value);
 }
 
 function isValidSearchlandUrl(value: string) {

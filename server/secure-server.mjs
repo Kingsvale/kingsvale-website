@@ -20,6 +20,7 @@ import {
 import { basename, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
 
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distDir = resolve(rootDir, "dist");
@@ -58,6 +59,9 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".pdf": "application/pdf",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webp": "image/webp"
@@ -404,6 +408,36 @@ async function handleApiRequest(request, response, url) {
     }
 
     await handleImageUpload(request, response, session);
+    return;
+  }
+
+  if (url.pathname === "/api/uploads/letters") {
+    const session = requireSession(request, response);
+    if (!session) {
+      return;
+    }
+
+    if (request.method !== "POST") {
+      sendJson(response, 405, { error: "Method not allowed." });
+      return;
+    }
+
+    await handleLetterUpload(request, response, session);
+    return;
+  }
+
+  if (url.pathname === "/api/letters/generate") {
+    const session = requireSession(request, response);
+    if (!session) {
+      return;
+    }
+
+    if (request.method !== "POST") {
+      sendJson(response, 405, { error: "Method not allowed." });
+      return;
+    }
+
+    await handleLetterGeneration(request, response, session);
     return;
   }
 
@@ -989,6 +1023,99 @@ async function handleImageUpload(request, response, session) {
   });
 }
 
+async function handleLetterUpload(request, response, session) {
+  const contentType = request.headers["content-type"] ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    sendJson(response, 415, { error: "Upload must be multipart/form-data." });
+    return;
+  }
+
+  const body = await readRequestBody(request, 9_000_000);
+  const upload = parseMultipartFile(body, contentType);
+  if (!upload) {
+    sendJson(response, 400, { error: "Letter file is required." });
+    return;
+  }
+
+  if (!isAllowedLetterUpload(upload)) {
+    sendJson(response, 415, { error: "Only PDF, image, DOC and DOCX letter files up to 8MB are supported." });
+    return;
+  }
+
+  const extension = normalizeLetterExtension(upload.filename, upload.contentType);
+  const slug = toSlug(upload.filename.replace(/\.[^.]+$/, "")) || "letter";
+  const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}${extension}`;
+  await mkdir(uploadsDir, { recursive: true });
+  await writeFile(join(uploadsDir, filename), upload.data);
+  await writeAudit("letter_uploaded", request, {
+    user: session.user,
+    filename: upload.filename,
+    bytes: upload.data.length
+  });
+
+  sendJson(response, 201, {
+    file: {
+      name: upload.filename,
+      url: `/media/${filename}`,
+      contentType: upload.contentType,
+      bytes: upload.data.length
+    }
+  });
+}
+
+async function handleLetterGeneration(request, response, session) {
+  const payload = await readJsonBody(request, 1_200_000);
+  const site = normalizeTrackingSite(payload.site ?? {});
+  const validation = validateTrackingSite(site);
+  if (!validation.valid) {
+    sendJson(response, 400, { errors: validation.errors });
+    return;
+  }
+
+  const templateUrl = String(payload.templateUrl ?? site.letterTemplateUrl ?? "");
+  if (!templateUrl) {
+    sendJson(response, 400, { error: "A DOCX letter template is required." });
+    return;
+  }
+
+  let templateBuffer;
+  try {
+    templateBuffer = await readLetterTemplateSource(templateUrl);
+  } catch {
+    sendJson(response, 400, { error: "Letter template could not be loaded from server media." });
+    return;
+  }
+
+  const publicLink = String(payload.publicLink ?? "");
+  try {
+    const qrPng = await createTrackingQrPng(publicLink, site.qrStyle, site.title || site.reference);
+    const generated = generateLetterDocx(templateBuffer, site, publicLink, qrPng);
+    const slug = toSlug(`${site.reference || site.title || "letter"} generated letter`) || "generated-letter";
+    const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}.docx`;
+    await mkdir(uploadsDir, { recursive: true });
+    await writeFile(join(uploadsDir, filename), generated);
+
+    await writeAudit("letter_generated", request, {
+      user: session.user,
+      siteId: site.id,
+      templateUrl,
+      generated: filename
+    });
+
+    sendJson(response, 201, {
+      file: {
+        name: `${site.reference || site.title || "generated"}-letter.docx`,
+        url: `/media/${filename}`,
+        contentType: mimeTypes[".docx"],
+        bytes: generated.length
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    sendJson(response, 500, { error: "Letter could not be generated." });
+  }
+}
+
 function parseMultipartFile(body, contentType) {
   const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
   if (!boundary) {
@@ -1029,6 +1156,58 @@ function parseMultipartFile(body, contentType) {
 
 function isAllowedImageType(contentType) {
   return ["image/jpeg", "image/png", "image/webp", "image/avif"].includes(contentType);
+}
+
+function isAllowedLetterUpload(upload) {
+  if (!upload || upload.data.length > 8_000_000) {
+    return false;
+  }
+
+  const extension = normalizeLetterExtension(upload.filename, upload.contentType);
+  return Boolean(extension);
+}
+
+function normalizeLetterExtension(filename, contentType = "") {
+  const extension = extname(filename).toLowerCase();
+  const allowedByExtension = new Set([".pdf", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx"]);
+  if (allowedByExtension.has(extension)) {
+    return extension;
+  }
+
+  const byType = {
+    "application/pdf": ".pdf",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx"
+  };
+  return byType[contentType] ?? "";
+}
+
+async function readLetterTemplateSource(url) {
+  if (url.startsWith("/media/")) {
+    if (extname(url).toLowerCase() !== ".docx") {
+      throw new Error("Letter template must be DOCX.");
+    }
+    return readFile(resolveMediaPath(url));
+  }
+
+  const dataUrl = url.match(/^data:application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document;base64,([a-zA-Z0-9+/=]+)$/);
+  if (dataUrl) {
+    return Buffer.from(dataUrl[1], "base64");
+  }
+
+  throw new Error("Unsupported letter template source.");
+}
+
+function resolveMediaPath(url) {
+  const safePath = normalize(decodeURIComponent(url.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
+  const candidate = resolve(uploadsDir, safePath);
+  if (!candidate.startsWith(uploadsDir)) {
+    throw new Error("Media path is outside uploads.");
+  }
+  return candidate;
 }
 
 async function readCmsStore() {
@@ -1393,8 +1572,12 @@ function validateTrackingSite(site) {
     errors.push({ path: "mapEmbedUrl", message: "Google My Maps embed must be a safe Google map URL." });
   }
   validateOptionalText(errors, "privateNotes", site.privateNotes, "Private note", 1200);
+  validateOptionalText(errors, "letterTemplateName", site.letterTemplateName, "Letter template filename", 160);
+  if (site.letterTemplateUrl && (site.letterTemplateUrl.length > 7_000_000 || !isSafeLetterTemplateUrl(site.letterTemplateUrl))) {
+    errors.push({ path: "letterTemplateUrl", message: "Letter template must be a DOCX file stored on the server." });
+  }
   validateOptionalText(errors, "letterFileName", site.letterFileName, "Letter filename", 160);
-  if (site.letterFileUrl && (site.letterFileUrl.length > 7_000_000 || !isSafeLetterDataUrl(site.letterFileUrl))) {
+  if (site.letterFileUrl && (site.letterFileUrl.length > 7_000_000 || !isSafeLetterUrl(site.letterFileUrl))) {
     errors.push({ path: "letterFileUrl", message: "Letter upload must be a PDF, image or Word document under the upload limit." });
   }
   validateOptionalText(errors, "searchlandUrl", site.searchlandUrl, "Searchland URL", 1200);
@@ -1557,6 +1740,8 @@ function normalizeTrackingSite(site) {
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     privateNotes: site.privateNotes ?? "",
+    letterTemplateName: site.letterTemplateName ?? "",
+    letterTemplateUrl: site.letterTemplateUrl ?? "",
     letterFileName: site.letterFileName ?? "",
     letterFileUrl: site.letterFileUrl ?? "",
     searchlandUrl: site.searchlandUrl ?? "",
@@ -1604,6 +1789,8 @@ function publicTrackingSite(site) {
     trackingStatus,
     trackingLastCheckedAt,
     privateNotes,
+    letterTemplateName,
+    letterTemplateUrl,
     letterFileName,
     letterFileUrl,
     searchlandUrl,
@@ -1622,6 +1809,8 @@ function publicTrackingSite(site) {
   void trackingStatus;
   void trackingLastCheckedAt;
   void privateNotes;
+  void letterTemplateName;
+  void letterTemplateUrl;
   void letterFileName;
   void letterFileUrl;
   void searchlandUrl;
@@ -1985,8 +2174,30 @@ function isSafeMapEmbedUrl(value) {
   }
 }
 
-function isSafeLetterDataUrl(value) {
+function isSafeLetterUrl(value) {
+  if (value.startsWith("/media/")) {
+    try {
+      resolveMediaPath(value);
+      return [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx"].includes(extname(value).toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
   return /^data:(application\/pdf|image\/png|image\/jpeg|image\/webp|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document);base64,[a-zA-Z0-9+/=]+$/.test(value);
+}
+
+function isSafeLetterTemplateUrl(value) {
+  if (value.startsWith("/media/")) {
+    try {
+      resolveMediaPath(value);
+      return extname(value).toLowerCase() === ".docx";
+    } catch {
+      return false;
+    }
+  }
+
+  return /^data:application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document;base64,[a-zA-Z0-9+/=]+$/.test(value);
 }
 
 function isSafeSearchlandUrl(value) {

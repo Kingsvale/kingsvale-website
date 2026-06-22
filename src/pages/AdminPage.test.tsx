@@ -129,7 +129,14 @@ describe("AdminPage", () => {
     expect(document.querySelector("#summary")).not.toBeInTheDocument();
     expect(document.querySelector("#private-notes")).toBeInTheDocument();
     expect(document.querySelector("#searchland-url")).toBeInTheDocument();
-    expect(screen.getByText("No letter uploaded")).toBeInTheDocument();
+    expect(screen.getByText("No template uploaded")).toBeInTheDocument();
+    expect(screen.getByText("No generated letter")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate letter/i })).toBeDisabled();
+    expect(screen.getByText("{{legal_name}}")).toBeInTheDocument();
+    expect(screen.getByText("Initial letter template")).toHaveAttribute(
+      "href",
+      "/templates/kingsvale-initial-letter-template.docx"
+    );
 
     fireEvent.change(document.querySelector("#site-address") as HTMLInputElement, {
       target: { value: "12 Meadow Lane, Wokingham" }

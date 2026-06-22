@@ -1982,6 +1982,89 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   justify-content: flex-end;
 }
 
+.letter-template {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px dashed rgba(70, 59, 48, 0.22);
+  background: rgba(251, 248, 242, 0.72);
+}
+
+.letter-template__intro {
+  display: grid;
+  gap: 12px;
+}
+
+.letter-template__intro > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.letter-template__intro svg {
+  width: 22px;
+  height: 22px;
+  color: #365e7e;
+  flex: 0 0 auto;
+}
+
+.letter-template__intro strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.letter-template__intro small,
+.letter-generator-actions small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.letter-template__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.letter-template__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.letter-template__links a {
+  color: #365e7e;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.letter-template__tokens code {
+  padding: 5px 8px;
+  border: 1px solid rgba(70, 59, 48, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #365e7e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.letter-generator-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.letter-generator-actions small {
+  max-width: 420px;
+}
+
 .qr-designer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);

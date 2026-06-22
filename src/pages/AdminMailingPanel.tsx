@@ -9,7 +9,8 @@ import {
 import {
   checkMailingTrackingStatus,
   listTrackingSites,
-  saveTrackingSite
+  saveTrackingSite,
+  uploadLetterFile
 } from "../lib/cmsApi";
 import {
   isRemailReminderOverdue,
@@ -177,16 +178,26 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     }
 
     if (!isAllowedLetterFile(file)) {
-      setStatus("Letter upload must be a PDF, image or Word document under 5MB.");
+      setStatus("Letter upload must be a PDF, image or Word document under 8MB.");
       return;
     }
 
-    const dataUrl = await readFileAsDataUrl(file);
-    updateDraft((site) => {
-      site.letterFileName = file.name;
-      site.letterFileUrl = dataUrl;
-    });
-    setStatus("Letter attached. Save mailing to keep it.");
+    setBusy(true);
+    try {
+      const upload = await uploadLetterFile(file);
+      if (!upload) {
+        setStatus("Letter could not be uploaded to the server.");
+        return;
+      }
+
+      updateDraft((site) => {
+        site.letterFileName = upload.name;
+        site.letterFileUrl = upload.url;
+      });
+      setStatus("Letter uploaded to server. Save mailing to keep it.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function clearLetterUpload() {
@@ -517,14 +528,5 @@ function isAllowedLetterFile(file: File) {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   ]);
-  return file.size <= 5_000_000 && allowedTypes.has(file.type);
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
-    reader.addEventListener("error", () => reject(reader.error ?? new Error("File could not be read.")));
-    reader.readAsDataURL(file);
-  });
+  return file.size <= 8_000_000 && (allowedTypes.has(file.type) || /\.(pdf|png|jpe?g|webp|docx?)$/i.test(file.name));
 }

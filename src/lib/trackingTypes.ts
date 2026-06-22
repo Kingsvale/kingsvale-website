@@ -73,6 +73,8 @@ export type TrackingSite = {
   summary: string;
   mapEmbedUrl: string;
   privateNotes: string;
+  letterTemplateName: string;
+  letterTemplateUrl: string;
   letterFileName: string;
   letterFileUrl: string;
   searchlandUrl: string;

@@ -210,6 +210,66 @@ export async function uploadCmsImage(file: File): Promise<ImageAsset | null> {
   }
 }
 
+export type UploadedLetterFile = {
+  name: string;
+  url: string;
+  contentType: string;
+  bytes: number;
+};
+
+export async function uploadLetterFile(file: File): Promise<UploadedLetterFile | null> {
+  try {
+    const formData = new FormData();
+    formData.set("file", file);
+    const response = await fetch("/api/uploads/letters", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { file: UploadedLetterFile };
+    return payload.file;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateLetterFromTemplate(
+  site: TrackingSite,
+  publicLink: string
+): Promise<UploadedLetterFile | null> {
+  try {
+    const generationSite = {
+      ...site,
+      letterFileUrl: site.letterFileUrl.startsWith("data:") ? "" : site.letterFileUrl
+    };
+    const response = await fetch("/api/letters/generate", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+      body: JSON.stringify({
+        site: generationSite,
+        templateUrl: generationSite.letterTemplateUrl,
+        publicLink
+      })
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { file: UploadedLetterFile };
+    return payload.file;
+  } catch {
+    return null;
+  }
+}
+
 export async function listTrackingSites(): Promise<TrackingSite[]> {
   try {
     const response = await fetch("/api/tracking-sites", {

@@ -27,10 +27,12 @@ import { TrackingQrCode } from "../components/TrackingQrCode";
 import {
   archiveTrackingSite,
   deleteTrackingSite,
+  generateLetterFromTemplate,
   getTrackingStorageStatus,
   listTrackingSites,
   saveTrackingSite,
-  subscribeTrackingStorageStatus
+  subscribeTrackingStorageStatus,
+  uploadLetterFile
 } from "../lib/cmsApi";
 import {
   createTrackingResource,
@@ -56,6 +58,20 @@ import {
 
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
+const letterTokens = [
+  "{{legal_name}}",
+  "{{address}}",
+  "{{street}}",
+  "{{address_line_2}}",
+  "{{town}}",
+  "{{postal_code}}",
+  "{{council}}",
+  "{{tracking_link}}"
+];
+const starterLetterTemplates = [
+  ["/templates/kingsvale-initial-letter-template.docx", "Initial letter template"],
+  ["/templates/kingsvale-follow-up-letter-template.docx", "Follow-up letter template"]
+] as const;
 
 function TrackingTextInput({ id, label, ...props }: ComponentProps<typeof AdminTextInput>) {
   return <AdminTextInput {...props} id={id ?? toId(label)} label={label} />;
@@ -276,6 +292,75 @@ export function AdminSitesPanel() {
     });
   }
 
+  async function handleLetterTemplateUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!isAllowedLetterTemplateFile(file)) {
+      setStatus("Letter template must be a DOCX Word document under 8MB.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const upload = await uploadLetterFile(file);
+      if (!upload) {
+        setStatus("Template could not be uploaded to the server. Generation needs server storage.");
+        return;
+      }
+
+      updateDraft((site) => {
+        site.letterTemplateName = upload.name;
+        site.letterTemplateUrl = upload.url;
+      });
+      setStatus("Letter template uploaded to server. Save the site, or generate a letter now.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGenerateLetter() {
+    if (!draft) {
+      return;
+    }
+
+    if (!draft.letterTemplateUrl) {
+      setStatus("Upload a DOCX letter template before generating.");
+      return;
+    }
+
+    const result = validateTrackingSite(draft);
+    if (!result.valid) {
+      setStatus("Resolve the site guardrails before generating a letter.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const generated = await generateLetterFromTemplate(draft, publicLink);
+      if (!generated) {
+        setStatus("Letter could not be generated. Check the template is a server-uploaded DOCX.");
+        return;
+      }
+
+      const nextDraft = {
+        ...draft,
+        letterFileName: generated.name,
+        letterFileUrl: generated.url
+      };
+      const saved = await saveTrackingSite(nextDraft);
+      setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
+      setDraft(saved);
+      setStatus("Letter generated with the site details and tracked QR code.");
+    } catch {
+      setStatus("Letter could not be generated.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleLetterUpload(files: FileList | null) {
     const file = files?.[0];
     if (!file) {
@@ -283,16 +368,34 @@ export function AdminSitesPanel() {
     }
 
     if (!isAllowedLetterFile(file)) {
-      setStatus("Letter upload must be a PDF, image or Word document under 5MB.");
+      setStatus("Letter upload must be a PDF, image or Word document under 8MB.");
       return;
     }
 
-    const dataUrl = await readFileAsDataUrl(file);
+    setBusy(true);
+    try {
+      const upload = await uploadLetterFile(file);
+      if (!upload) {
+        setStatus("Letter could not be uploaded to the server.");
+        return;
+      }
+
+      updateDraft((site) => {
+        site.letterFileName = upload.name;
+        site.letterFileUrl = upload.url;
+      });
+      setStatus("Letter uploaded to server. Save the site to keep it.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearLetterTemplate() {
     updateDraft((site) => {
-      site.letterFileName = file.name;
-      site.letterFileUrl = dataUrl;
+      site.letterTemplateName = "";
+      site.letterTemplateUrl = "";
     });
-    setStatus("Letter attached. Save the site to keep it.");
+    setStatus("Letter template removed. Save the site to keep this change.");
   }
 
   function clearLetterUpload() {
@@ -539,7 +642,7 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateDraft((site) => { site.title = value; })}
                   />
                   <TrackingTextInput
-                    label="Customer name"
+                    label="Legal owner / customer name"
                     value={draft.customerName}
                     maxLength={trackingFieldLimits.customerName}
                     error={errorsByPath.customerName}
@@ -620,7 +723,7 @@ export function AdminSitesPanel() {
 
               <section className="admin-panel" aria-labelledby="site-private-title">
                 <div className="admin-section-heading">
-                  <h2 id="site-private-title">Editor-only notes and letter</h2>
+                  <h2 id="site-private-title">Editor-only notes and letters</h2>
                 </div>
                 <TrackingTextarea
                   label="Private notes"
@@ -629,12 +732,81 @@ export function AdminSitesPanel() {
                   error={errorsByPath.privateNotes}
                   onChange={(value) => updateDraft((site) => { site.privateNotes = value; })}
                 />
+                <div className="letter-template">
+                  <div className="letter-template__intro">
+                    <div>
+                      <FileText aria-hidden="true" />
+                      <span>
+                        <strong>Template placeholders</strong>
+                        <small>
+                          Replace only owner/address/legal fields in Word. The QR image already positioned in the
+                          template will be swapped for this site&apos;s tracking QR.
+                        </small>
+                      </span>
+                    </div>
+                    <div className="letter-template__tokens" aria-label="Supported letter placeholders">
+                      {letterTokens.map((token) => (
+                        <code key={token}>{token}</code>
+                      ))}
+                    </div>
+                    <div className="letter-template__links" aria-label="Starter letter templates">
+                      {starterLetterTemplates.map(([href, label]) => (
+                        <a key={href} href={href} download>
+                          {label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 <div className="letter-upload">
                   <div>
                     <FileText aria-hidden="true" />
                     <span>
-                      <strong>{draft.letterFileName || "No letter uploaded"}</strong>
-                      <small>Visible in Studio and Mailing only.</small>
+                      <strong>{draft.letterTemplateName || "No template uploaded"}</strong>
+                      <small>Upload a DOCX with placeholders like {"{{legal_name}}"} and {"{{postal_code}}"}.</small>
+                    </span>
+                  </div>
+                  <div className="letter-upload__actions">
+                    {draft.letterTemplateUrl && (
+                      <a href={draft.letterTemplateUrl} download={draft.letterTemplateName || "letter-template.docx"} className="admin-open">
+                        <ExternalLink aria-hidden="true" />
+                        Open
+                      </a>
+                    )}
+                    <label className="admin-small">
+                      Upload template
+                      <input
+                        className="sr-only"
+                        type="file"
+                        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event) => void handleLetterTemplateUpload(event.target.files)}
+                      />
+                    </label>
+                    {draft.letterTemplateUrl && (
+                      <button type="button" className="admin-ghost" onClick={clearLetterTemplate}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="letter-generator-actions">
+                  <button
+                    type="button"
+                    className="admin-save"
+                    onClick={handleGenerateLetter}
+                    disabled={busy || !validation.valid || !draft.letterTemplateUrl}
+                  >
+                    <FileText aria-hidden="true" />
+                    {busy ? "Generating" : "Generate letter"}
+                  </button>
+                  <small>Creates a DOCX from the template, fills legal/address placeholders, and inserts the tracked QR.</small>
+                </div>
+                <div className="letter-upload">
+                  <div>
+                    <FileText aria-hidden="true" />
+                    <span>
+                      <strong>{draft.letterFileName || "No generated letter"}</strong>
+                      <small>Generated or manually attached letter. Visible in Studio and Mailing only.</small>
                     </span>
                   </div>
                   <div className="letter-upload__actions">
@@ -645,7 +817,7 @@ export function AdminSitesPanel() {
                       </a>
                     )}
                     <label className="admin-small">
-                      Upload letter
+                      Upload final letter
                       <input
                         className="sr-only"
                         type="file"
@@ -859,16 +1031,14 @@ function isAllowedLetterFile(file: File) {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   ]);
-  return file.size <= 5_000_000 && allowedTypes.has(file.type);
+  return file.size <= 8_000_000 && (allowedTypes.has(file.type) || /\.(pdf|png|jpe?g|webp|docx?)$/i.test(file.name));
 }
 
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
-    reader.addEventListener("error", () => reject(reader.error ?? new Error("File could not be read.")));
-    reader.readAsDataURL(file);
-  });
+function isAllowedLetterTemplateFile(file: File) {
+  return file.size <= 8_000_000 && (
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    /\.docx$/i.test(file.name)
+  );
 }
 
 function toTrackingErrorMap(errors: TrackingValidationError[]) {

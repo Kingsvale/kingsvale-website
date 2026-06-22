@@ -13,8 +13,8 @@
       "summary": "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
       "mapEmbedUrl": "https://www.google.com/maps/d/u/1/embed?mid=1XnqnGDyqL_EylhqEroHdho-E-YvL6m0&ehbc=2E312F",
       "privateNotes": "",
-      "letterFileName": "",
-      "letterFileUrl": "",
+      "letterFileName": "KV0111-letter.docx",
+      "letterFileUrl": "/media/kv0111-generated-letter-1782122585964-0ce9feb0.docx",
       "searchlandUrl": "https://app.searchland.co.uk/preview?token=6a1409a0-11f2-4723-ba23-e7c5b7ae1c78&titleNo=BK255156&custom=false",
       "currentStatus": "planning",
       "statusNote": "Kingsvale is interested in your land.",
@@ -86,8 +86,10 @@
       "mailingNotes": "",
       "mailingLastUpdatedAt": "2026-06-21T20:50:12.835Z",
       "createdAt": "2026-06-21T13:56:44.555Z",
-      "updatedAt": "2026-06-21T20:50:12.835Z",
-      "archived": false
+      "updatedAt": "2026-06-22T10:03:06.004Z",
+      "archived": false,
+      "letterTemplateName": "kingsvale-follow-up-letter-template.docx",
+      "letterTemplateUrl": "/media/kingsvale-follow-up-letter-template-1782122582464-1f1b9061.docx"
     },
     {
       "id": "tracking-1781314978467-ujai",
@@ -176,8 +178,10 @@
       "mailingLastUpdatedAt": "2026-06-13T01:46:28.103Z",
       "createdAt": "2026-06-13T01:42:58.467Z",
       "updatedAt": "2026-06-13T01:46:29.016Z",
-      "archived": false
+      "archived": false,
+      "letterTemplateName": "",
+      "letterTemplateUrl": ""
     }
   ],
-  "updatedAt": "2026-06-21T21:00:37.716Z"
+  "updatedAt": "2026-06-22T10:03:06.004Z"
 }

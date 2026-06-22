@@ -1,12 +1,16 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { createReadStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, extname, join, normalize, resolve } from "node:path";
+import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ViteDevServer } from "vite";
 import { normalizeTrackingSite } from "./src/lib/trackingNormalize";
 import type { TrackingSite } from "./src/lib/trackingTypes";
 import { validateTrackingSite } from "./src/lib/trackingValidation";
+// @ts-expect-error server helper is intentionally authored as runtime ESM for production Node.
+import { createTrackingQrPng, generateLetterDocx } from "./server/letter-generator.mjs";
 
 export default defineConfig({
   plugins: [devTrackingApi(), react()],
@@ -63,6 +67,16 @@ export default defineConfig({
 });
 
 const devTrackingStoreFile = resolve("data/dev-tracking-sites.json");
+const devUploadsDir = resolve("data/uploads");
+const devMimeTypes: Record<string, string> = {
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".webp": "image/webp"
+};
 
 type DevTrackingStore = {
   sites: TrackingSite[];
@@ -75,12 +89,37 @@ function devTrackingApi(): Plugin {
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (request, response, next) => {
         const url = new URL(request.url ?? "/", "http://127.0.0.1");
+        if (url.pathname.startsWith("/media/")) {
+          await serveDevMedia(url.pathname, response);
+          return;
+        }
+
         if (url.pathname === "/api/backup" && request.method === "PUT") {
           try {
             await handleDevBackupImport(request, response);
           } catch (error) {
             console.error(error);
             sendDevJson(response, 500, { error: "Development backup import failed." });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/uploads/letters") {
+          try {
+            await handleDevLetterUpload(request, response);
+          } catch (error) {
+            console.error(error);
+            sendDevJson(response, 500, { error: "Development letter upload failed." });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/letters/generate") {
+          try {
+            await handleDevLetterGeneration(request, response);
+          } catch (error) {
+            console.error(error);
+            sendDevJson(response, 500, { error: "Development letter generation failed." });
           }
           return;
         }
@@ -238,6 +277,78 @@ async function handleDevBackupImport(request: IncomingMessage, response: ServerR
   sendDevJson(response, 200, { ok: true, importedAt: updatedAt, mode, storage: "dev-file" });
 }
 
+async function handleDevLetterUpload(request: IncomingMessage, response: ServerResponse) {
+  if (request.method !== "POST") {
+    sendDevJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const contentType = request.headers["content-type"] ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    sendDevJson(response, 415, { error: "Upload must be multipart/form-data." });
+    return;
+  }
+
+  const body = await readDevRequestBody(request, 9_000_000);
+  const upload = parseDevMultipartFile(body, contentType);
+  if (!upload || !isAllowedDevLetterUpload(upload)) {
+    sendDevJson(response, 415, { error: "Only PDF, image, DOC and DOCX letter files up to 8MB are supported." });
+    return;
+  }
+
+  const extension = normalizeDevLetterExtension(upload.filename, upload.contentType);
+  const slug = toDevSlug(upload.filename.replace(/\.[^.]+$/, "")) || "letter";
+  const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}${extension}`;
+  await mkdir(devUploadsDir, { recursive: true });
+  await writeFile(join(devUploadsDir, filename), upload.data);
+  sendDevJson(response, 201, {
+    file: {
+      name: upload.filename,
+      url: `/media/${filename}`,
+      contentType: upload.contentType,
+      bytes: upload.data.length
+    }
+  });
+}
+
+async function handleDevLetterGeneration(request: IncomingMessage, response: ServerResponse) {
+  if (request.method !== "POST") {
+    sendDevJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  const payload = await readDevJsonBody(request, 1_200_000);
+  const site = normalizeTrackingSite(payload.site ?? {} as TrackingSite);
+  const validation = validateTrackingSite(site);
+  if (!validation.valid) {
+    sendDevJson(response, 400, { errors: validation.errors });
+    return;
+  }
+
+  const templateUrl = String(payload.templateUrl ?? site.letterTemplateUrl ?? "");
+  if (!templateUrl.startsWith("/media/") || extname(templateUrl).toLowerCase() !== ".docx") {
+    sendDevJson(response, 400, { error: "A server-uploaded DOCX template is required." });
+    return;
+  }
+
+  const template = await readFile(resolveDevMediaPath(templateUrl));
+  const publicLink = String(payload.publicLink ?? "");
+  const qrPng = await createTrackingQrPng(publicLink, site.qrStyle, site.title || site.reference);
+  const generated = generateLetterDocx(template, site, publicLink, qrPng);
+  const slug = toDevSlug(`${site.reference || site.title || "letter"} generated letter`) || "generated-letter";
+  const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}.docx`;
+  await mkdir(devUploadsDir, { recursive: true });
+  await writeFile(join(devUploadsDir, filename), generated);
+  sendDevJson(response, 201, {
+    file: {
+      name: `${site.reference || site.title || "generated"}-letter.docx`,
+      url: `/media/${filename}`,
+      contentType: devMimeTypes[".docx"],
+      bytes: generated.length
+    }
+  });
+}
+
 async function updateDevTrackingSite(id: string, recipe: (site: TrackingSite) => TrackingSite) {
   const store = await readDevTrackingStore();
   const target = store.sites.find((site) => site.id === id);
@@ -271,6 +382,11 @@ async function writeDevTrackingStore(store: DevTrackingStore) {
 }
 
 async function readDevJsonBody(request: IncomingMessage, limit: number) {
+  const raw = (await readDevRequestBody(request, limit)).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function readDevRequestBody(request: IncomingMessage, limit: number) {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -282,8 +398,94 @@ async function readDevJsonBody(request: IncomingMessage, limit: number) {
     chunks.push(buffer);
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : {};
+  return Buffer.concat(chunks);
+}
+
+function parseDevMultipartFile(body: Buffer, contentType: string) {
+  const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
+  if (!boundary) {
+    return null;
+  }
+
+  const boundaryBytes = Buffer.from(`--${boundary}`);
+  let start = body.indexOf(boundaryBytes);
+  while (start !== -1) {
+    const next = body.indexOf(boundaryBytes, start + boundaryBytes.length);
+    if (next === -1) {
+      break;
+    }
+
+    const part = body.subarray(start + boundaryBytes.length + 2, next - 2);
+    const separator = part.indexOf(Buffer.from("\r\n\r\n"));
+    if (separator !== -1) {
+      const rawHeaders = part.subarray(0, separator).toString("utf8");
+      const data = part.subarray(separator + 4);
+      const filename = rawHeaders.match(/filename="([^"]+)"/)?.[1];
+      const fieldName = rawHeaders.match(/name="([^"]+)"/)?.[1];
+      const partContentType = rawHeaders.match(/Content-Type:\s*([^\r\n]+)/i)?.[1];
+
+      if (filename && (fieldName === "file" || fieldName === "letter")) {
+        return {
+          filename: basename(filename),
+          contentType: partContentType ?? "application/octet-stream",
+          data
+        };
+      }
+    }
+
+    start = next;
+  }
+
+  return null;
+}
+
+function isAllowedDevLetterUpload(upload: { filename: string; contentType: string; data: Buffer }) {
+  return upload.data.length <= 8_000_000 && Boolean(normalizeDevLetterExtension(upload.filename, upload.contentType));
+}
+
+function normalizeDevLetterExtension(filename: string, contentType = "") {
+  const extension = extname(filename).toLowerCase();
+  if ([".pdf", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx"].includes(extension)) {
+    return extension;
+  }
+
+  const byType: Record<string, string> = {
+    "application/pdf": ".pdf",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx"
+  };
+  return byType[contentType] ?? "";
+}
+
+async function serveDevMedia(pathname: string, response: ServerResponse) {
+  const candidate = resolveDevMediaPath(pathname);
+  try {
+    await readFile(candidate);
+  } catch {
+    sendDevJson(response, 404, { error: "Media not found." });
+    return;
+  }
+
+  response.statusCode = 200;
+  response.setHeader("Content-Type", devMimeTypes[extname(candidate).toLowerCase()] ?? "application/octet-stream");
+  response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  createReadStream(candidate).pipe(response);
+}
+
+function resolveDevMediaPath(pathname: string) {
+  const safePath = normalize(decodeURIComponent(pathname.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
+  const candidate = resolve(devUploadsDir, safePath);
+  if (!candidate.startsWith(devUploadsDir)) {
+    throw new Error("Media path is outside uploads.");
+  }
+  return candidate;
+}
+
+function toDevSlug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60);
 }
 
 function sendDevJson(response: ServerResponse, status: number, payload: unknown) {
@@ -303,6 +505,8 @@ function publicDevTrackingSite(site: TrackingSite) {
     trackingStatus,
     trackingLastCheckedAt,
     privateNotes,
+    letterTemplateName,
+    letterTemplateUrl,
     letterFileName,
     letterFileUrl,
     searchlandUrl,
@@ -321,6 +525,8 @@ function publicDevTrackingSite(site: TrackingSite) {
   void trackingStatus;
   void trackingLastCheckedAt;
   void privateNotes;
+  void letterTemplateName;
+  void letterTemplateUrl;
   void letterFileName;
   void letterFileUrl;
   void searchlandUrl;
