@@ -22,6 +22,7 @@ const publicJsSizes = await Promise.all(publicJsFiles.map((file) => gzipSize(fil
 const cssSizes = await Promise.all(cssFiles.map((file) => gzipSize(file)));
 const routeHtmlCount = (await listFiles(distDir)).filter((file) => file.endsWith("index.html")).length;
 const indexHtml = await readFile(join(distDir, "index.html"), "utf8");
+const publicChunkStudioImports = await findPublicStudioChunkImports(jsFiles);
 
 const report = {
   largestJavaScriptGzip: Math.max(0, ...jsSizes),
@@ -29,7 +30,8 @@ const report = {
   totalJavaScriptGzip: sum(jsSizes),
   totalCssGzip: sum(cssSizes),
   prerenderedRoutes: routeHtmlCount,
-  studioChunkPubliclyPreloaded: /\/assets\/studio-[^"]+\.js/.test(indexHtml)
+  studioChunkPubliclyPreloaded: /\/assets\/studio-[^"]+\.js/.test(indexHtml),
+  publicChunkStudioImports: publicChunkStudioImports.length > 0 ? publicChunkStudioImports.join(", ") : "none"
 };
 
 const failures = [];
@@ -49,6 +51,9 @@ if (report.prerenderedRoutes < budgets.prerenderedRoutes) {
 }
 if (report.studioChunkPubliclyPreloaded) {
   failures.push("The private studio chunk is referenced from public index.html.");
+}
+if (publicChunkStudioImports.length > 0) {
+  failures.push(`Public chunks import the private studio chunk: ${publicChunkStudioImports.join(", ")}.`);
 }
 
 console.table(report);
@@ -85,4 +90,18 @@ function sum(values) {
 
 function isPrivateJavaScriptChunk(file) {
   return /^studio-[\w-]+\.js$/.test(basename(file));
+}
+
+async function findPublicStudioChunkImports(files) {
+  const studioChunkImportPattern = /(?:from|import\()\s*["']\.\/studio-[^"']+\.js["']|\/assets\/studio-[^"']+\.js/;
+  const leaks = [];
+
+  for (const file of files.filter((item) => !isPrivateJavaScriptChunk(item))) {
+    const source = await readFile(file, "utf8");
+    if (studioChunkImportPattern.test(source)) {
+      leaks.push(basename(file));
+    }
+  }
+
+  return leaks;
 }

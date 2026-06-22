@@ -1,6 +1,97 @@
 {
   "sites": [
     {
+      "id": "tracking-1782123134239-41xf",
+      "token": "RJEKoS4INqJjFNRd-hL3WO-B",
+      "title": "Skibidi rizz test 67",
+      "customerName": "Skibidi",
+      "siteAddress": "6 Nigger Court, Chinky Street, Skibidia, 67H 69K",
+      "reference": "KV0112",
+      "region": "Uncategorised",
+      "ownerContactName": "",
+      "contactPriority": "low",
+      "summary": "View the title area Kingsvale is interested in so the proposal can be understood clearly.",
+      "mapEmbedUrl": "",
+      "privateNotes": "",
+      "letterTemplateName": "kingsvale-follow-up-letter-template (1).docx",
+      "letterTemplateUrl": "/media/kingsvale-follow-up-letter-template-1-1782123269967-9df93e91.docx",
+      "letterFileName": "KV0112-letter.docx",
+      "letterFileUrl": "/media/kv0112-generated-letter-1782125711938-41e59e8b.docx",
+      "searchlandUrl": "",
+      "currentStatus": "planning",
+      "statusNote": "Kingsvale is reviewing this land interest opportunity.",
+      "milestones": [
+        {
+          "id": "milestone-1782123134239-jefs",
+          "label": "Planning details prepared",
+          "state": "active",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1782123134239-klam",
+          "label": "Application submitted",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1782123134239-5pvl",
+          "label": "Council review",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1782123134239-p318",
+          "label": "Decision issued",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        },
+        {
+          "id": "milestone-1782123134239-jt6h",
+          "label": "Construction progress",
+          "state": "pending",
+          "date": "",
+          "note": ""
+        }
+      ],
+      "resources": [],
+      "qrStyle": {
+        "foreground": "#22211d",
+        "background": "#fbf8f2",
+        "accent": "#32d926",
+        "dotRoundness": 48,
+        "finderRoundness": 24,
+        "frameRoundness": 42,
+        "frameCut": 0,
+        "frameLabel": "Scan to view the plot",
+        "includeLogo": true
+      },
+      "council": {
+        "mode": "none",
+        "councilName": "",
+        "applicationReference": "",
+        "apiBaseUrl": "",
+        "lastCheckedAt": null,
+        "lastSyncStatus": "Not configured"
+      },
+      "mailingStatus": "not-mailed",
+      "firstMailedAt": "",
+      "lastMailedAt": "",
+      "royalMailTrackingNumber": "",
+      "trackingStatus": "Tracking unavailable",
+      "trackingLastCheckedAt": null,
+      "remailReminderDays": 14,
+      "remailReminderDate": "",
+      "mailingNotes": "",
+      "mailingLastUpdatedAt": "2026-06-22T10:12:14.238Z",
+      "createdAt": "2026-06-22T10:12:14.238Z",
+      "updatedAt": "2026-06-22T10:55:11.981Z",
+      "archived": false
+    },
+    {
       "id": "tracking-1782050204555-2atz",
       "token": "zy_Xcflz7B54FsJRrpiHLEVW",
       "title": "6 Petworth Court, Helston Lane",
@@ -183,5 +274,5 @@
       "letterTemplateUrl": ""
     }
   ],
-  "updatedAt": "2026-06-22T10:03:06.004Z"
+  "updatedAt": "2026-06-22T10:55:11.981Z"
 }

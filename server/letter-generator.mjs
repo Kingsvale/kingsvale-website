@@ -5,6 +5,9 @@ import { buildStyledQrSvg, safeColor, WORD_QR_EXPORT_SIZE } from "../src/lib/tra
 const textNodePattern = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
 const xmlEntryPattern = /^word\/(?!_rels\/).+\.xml$/;
 const wordRelationshipPattern = /<Relationship\b[^>]*\/>/g;
+const maxDocxEntries = 600;
+const maxDocxEntryBytes = 12_000_000;
+const maxDocxUncompressedBytes = 40_000_000;
 
 export async function createTrackingQrPng(value, style = {}, title = "") {
   const svg = buildStyledQrSvg(value || "https://www.kingsvalehomes.co.uk", style, title, {
@@ -134,8 +137,21 @@ function readZip(buffer) {
   const centralDirectoryOffset = source.readUInt32LE(eocdOffset + 16);
   const entries = [];
   let offset = centralDirectoryOffset;
+  let uncompressedBytes = 0;
+
+  if (entryCount > maxDocxEntries) {
+    throw new Error("DOCX template contains too many files.");
+  }
+
+  if (centralDirectoryOffset >= source.length) {
+    throw new Error("DOCX central directory is outside the file.");
+  }
 
   for (let index = 0; index < entryCount; index += 1) {
+    if (offset + 46 > source.length) {
+      throw new Error("DOCX central directory is truncated.");
+    }
+
     if (source.readUInt32LE(offset) !== 0x02014b50) {
       throw new Error("DOCX central directory is invalid.");
     }
@@ -148,9 +164,22 @@ function readZip(buffer) {
     const localHeaderOffset = source.readUInt32LE(offset + 42);
     const name = source.subarray(offset + 46, offset + 46 + filenameLength).toString("utf8");
 
+    if (offset + 46 + filenameLength + extraLength + commentLength > source.length) {
+      throw new Error("DOCX central directory entry is truncated.");
+    }
+
+    if (localHeaderOffset + 30 > source.length || source.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      throw new Error(`DOCX entry ${name || index} has an invalid local header.`);
+    }
+
     const localNameLength = source.readUInt16LE(localHeaderOffset + 26);
     const localExtraLength = source.readUInt16LE(localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataStart > source.length || dataEnd > source.length) {
+      throw new Error(`DOCX entry ${name || index} is truncated.`);
+    }
+
     const compressedData = source.subarray(dataStart, dataStart + compressedSize);
     const data = method === 0
       ? Buffer.from(compressedData)
@@ -160,6 +189,15 @@ function readZip(buffer) {
 
     if (!data) {
       throw new Error(`DOCX entry ${name} uses unsupported compression method ${method}.`);
+    }
+
+    if (data.length > maxDocxEntryBytes) {
+      throw new Error(`DOCX entry ${name || index} is too large.`);
+    }
+
+    uncompressedBytes += data.length;
+    if (uncompressedBytes > maxDocxUncompressedBytes) {
+      throw new Error("DOCX template expands to too much data.");
     }
 
     entries.push({ name, data, method });

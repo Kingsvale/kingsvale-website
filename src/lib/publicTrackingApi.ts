@@ -1,10 +1,9 @@
 import {
-  findLocalTrackingSiteByToken,
-  loadLocalTrackingSites,
-  normalizeTrackingSite
-} from "./trackingStorage";
+  findPublicLocalTrackingSiteByToken,
+  loadPublicLocalTrackingSites,
+  normalizePublicTrackingSite
+} from "./trackingLocalRead";
 import type { TrackingSite } from "./trackingTypes";
-import { isLocalDemoRuntime } from "./runtimeMode";
 
 export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
   try {
@@ -14,13 +13,13 @@ export async function fetchTrackingSiteByToken(token: string): Promise<TrackingS
     });
 
     if (!response.ok) {
-      return isLocalDemoRuntime() ? findLocalTrackingSiteByToken(token) : null;
+      return isLocalDemoRuntime() ? findPublicLocalTrackingSiteByToken(token) : null;
     }
 
     const payload = (await response.json()) as { site: TrackingSite | null };
-    return payload.site ? normalizeTrackingSite(payload.site) : null;
+    return payload.site ? normalizePublicTrackingSite(payload.site) : null;
   } catch {
-    return isLocalDemoRuntime() ? findLocalTrackingSiteByToken(token) : null;
+    return isLocalDemoRuntime() ? findPublicLocalTrackingSiteByToken(token) : null;
   }
 }
 
@@ -38,7 +37,7 @@ export async function lookupTrackingSite(reference: string, postcode: string): P
     }
 
     const payload = (await response.json()) as { site: TrackingSite | null };
-    return payload.site ? normalizeTrackingSite(payload.site) : null;
+    return payload.site ? normalizePublicTrackingSite(payload.site) : null;
   } catch {
     return isLocalDemoRuntime() ? lookupLocalTrackingSite(reference, postcode) : null;
   }
@@ -47,7 +46,7 @@ export async function lookupTrackingSite(reference: string, postcode: string): P
 function lookupLocalTrackingSite(reference: string, postcode: string) {
   const normalizedReference = reference.trim().toUpperCase();
   const normalizedPostcode = postcode.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return loadLocalTrackingSites().find((site) =>
+  return loadPublicLocalTrackingSites().find((site) =>
     !site.archived &&
     site.reference.trim().toUpperCase() === normalizedReference &&
     extractPostcode(site.siteAddress) === normalizedPostcode
@@ -57,4 +56,13 @@ function lookupLocalTrackingSite(reference: string, postcode: string) {
 function extractPostcode(address: string) {
   const match = address.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
   return match ? match[1].replace(/[^A-Z0-9]/g, "") : "";
+}
+
+function isLocalDemoRuntime() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const { hostname, protocol } = window.location;
+  return protocol === "file:" || hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }

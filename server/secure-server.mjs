@@ -17,7 +17,7 @@ import {
   randomBytes,
   timingSafeEqual
 } from "node:crypto";
-import { basename, extname, join, normalize, resolve } from "node:path";
+import { basename, extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
@@ -111,6 +111,11 @@ const server = createServer(async (request, response) => {
 
     await serveStatic(url.pathname, response);
   } catch (error) {
+    if (error instanceof HttpError) {
+      sendJson(response, error.status, { error: error.message });
+      return;
+    }
+
     console.error(error);
     sendJson(response, 500, { error: "Internal server error." });
   }
@@ -726,7 +731,7 @@ async function handleTrackingSiteLookup(request, response) {
 
 async function handleTrackingSiteItem(request, response, url) {
   const [, , , idOrToken, action] = url.pathname.split("/");
-  const decodedIdOrToken = decodeURIComponent(idOrToken ?? "");
+  const decodedIdOrToken = decodePathComponent(idOrToken ?? "");
 
   if (!action && request.method === "GET") {
     const store = await readTrackingStore();
@@ -1111,6 +1116,11 @@ async function handleLetterGeneration(request, response, session) {
       }
     });
   } catch (error) {
+    if (error instanceof Error && /^DOCX\b/.test(error.message)) {
+      sendJson(response, 400, { error: "Letter template is invalid or too large." });
+      return;
+    }
+
     console.error(error);
     sendJson(response, 500, { error: "Letter could not be generated." });
   }
@@ -1202,10 +1212,10 @@ async function readLetterTemplateSource(url) {
 }
 
 function resolveMediaPath(url) {
-  const safePath = normalize(decodeURIComponent(url.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
+  const safePath = normalize(decodePathComponent(url.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
   const candidate = resolve(uploadsDir, safePath);
-  if (!candidate.startsWith(uploadsDir)) {
-    throw new Error("Media path is outside uploads.");
+  if (!isPathInside(uploadsDir, candidate)) {
+    throw new HttpError(404, "Media not found.");
   }
   return candidate;
 }
@@ -1423,11 +1433,7 @@ async function readFlexibleBody(request, limit) {
   const raw = await readRequestBody(request, limit);
   const contentType = request.headers["content-type"] ?? "";
   if (contentType.includes("application/json")) {
-    try {
-      return JSON.parse(raw.toString("utf8") || "{}");
-    } catch {
-      return {};
-    }
+    return parseJsonBody(raw);
   }
 
   const params = new URLSearchParams(raw.toString("utf8"));
@@ -1436,11 +1442,7 @@ async function readFlexibleBody(request, limit) {
 
 async function readJsonBody(request, limit) {
   const raw = await readRequestBody(request, limit);
-  try {
-    return JSON.parse(raw.toString("utf8") || "{}");
-  } catch {
-    return {};
-  }
+  return parseJsonBody(raw);
 }
 
 async function readRequestBody(request, limit) {
@@ -1450,11 +1452,19 @@ async function readRequestBody(request, limit) {
     const buffer = Buffer.from(chunk);
     length += buffer.length;
     if (length > limit) {
-      throw new Error("Request body too large.");
+      throw new HttpError(413, "Request body is too large.");
     }
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);
+}
+
+function parseJsonBody(raw) {
+  try {
+    return JSON.parse(raw.toString("utf8") || "{}");
+  } catch {
+    throw new HttpError(400, "Invalid JSON body.");
+  }
 }
 
 function validateNewsletter(payload) {
@@ -2250,9 +2260,9 @@ function clampNumber(value, fallback, min, max) {
 }
 
 async function serveMedia(pathname, response) {
-  const safePath = normalize(decodeURIComponent(pathname.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
+  const safePath = normalize(decodePathComponent(pathname.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
   const candidate = resolve(uploadsDir, safePath);
-  if (!candidate.startsWith(uploadsDir)) {
+  if (!isPathInside(uploadsDir, candidate)) {
     sendJson(response, 404, { error: "Media not found." });
     return;
   }
@@ -2310,12 +2320,32 @@ function sendStaticFile(filePath, response) {
 }
 
 function resolveStaticPath(pathname) {
-  const safePath = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, "");
+  const safePath = normalize(decodePathComponent(pathname)).replace(/^(\.\.[/\\])+/, "");
   const candidate = resolve(distDir, safePath.slice(1));
-  if (!candidate.startsWith(distDir)) {
+  if (!isPathInside(distDir, candidate)) {
     return join(distDir, "index.html");
   }
   return candidate;
+}
+
+function decodePathComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new HttpError(400, "Malformed request path.");
+  }
+}
+
+function isPathInside(parent, candidate) {
+  const relation = relative(parent, candidate);
+  return relation === "" || (!relation.startsWith("..") && !isAbsolute(relation));
+}
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
 }
 
 function sendJson(response, status, body) {

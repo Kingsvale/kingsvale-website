@@ -1,21 +1,14 @@
-import {
-  AlertCircle,
-  Clock,
-  ExternalLink,
-  FileText,
-  Home,
-  Image as ImageIcon,
-  MapPin
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SVGProps } from "react";
 import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
 import { fetchTrackingSiteByToken } from "../lib/publicTrackingApi";
-import {
-  trackingResourceLabels,
-  type TrackingResource,
-  type TrackingSite
-} from "../lib/trackingTypes";
+import type { TrackingResource, TrackingResourceType, TrackingSite } from "../lib/trackingTypes";
+
+const trackingResourceLabels: Record<TrackingResourceType, string> = {
+  image: "Image",
+  document: "Document",
+  link: "Link"
+};
 
 type TrackingPageProps = {
   content: SiteContent;
@@ -56,7 +49,7 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
       <main className="tracking-page">
         <section className="tracking-empty" aria-labelledby="tracking-missing-title">
           <Logo brandName={content.brandName} brandSuffix={content.brandSuffix} />
-          <AlertCircle aria-hidden="true" />
+          <AlertCircleIcon aria-hidden="true" />
           <h1 id="tracking-missing-title">Map link unavailable.</h1>
           <p>This private plot map link may have expired, been archived, or been typed incorrectly.</p>
           <a className="button-link button-link--dark" href="/">
@@ -82,18 +75,18 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
         </div>
         <dl className="tracking-facts">
           <div>
-            <dt><MapPin aria-hidden="true" /> Site</dt>
+            <dt><MapPinIcon aria-hidden="true" /> Site</dt>
             <dd>{site.siteAddress}</dd>
           </div>
           {site.customerName && (
             <div>
-              <dt><Home aria-hidden="true" /> Recipient</dt>
+              <dt><HomeIcon aria-hidden="true" /> Recipient</dt>
               <dd>{site.customerName}</dd>
             </div>
           )}
           {site.reference && (
             <div>
-              <dt><Clock aria-hidden="true" /> Reference</dt>
+              <dt><ClockIcon aria-hidden="true" /> Reference</dt>
               <dd>{site.reference}</dd>
             </div>
           )}
@@ -128,7 +121,7 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
           />
         ) : (
           <div className="tracking-map tracking-map--empty">
-            <MapPin aria-hidden="true" />
+            <MapPinIcon aria-hidden="true" />
             <h3>Map coming soon.</h3>
             <p>Kingsvale has not added the plot outline map to this page yet.</p>
           </div>
@@ -163,7 +156,7 @@ function TrackingResourceCard({ resource }: { resource: TrackingResource }) {
         </a>
       ) : (
         <div className="tracking-resource__icon">
-          {resource.type === "document" ? <FileText aria-hidden="true" /> : <ExternalLink aria-hidden="true" />}
+          {resource.type === "document" ? <FileTextIcon aria-hidden="true" /> : <ExternalLinkIcon aria-hidden="true" />}
         </div>
       )}
       <div className="tracking-resource__body">
@@ -175,9 +168,94 @@ function TrackingResourceCard({ resource }: { resource: TrackingResource }) {
         {resource.note && <p>{resource.note}</p>}
         <a href={resource.url} target="_blank" rel="noreferrer">
           Open resource
-          <ExternalLink aria-hidden="true" />
+          <ExternalLinkIcon aria-hidden="true" />
         </a>
       </div>
     </article>
+  );
+}
+
+function TrackingIcon({ children, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+}
+
+function AlertCircleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </TrackingIcon>
+  );
+}
+
+function ClockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </TrackingIcon>
+  );
+}
+
+function ExternalLinkIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </TrackingIcon>
+  );
+}
+
+function FileTextIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+      <path d="M10 9H8" />
+    </TrackingIcon>
+  );
+}
+
+function HomeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+      <path d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </TrackingIcon>
+  );
+}
+
+function ImageIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" />
+    </TrackingIcon>
+  );
+}
+
+function MapPinIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <TrackingIcon {...props}>
+      <path d="M20 10c0 5-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 15 4 10a8 8 0 0 1 16 0" />
+      <circle cx="12" cy="10" r="3" />
+    </TrackingIcon>
   );
 }

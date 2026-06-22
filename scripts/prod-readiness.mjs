@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 const rootDir = resolve(".");
 const distDir = join(rootDir, "dist");
@@ -108,6 +108,12 @@ await check("public HTML does not reference the private studio chunk", async () 
   assert(!/\/assets\/studio-[^"]+\.js/.test(indexHtml), "dist/index.html references the studio chunk.");
 });
 
+await check("public JavaScript chunks do not import the private studio chunk", async () => {
+  const assetFiles = await listFiles(join(distDir, "assets"));
+  const leaks = await findPublicStudioChunkImports(assetFiles.filter((file) => file.endsWith(".js")));
+  assert(leaks.length === 0, `Public chunks import private studio code: ${leaks.join(", ")}`);
+});
+
 const failed = checks.filter((item) => item.status === "fail");
 console.table(checks);
 
@@ -154,4 +160,18 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function findPublicStudioChunkImports(jsFiles) {
+  const studioChunkImportPattern = /(?:from|import\()\s*["']\.\/studio-[^"']+\.js["']|\/assets\/studio-[^"']+\.js/;
+  const leaks = [];
+
+  for (const file of jsFiles.filter((item) => !/^studio-[\w-]+\.js$/.test(basename(item)))) {
+    const source = await readFile(file, "utf8");
+    if (studioChunkImportPattern.test(source)) {
+      leaks.push(basename(file));
+    }
+  }
+
+  return leaks;
 }
