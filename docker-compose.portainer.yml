@@ -1,13 +1,11 @@
 services:
   kingsvale:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: kingsvale-luxury-real-estate:latest
+    image: ghcr.io/kingsvale/kingsvale-website:latest
+    pull_policy: always
     container_name: kingsvale-site
     restart: unless-stopped
     ports:
-      - "${HOST_PORT:-8095}:4173"
+      - "${HOST_PORT:-3417}:4173"
     environment:
       NODE_ENV: production
       PORT: 4173

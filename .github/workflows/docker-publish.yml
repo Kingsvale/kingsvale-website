@@ -1,18 +1,20 @@
-name: Build Kingsvale Docker Image
+name: Publish Docker image
 
 on:
   push:
     branches:
       - main
-      - master
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE_NAME: ghcr.io/kingsvale/kingsvale-website
+
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,24 +31,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ github.sha }}
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: |
-            ghcr.io/kingsvale/kingsvale-website:latest
-            ghcr.io/kingsvale/kingsvale-website:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Trigger Portainer webhook
-        env:
-          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
-        run: |
-          if [ -n "$PORTAINER_WEBHOOK_URL" ]; then
-            curl -fsSL -X POST "$PORTAINER_WEBHOOK_URL"
-          else
-            echo "PORTAINER_WEBHOOK_URL is not set; image was pushed but Portainer was not triggered."
-          fi
