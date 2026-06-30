@@ -1,4 +1,4 @@
-import { FileText, Plus, Save, Settings, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, Plus, Save, Settings, Sheet, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AdminSelectField as SelectField,
@@ -263,6 +263,71 @@ export function AdminSettingsPanel() {
             }
             options={contactPriorities.map((priority) => [priority, contactPriorityLabels[priority]] as const)}
           />
+        </section>
+
+        <section className="admin-panel" aria-labelledby="settings-google-sheet-title">
+          <div className="admin-section-heading">
+            <h2 id="settings-google-sheet-title">Google Sheet</h2>
+          </div>
+          <p className="admin-panel__note">
+            Attach a Google Sheet for the letter reference log. Each saved Site is upserted by Site ID so repeat saves
+            update the same row.
+          </p>
+          <label className="sites-admin__toggle">
+            <input
+              type="checkbox"
+              checked={settings.googleSheet.enabled}
+              onChange={(event) =>
+                updateSettings((draft) => {
+                  draft.googleSheet.enabled = event.target.checked;
+                })
+              }
+            />
+            <span>Sync saved Sites to Google Sheets</span>
+          </label>
+          <TextInput
+            id="settings-google-spreadsheet-id"
+            label="Spreadsheet ID"
+            value={settings.googleSheet.spreadsheetId}
+            maxLength={160}
+            onChange={(value) =>
+              updateSettings((draft) => {
+                draft.googleSheet.spreadsheetId = value;
+              })
+            }
+          />
+          <TextInput
+            id="settings-google-sheet-name"
+            label="Sheet tab name"
+            value={settings.googleSheet.sheetName}
+            maxLength={80}
+            onChange={(value) =>
+              updateSettings((draft) => {
+                draft.googleSheet.sheetName = value;
+              })
+            }
+          />
+          <div className="tracking-storage-banner tracking-storage-banner--server" role="note">
+            <Sheet aria-hidden="true" />
+            <div>
+              <strong>Server credentials stay outside Studio.</strong>
+              <span>
+                Set a Google service account in environment variables, then share the spreadsheet with that service
+                account email.
+              </span>
+            </div>
+          </div>
+          {settings.googleSheet.spreadsheetId ? (
+            <a
+              className="admin-open"
+              href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(settings.googleSheet.spreadsheetId)}/edit`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink aria-hidden="true" />
+              Open configured sheet
+            </a>
+          ) : null}
         </section>
       </div>
     </section>

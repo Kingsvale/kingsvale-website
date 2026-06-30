@@ -28,9 +28,10 @@ import {
   archiveTrackingSite,
   deleteTrackingSite,
   fetchStudioSettings,
+  type GoogleSheetSyncResult,
   getTrackingStorageStatus,
   listTrackingSites,
-  saveTrackingSite,
+  saveTrackingSiteWithResult,
   subscribeTrackingStorageStatus,
   unarchiveTrackingSite,
   uploadLetterFile
@@ -182,10 +183,10 @@ export function AdminSitesPanel() {
       const siteDraft = createTrackingSite();
       siteDraft.reference = nextTrackingReference(sites);
       siteDraft.contactPriority = settings.defaultContactPriority;
-      const site = await saveTrackingSite(siteDraft);
+      const { site, googleSheetSync } = await saveTrackingSiteWithResult(siteDraft);
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-      setStatus(`Map page created with reference ${site.reference}. Add the plot map link, then save.`);
+      setStatus(`Map page created with reference ${site.reference}. Add the plot map link, then save.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
     } catch {
       setStatus("Map page could not be created.");
     } finally {
@@ -211,10 +212,10 @@ export function AdminSitesPanel() {
 
     setBusy(true);
     try {
-      const saved = await saveTrackingSite(draft);
+      const { site: saved, googleSheetSync } = await saveTrackingSiteWithResult(draft);
       setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
       setDraft(saved);
-      setStatus("Map page saved.");
+      setStatus(`Map page saved.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
     } catch {
       setStatus("Map page could not be saved.");
     } finally {
@@ -925,6 +926,24 @@ function buildPublicLink(token: string) {
   }
 
   return `${window.location.origin}/track/${token}`;
+}
+
+function formatGoogleSheetSyncStatus(result: GoogleSheetSyncResult | null) {
+  if (!result || result.status === "disabled") {
+    return "";
+  }
+
+  if (result.status === "synced") {
+    return result.action === "updated"
+      ? " Google Sheet row updated."
+      : " Google Sheet row added.";
+  }
+
+  if (result.status === "skipped") {
+    return ` Google Sheet sync skipped: ${result.message ?? "configuration is incomplete"}`;
+  }
+
+  return ` Google Sheet sync failed: ${result.message ?? "check server credentials and sheet access"}`;
 }
 
 function sortSites(sites: TrackingSite[]) {

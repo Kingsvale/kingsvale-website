@@ -13,7 +13,14 @@ export type StudioSettings = {
   letterPresets: LetterPreset[];
   defaultReminderDays: number;
   defaultContactPriority: ContactPriority;
+  googleSheet: GoogleSheetSettings;
   updatedAt: string;
+};
+
+export type GoogleSheetSettings = {
+  enabled: boolean;
+  spreadsheetId: string;
+  sheetName: string;
 };
 
 export const studioSettingsStorageKey = "kingsvale-studio-settings-v1";
@@ -26,6 +33,7 @@ export function defaultStudioSettings(): StudioSettings {
     letterPresets: [],
     defaultReminderDays: 14,
     defaultContactPriority: "unknown",
+    googleSheet: defaultGoogleSheetSettings(),
     updatedAt: new Date().toISOString()
   };
 }
@@ -41,6 +49,7 @@ export function normalizeStudioSettings(value: Partial<StudioSettings> | null | 
     defaultContactPriority: allowedPriorities.includes(value?.defaultContactPriority as ContactPriority)
       ? value?.defaultContactPriority as ContactPriority
       : fallback.defaultContactPriority,
+    googleSheet: normalizeGoogleSheetSettings(value?.googleSheet),
     updatedAt: typeof value?.updatedAt === "string" && value.updatedAt ? value.updatedAt : fallback.updatedAt
   };
 }
@@ -95,6 +104,23 @@ function normalizeLetterPreset(value: Partial<LetterPreset> | null | undefined) 
   };
 }
 
+function defaultGoogleSheetSettings(): GoogleSheetSettings {
+  return {
+    enabled: false,
+    spreadsheetId: "",
+    sheetName: "Letter reference"
+  };
+}
+
+function normalizeGoogleSheetSettings(value: Partial<GoogleSheetSettings> | null | undefined): GoogleSheetSettings {
+  const fallback = defaultGoogleSheetSettings();
+  return {
+    enabled: Boolean(value?.enabled),
+    spreadsheetId: cleanText(value?.spreadsheetId).slice(0, 160),
+    sheetName: cleanSheetName(value?.sheetName) || fallback.sheetName
+  };
+}
+
 function isSafeLetterTemplateUrl(value: string) {
   if (value.startsWith("/media/")) {
     return /\.docx$/i.test(value);
@@ -105,4 +131,8 @@ function isSafeLetterTemplateUrl(value: string) {
 
 function cleanText(value: unknown) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function cleanSheetName(value: unknown) {
+  return cleanText(value).replace(/[\][*?/\\:]/g, " ").replace(/\s+/g, " ").slice(0, 80);
 }

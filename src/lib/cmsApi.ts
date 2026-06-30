@@ -43,6 +43,20 @@ export type TrackingStorageStatus = {
   detail: string;
 };
 
+export type GoogleSheetSyncResult = {
+  status: "disabled" | "skipped" | "synced" | "failed";
+  message?: string;
+  action?: "appended" | "updated";
+  row?: number;
+  spreadsheetId?: string;
+  sheetName?: string;
+};
+
+export type TrackingSiteSaveResult = {
+  site: TrackingSite;
+  googleSheetSync: GoogleSheetSyncResult | null;
+};
+
 const authTokenStorageKey = "kingsvale-studio-auth-token-v1";
 const trackingStorageStatusEvent = "kingsvale-tracking-storage-status";
 const backupSessionError = "Backup requires an active server session.";
@@ -359,6 +373,10 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
 }
 
 export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
+  return (await saveTrackingSiteWithResult(site)).site;
+}
+
+export async function saveTrackingSiteWithResult(site: TrackingSite): Promise<TrackingSiteSaveResult> {
   try {
     const response = await fetch("/api/tracking-sites", {
       method: "PUT",
@@ -373,19 +391,26 @@ export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite
         throw new Error("Tracking site could not be saved to the secure server.");
       }
       markTrackingStorageLocal();
-      return upsertLocalTrackingSite(site);
+      return { site: upsertLocalTrackingSite(site), googleSheetSync: null };
     }
 
-    const payload = (await response.json()) as { site: TrackingSite; storage?: string };
+    const payload = (await response.json()) as {
+      site: TrackingSite;
+      storage?: string;
+      googleSheetSync?: GoogleSheetSyncResult;
+    };
     markTrackingStorageServer(payload.storage);
-    return normalizeTrackingSite(payload.site);
+    return {
+      site: normalizeTrackingSite(payload.site),
+      googleSheetSync: payload.googleSheetSync ?? null
+    };
   } catch {
     if (!isLocalDemoRuntime()) {
       markTrackingStorageUnavailable();
       throw new Error("Tracking site could not be saved to the secure server.");
     }
     markTrackingStorageLocal();
-    return upsertLocalTrackingSite(site);
+    return { site: upsertLocalTrackingSite(site), googleSheetSync: null };
   }
 }
 

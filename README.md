@@ -79,6 +79,20 @@ $env:ROYAL_MAIL_TRACKING_API_URL="https://tracking-provider.example/lookup"
 $env:ROYAL_MAIL_TRACKING_API_KEY="provider-api-key"
 ```
 
+Optional Google Sheets letter reference sync:
+
+```bash
+$env:GOOGLE_SERVICE_ACCOUNT_EMAIL="service-account@project.iam.gserviceaccount.com"
+$env:GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+$env:PUBLIC_SITE_URL="https://www.kingsvalehomes.co.uk"
+$env:GOOGLE_SHEETS_SYNC_TIMEOUT_MS="8000"
+```
+
+In Studio, open **Settings > Google Sheet**, enable sync, add the spreadsheet ID, and choose the tab name. Share the
+spreadsheet with the service-account email. `PUBLIC_SITE_URL` is required for production tracking links in the sheet.
+The server creates the tab/header row when needed and upserts each saved Site by Site ID so repeat saves update the
+same reference row.
+
 Optional lead forwarding:
 
 ```bash
@@ -150,6 +164,11 @@ CMS_MAX_BACKUPS=30
 BACKUP_IMPORT_MAX_MB=25
 ROYAL_MAIL_TRACKING_API_URL=
 ROYAL_MAIL_TRACKING_API_KEY=
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_SERVICE_ACCOUNT_JSON=
+PUBLIC_SITE_URL=https://www.kingsvalehomes.co.uk
+GOOGLE_SHEETS_SYNC_TIMEOUT_MS=8000
 CONTACT_WEBHOOK_URL=
 NEWSLETTER_WEBHOOK_URL=
 LEAD_WEBHOOK_HMAC_SECRET=

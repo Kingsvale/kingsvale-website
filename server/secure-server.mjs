@@ -20,6 +20,7 @@ import {
 import { basename, extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { syncTrackingSiteToGoogleSheet } from "./google-sheets-sync.mjs";
 import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
 
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -711,8 +712,17 @@ async function handleTrackingSitesCollection(request, response) {
       : [savedSite, ...store.sites];
     store.updatedAt = now;
     await writeTrackingStore(store);
-    await writeAudit("tracking_site_saved", request, { user: session.user, siteId: savedSite.id });
-    sendJson(response, 200, { ok: true, site: savedSite });
+    const googleSheetSettings = (await readStudioSettings()).googleSheet;
+    const publicLink = buildPublicTrackingLink(savedSite.token);
+    const googleSheetSync = googleSheetSettings.enabled && !publicLink
+      ? { status: "skipped", message: "PUBLIC_SITE_URL or SITE_URL is required for Google Sheet sync." }
+      : await syncTrackingSiteToGoogleSheet(savedSite, googleSheetSettings, { publicLink });
+    await writeAudit("tracking_site_saved", request, {
+      user: session.user,
+      siteId: savedSite.id,
+      googleSheetSync: googleSheetSync.status
+    });
+    sendJson(response, 200, { ok: true, site: savedSite, googleSheetSync });
     return;
   }
 
@@ -1869,6 +1879,16 @@ function validateStudioSettings(settings) {
     errors.push({ path: "defaultContactPriority", message: "Choose an approved default priority." });
   }
 
+  if (!settings.googleSheet || typeof settings.googleSheet !== "object") {
+    errors.push({ path: "googleSheet", message: "Google Sheet settings are required." });
+  } else {
+    if (settings.googleSheet.enabled && !settings.googleSheet.spreadsheetId) {
+      errors.push({ path: "googleSheet.spreadsheetId", message: "Spreadsheet ID is required when Google Sheet sync is enabled." });
+    }
+    validateOptionalText(errors, "googleSheet.spreadsheetId", settings.googleSheet.spreadsheetId, "Spreadsheet ID", 160);
+    validateText(errors, "googleSheet.sheetName", settings.googleSheet.sheetName, "Sheet tab name", 80);
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -1910,6 +1930,7 @@ function defaultStudioSettings() {
     letterPresets: [],
     defaultReminderDays: 14,
     defaultContactPriority: "unknown",
+    googleSheet: defaultGoogleSheetSettings(),
     updatedAt: new Date().toISOString()
   };
 }
@@ -1922,7 +1943,26 @@ function normalizeStudioSettings(settings = {}) {
       : [],
     defaultReminderDays: boundedReminderDays(settings.defaultReminderDays),
     defaultContactPriority: normalizeContactPriority(settings.defaultContactPriority),
+    googleSheet: normalizeGoogleSheetSettings(settings.googleSheet),
     updatedAt: typeof settings.updatedAt === "string" && settings.updatedAt ? settings.updatedAt : fallback.updatedAt
+  };
+}
+
+function defaultGoogleSheetSettings() {
+  return {
+    enabled: false,
+    spreadsheetId: "",
+    sheetName: "Letter reference"
+  };
+}
+
+function normalizeGoogleSheetSettings(settings = {}) {
+  const values = settings && typeof settings === "object" ? settings : {};
+  const fallback = defaultGoogleSheetSettings();
+  return {
+    enabled: Boolean(values.enabled),
+    spreadsheetId: cleanText(values.spreadsheetId).slice(0, 160),
+    sheetName: cleanSheetName(values.sheetName) || fallback.sheetName
   };
 }
 
@@ -1956,6 +1996,9 @@ function mergeStudioSettings(current, imported) {
         (preset) => !importedSettings.letterPresets.some((item) => item.id === preset.id)
       )
     ],
+    googleSheet: hasOwn(imported, "googleSheet")
+      ? importedSettings.googleSheet
+      : currentSettings.googleSheet,
     updatedAt: new Date().toISOString()
   };
 }
@@ -2019,6 +2062,28 @@ function normalizeTrackingSite(site) {
     mailingNotes: site.mailingNotes ?? "",
     mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
+}
+
+function buildPublicTrackingLink(token) {
+  const configuredOrigin = cleanOrigin(process.env.PUBLIC_SITE_URL || process.env.SITE_URL);
+  return configuredOrigin ? `${configuredOrigin}/track/${encodeURIComponent(token)}` : "";
+}
+
+function cleanOrigin(value) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value);
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+function hasOwn(value, key) {
+  return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function publicTrackingSite(site) {
@@ -2258,6 +2323,10 @@ function boundedReminderDays(value) {
 
 function cleanText(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function cleanSheetName(value) {
+  return cleanText(value).replace(/[\][*?/\\:]/g, " ").replace(/\s+/g, " ").slice(0, 80);
 }
 
 function suggestRemailReminderDate(firstMailedAt, reminderDays = 14) {
