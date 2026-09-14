@@ -4,13 +4,13 @@ The contact form saves every enquiry on the backend, then emails enquiries@kings
 
 ## Google Workspace / Portainer
 
-1. Sign into the Google account for enquiries@kingsvalehomes.co.uk. Open https://myaccount.google.com/security and enable 2-Step Verification. Then open https://myaccount.google.com/apppasswords, enter Kingsvale website as the app name and create an app password. Copy its 16 characters privately. This must be a sign-in-capable mailbox. If it is an alias, use its owning mailbox for SMTP_USER and configure the alias as an approved sending address.
+1. Sign into the main Google mailbox, info@kingsvalehomes.co.uk. Open https://myaccount.google.com/security and enable 2-Step Verification. Then open https://myaccount.google.com/apppasswords, enter Kingsvale website as the app name and create an app password. Copy its 16 characters privately. The enquiries@kingsvalehomes.co.uk address is an alias of this mailbox. Keep enquiries as the sending and receiving address, and ensure it is configured as an approved sending alias in Gmail. The app password belongs to info.
 2. In your Portainer stack environment, set:
 
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-SMTP_USER=enquiries@kingsvalehomes.co.uk
+SMTP_USER=info@kingsvalehomes.co.uk
 SMTP_PASSWORD=<Google app password entered privately>
 CONTACT_EMAIL_FROM=enquiries@kingsvalehomes.co.uk
 CONTACT_EMAIL_TO=enquiries@kingsvalehomes.co.uk

@@ -19,7 +19,7 @@ services:
       BACKUP_IMPORT_MAX_MB: "${BACKUP_IMPORT_MAX_MB:-250}"
       SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
       SMTP_PORT: "${SMTP_PORT:-465}"
-      SMTP_USER: "${SMTP_USER:-enquiries@kingsvalehomes.co.uk}"
+      SMTP_USER: "${SMTP_USER:-info@kingsvalehomes.co.uk}"
       SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
       CONTACT_EMAIL_FROM: "${CONTACT_EMAIL_FROM:-enquiries@kingsvalehomes.co.uk}"
       CONTACT_EMAIL_TO: "${CONTACT_EMAIL_TO:-enquiries@kingsvalehomes.co.uk}"
