@@ -61,6 +61,13 @@ await check(".env is ignored and .env.example documents production controls", as
   }
 });
 
+await check("both deployment stacks pass contact email settings into the container", async () => {
+  for (const file of ["docker-compose.yml", "docker-compose.portainer.yml"]) {
+    const compose = await readRequired(file);
+    for (const key of ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "CONTACT_EMAIL_FROM", "CONTACT_EMAIL_TO"]) assert(compose.includes(key + ":"), file + " is missing " + key);
+  }
+});
+
 await check("static host security headers are documented", async () => {
   const headers = await readRequired("public/_headers");
   for (const header of [

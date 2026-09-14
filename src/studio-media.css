@@ -108,3 +108,16 @@
   .gallery-thumbnails { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .studio-image__canvas { transition: none; } }
+.studio-delivery__heading { display:flex; gap:14px; align-items:center; }
+.studio-delivery__heading > svg { width:40px; height:40px; padding:9px; background:#e9ede3; border-radius:8px; color:#41563d; }
+.studio-delivery__heading h3 { margin:4px 0 0; }
+.studio-delivery__heading p { margin:0; }
+.studio-delivery__state { display:flex; align-items:center; gap:10px; padding:12px; border-radius:4px; background:#e9efe5; color:#34513c; font-size:13px; }
+.studio-delivery__state--pending { background:#f2eada; color:#705b34; }
+.studio-delivery__state svg { width:18px; flex-shrink:0; }
+.studio-delivery__facts { display:grid; gap:12px; margin:0; }
+.studio-delivery__facts div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 14px; border-bottom:1px solid #dfd6c8; padding-bottom:10px; }
+.studio-delivery__facts dt { font-size:12px; color:#756e63; }
+.studio-delivery__facts dd { margin:0; font-size:13px; overflow-wrap:anywhere; }
+.studio-delivery__actions { display:flex; flex-wrap:wrap; gap:10px; }
+.overview-editor { border-left:3px solid #607756; }

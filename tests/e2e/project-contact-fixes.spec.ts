@@ -1,0 +1,57 @@
+import { expect, test } from "@playwright/test";
+
+test("projects can exceed six, overview controls edit content, and removal can be undone", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
+  await page.getByRole("button", { name: "Unlock studio" }).click();
+  await page.getByRole("tab", { name: "Our developments", exact: true }).click();
+  await page.getByRole("button", { name: "Edit developments overview" }).click();
+  await page.getByLabel("Overview page heading").fill("Places to call home.");
+  await expect(page.frameLocator(".admin-preview__frame").getByRole("heading", { name: "Places to call home." })).toBeVisible();
+  await page.getByRole("button", { name: "Add project", exact: true }).click();
+  await expect(page.getByLabel("Project to edit").locator("option")).toHaveCount(7);
+  await page.getByLabel("Development 7 title", { exact: true }).fill("Willow Park");
+  await page.getByRole("button", { name: "Remove project", exact: true }).click();
+  await expect(page.getByLabel("Project to edit").locator("option")).toHaveCount(6);
+  await page.getByRole("button", { name: "Undo removal" }).click();
+  await expect(page.getByLabel("Development 7 title", { exact: true })).toHaveValue("Willow Park");
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText(/Published\. The public site/)).toBeVisible();
+  await page.goto("/developments");
+  await expect(page.getByRole("heading", { name: "Places to call home." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Willow Park", exact: true })).toBeVisible();
+  await page.goto("/studio");
+  await page.getByRole("tab", { name: "Our developments", exact: true }).click();
+  for (let i = 0; i < 7; i++) await page.getByRole("button", { name: "Remove project", exact: true }).click();
+  await expect(page.getByText("No projects yet. Select Add project to create your first project.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText(/Published\. The public site/)).toBeVisible();
+  await page.reload();
+  await page.getByRole("tab", { name: "Our developments", exact: true }).click();
+  await page.getByRole("button", { name: "Add project", exact: true }).click();
+  await expect(page.getByLabel("Development 1 title", { exact: true })).toHaveValue("New project");
+});
+
+test("contact form confirms successful API responses and preserves failed enquiries", async ({ page }, testInfo) => {
+  let fail = false; let calls = 0;
+  await page.route("**/api/contact", async (route) => { calls++; await route.fulfill({ status: fail ? 503 : 202, contentType: "application/json", body: JSON.stringify(fail ? { error: "Unavailable" } : { ok: true, id: "test-only" }) }); });
+  await page.goto("/contact");
+  const form = page.getByRole("form", { name: "Send an enquiry" });
+  await form.getByLabel("Name", { exact: true }).fill("Test Visitor");
+  await form.getByLabel("Email", { exact: true }).fill("test@example.com");
+  await form.getByLabel("Message", { exact: true }).fill("Please tell me about your latest projects.");
+  await form.getByRole("button", { name: "Send enquiry", exact: true }).click();
+  await expect(form.getByRole("status")).toHaveText("Thank you. Your enquiry has been received.");
+  await expect(form.getByRole("alert")).toHaveCount(0);
+  await expect(form.getByLabel("Name", { exact: true })).toHaveValue("");
+  expect(calls).toBe(1);
+  fail = true;
+  await form.getByLabel("Name", { exact: true }).fill("Test Visitor");
+  await form.getByLabel("Email", { exact: true }).fill("test@example.com");
+  await form.getByLabel("Message", { exact: true }).fill("Keep this message if submission fails.");
+  await form.getByRole("button", { name: "Send enquiry", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText("Your message has been kept");
+  await expect(form.getByLabel("Message", { exact: true })).toHaveValue("Keep this message if submission fails.");
+  await form.screenshot({ path: testInfo.outputPath("contact-form.png") });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});

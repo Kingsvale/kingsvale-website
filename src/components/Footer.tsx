@@ -16,14 +16,15 @@ export function Footer({ brandName, brandSuffix, footer }: FooterProps) {
 
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const email = String(form.get("email") ?? "");
 
     try {
       setSubmitState("submitting");
       await postJson("/api/newsletter", { email });
       setSubmitState("success");
-      event.currentTarget.reset();
+      formElement.reset();
     } catch {
       setSubmitState("error");
     }

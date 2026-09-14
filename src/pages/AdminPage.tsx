@@ -1,3 +1,4 @@
+import { AdminOverviewEditor } from "./AdminOverviewEditor";
 import { AdminContactDelivery } from "./AdminContactDelivery";
 import {
   AlertCircle,
@@ -187,7 +188,9 @@ export function AdminPage({
   const [imageSelection, setImageSelection] = useState("");
   const [textSelection, setTextSelection] = useState<{ path: string; value: string } | null>(null);
   const [scrollSection, setScrollSection] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState(draft.developments[0].id);
+  const [selectedProjectId, setSelectedProjectId] = useState(draft.developments[0]?.id ?? "");
+  const [editingOverview, setEditingOverview] = useState(false);
+  const [removedProject, setRemovedProject] = useState<{ project: Development; index: number } | null>(null);
   const selectedProject = draft.developments.find((project) => project.id === selectedProjectId) ?? draft.developments[0];
   const [serverMode, setServerMode] = useState(false);
   const [checkingStorage, setCheckingStorage] = useState(true);
@@ -285,7 +288,7 @@ export function AdminPage({
     if (section === "developments") setPreviewRoute("/developments");
     if (section === "legacy") { setPreviewRoute("/"); setScrollSection("legacy"); }
     else if (route) setPreviewRoute(route as PreviewRoute);
-    if (section === "images") setPreviewRoute(draft.developments[0].ctaHref);
+    if (section === "images") setPreviewRoute(draft.developments[0]?.ctaHref ?? "/");
   }
 
   function updateDraft(recipe: (content: SiteContent) => void) {
@@ -743,23 +746,29 @@ export function AdminPage({
             </details>
             <div className="admin-section-heading">
               <h3>Projects</h3>
-              <button type="button" className="admin-small" onClick={() => setPreviewRoute("/developments")}>Edit developments overview</button>
+              <button type="button" className="admin-small" onClick={() => { setEditingOverview(true); setPreviewRoute("/developments"); setScrollSection(""); }}>Edit developments overview</button>
               <button
                 type="button"
                 className="admin-small"
-                disabled={draft.developments.length >= 6}
+                disabled={draft.developments.length >= 100}
                 onClick={() => {
                   const project = createDevelopment();
                   updateDraft((content) => { content.developments.push(project); });
+                  setEditingOverview(false);
                   setSelectedProjectId(project.id);
                   setPreviewRoute(`/developments/${project.id}`);
                 }}
               >
                 <Plus aria-hidden="true" />
-                Add
+                Add project
               </button>
             </div>
-            <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setSelectedProjectId(id); setPreviewRoute(draft.developments.find((project) => project.id === id)!.ctaHref); }} />
+            {editingOverview && <AdminOverviewEditor content={draft} updateContent={updateDraft} onClose={() => setEditingOverview(false)} />}
+            {removedProject && <div className="admin-note" role="status">{removedProject.project.title} removed from the draft. <button type="button" className="admin-small" onClick={() => { updateDraft((next) => { next.developments.splice(Math.min(removedProject.index, next.developments.length), 0, removedProject.project); }); setSelectedProjectId(removedProject.project.id); setPreviewRoute(removedProject.project.ctaHref); setRemovedProject(null); }}>Undo removal</button></div>}
+            <p className="admin-note">{draft.developments.length} projects · Add, select or remove a project below. Save your draft, then publish when ready.</p>
+            {!selectedProject && <p className="admin-note">No projects yet. Select Add project to create your first project.</p>}
+            {selectedProject && <>
+            <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setEditingOverview(false); setSelectedProjectId(id); setPreviewRoute(draft.developments.find((project) => project.id === id)!.ctaHref); }} />
             <p className="admin-note">Choose a project below to edit its page, photographs and introduction. Click any text in the preview to edit the overview or the story below its gallery.</p>
             <button type="button" className="admin-small" onClick={() => { setPreviewRoute(selectedProject.ctaHref); setScrollSection("gallery"); }}>Edit selected project page & gallery</button>
             <div className="admin-stack">
@@ -770,18 +779,19 @@ export function AdminPage({
                   index={index}
                   canMoveUp={index > 0}
                   canMoveDown={index < draft.developments.length - 1}
-                  canRemove={draft.developments.length > 1}
+                  canRemove={true}
                   errorsByPath={errorsByPath}
                   onMove={(direction) =>
                     updateDraft((content) => {
                       content.developments = moveItem(content.developments, index, direction);
                     })
                   }
-                  onRemove={() =>
-                    updateDraft((content) => {
-                      content.developments.splice(index, 1);
-                    })
-                  }
+                  onRemove={() => {
+                    setRemovedProject({ project: development, index });
+                    const nextProject = draft.developments[index + 1] ?? draft.developments[index - 1];
+                    updateDraft((content) => { content.developments.splice(index, 1); });
+                    setSelectedProjectId(nextProject?.id ?? ""); setPreviewRoute(nextProject?.ctaHref ?? "/developments");
+                  }}
                   onChange={(nextDevelopment) => {
                     updateDraft((content) => { content.developments[index] = nextDevelopment; });
                     if (nextDevelopment.ctaHref !== development.ctaHref && /^\/developments\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nextDevelopment.ctaHref)) setPreviewRoute(nextDevelopment.ctaHref);
@@ -789,6 +799,7 @@ export function AdminPage({
                 />
               ))}
             </div>
+            </>}
           </EditorPanel>
           )}
 
@@ -1526,6 +1537,7 @@ function DevelopmentEditor({
         onMove={onMove}
         onRemove={canRemove ? onRemove : undefined}
       />
+      {canRemove && <button type="button" className="admin-small" onClick={onRemove}><Trash2 aria-hidden="true" />Remove project</button>}
       <div className="admin-grid admin-grid--two">
         <TextInput
           label={`Development ${index + 1} title`}
@@ -1717,11 +1729,16 @@ function replaceItem<T>(items: T[], index: number, item: T) {
 }
 
 function createDevelopment(): Development {
-  const id = `development-${Date.now()}`;
+  const id = `project-${crypto.randomUUID().slice(0, 8)}`;
   return {
     ...cloneContent(defaultContent).developments[0],
     id,
-    title: "New development",
+    title: "New project",
+    gallery: [],
+    priceGuide: "", homes: "", bedrooms: "",
+    status: "",
+    highlights: [],
+    heroBody: "Tell visitors about this project.",
     location: "Hampshire",
     description: "A refined collection of homes in a carefully chosen setting.",
     ctaHref: `/developments/${id}`

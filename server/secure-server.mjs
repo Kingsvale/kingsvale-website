@@ -240,6 +240,13 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/contact/verify") {
+    if (!requireSession(request, response)) return;
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    sendJson(response, 200, await contactMailer.verify());
+    return;
+  }
+
   if (url.pathname === "/api/contact/status") {
     if (!requireSession(request, response)) return;
     if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
@@ -1644,8 +1651,8 @@ function validateSiteContent(content) {
 
   validateEditorial(errors, "landWanted", content.landWanted);
 
-  if (!Array.isArray(content.developments) || content.developments.length < 1 || content.developments.length > 6) {
-    errors.push({ path: "developments", message: "Use between one and six developments." });
+  if (!Array.isArray(content.developments) || content.developments.length > 100) {
+    errors.push({ path: "developments", message: "Use up to 100 projects." });
   } else {
     content.developments.forEach((development, index) => {
       if (content.developments.some((other, i) => i !== index && (other.ctaHref === development.ctaHref || development.ctaHref === `/developments/${other.id}`))) errors.push({ path: `developments.${index}.ctaHref`, message: "Choose a unique project page address." });

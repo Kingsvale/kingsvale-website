@@ -889,8 +889,8 @@ function markLocalPostalSyncAttempt(id: string) {
   });
 }
 
-export async function fetchContactEmailStatus(): Promise<{ configured: boolean; recipient: string; sender: string; pending: number; lastStatus: string | null; message: string }> {
-  const response = await fetch("/api/contact/status", { credentials: "same-origin", headers: authHeaders({ Accept: "application/json" }) });
+export async function fetchContactEmailStatus(verify = false): Promise<{ configured: boolean; connection?: { verified: boolean; code: string | null } | null; recipient: string; sender: string; pending: number; lastStatus: string | null; message: string }> {
+  const response = await fetch(verify ? "/api/contact/verify" : "/api/contact/status", { method: verify ? "POST" : "GET", credentials: "same-origin", headers: authHeaders({ Accept: "application/json" }) });
   if (!response.ok || !isJsonResponse(response)) throw new Error("Email status unavailable");
   return response.json();
 }

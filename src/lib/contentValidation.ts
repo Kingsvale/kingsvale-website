@@ -344,10 +344,10 @@ export function validateSiteContent(content: SiteContent): ValidationResult {
     "Developments link"
   );
 
-  if (!Array.isArray(content.developments) || content.developments.length < 1 || content.developments.length > 6) {
+  if (!Array.isArray(content.developments) || content.developments.length > 100) {
     errors.push({
       path: "developments",
-      message: "Use between one and six developments."
+      message: "Use up to 100 projects."
     });
   } else {
     content.developments.forEach((development, index) =>

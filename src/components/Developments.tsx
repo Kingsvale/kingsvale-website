@@ -11,6 +11,7 @@ type DevelopmentsProps = {
 };
 
 export function Developments({ intro, developments }: DevelopmentsProps) {
+  if (!developments.length) return null;
   return (
     <section className="developments" id="developments" aria-labelledby="developments-title">
       <div className="section-heading">
@@ -25,7 +26,7 @@ export function Developments({ intro, developments }: DevelopmentsProps) {
           <DevelopmentCard
             development={development}
             index={index}
-            delay={index * 90}
+            delay={(index % 6) * 90}
             key={development.id}
           />
         ))}

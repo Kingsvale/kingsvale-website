@@ -28,9 +28,11 @@ export default defineConfig({
 
           if (
             normalizedId.includes("vite/preload-helper") ||
+            normalizedId.endsWith("/lucide-react/dist/esm/icons/circle-check.mjs") ||
             normalizedId.includes("/src/pages/Homepage") ||
             normalizedId.includes("/src/components/") ||
             normalizedId.includes("/src/data/defaultContent") ||
+            normalizedId.includes("/src/data/developmentsOverview") ||
             normalizedId.includes("/src/hooks/") ||
             normalizedId.includes("/src/lib/contentTypes") ||
             normalizedId.includes("/src/lib/contentValidation") ||

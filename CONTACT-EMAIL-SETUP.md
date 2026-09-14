@@ -4,7 +4,7 @@ The contact form saves every enquiry on the backend, then emails enquiries@kings
 
 ## Google Workspace / Portainer
 
-1. Enable 2-Step Verification for enquiries@kingsvalehomes.co.uk and generate a Google app password for this website. This must be a sign-in-capable mailbox. If it is an alias, use its owning mailbox for SMTP_USER and configure the alias as an approved sending address.
+1. Sign into the Google account for enquiries@kingsvalehomes.co.uk. Open https://myaccount.google.com/security and enable 2-Step Verification. Then open https://myaccount.google.com/apppasswords, enter Kingsvale website as the app name and create an app password. Copy its 16 characters privately. This must be a sign-in-capable mailbox. If it is an alias, use its owning mailbox for SMTP_USER and configure the alias as an approved sending address.
 2. In your Portainer stack environment, set:
 
 ```
@@ -16,8 +16,8 @@ CONTACT_EMAIL_FROM=enquiries@kingsvalehomes.co.uk
 CONTACT_EMAIL_TO=enquiries@kingsvalehomes.co.uk
 ```
 
-3. Redeploy the updated stack, retaining the existing data volume. docker-compose.yml passes these variables into the container. When using an image-only stack, add the same environment mappings to that stack.
-4. Open Studio → Website → Contact → Website enquiry emails. Refresh the status: it should say email delivery is configured.
+3. In Portainer → Stacks → your Kingsvale stack → Editor, update the stack definition using docker-compose.portainer.yml from this repository. Preserve your existing port, volume and other settings. Both Compose files now explicitly pass the SMTP variables into the container. Set the variables above under Environment variables and select Update the stack / redeploy, pulling the latest image. Updating only the Docker image does not add environment mappings to an older stack definition.
+4. Open Studio → Website → Contact → Website enquiry emails. Select Check email connection. It should report Email connection verified. This checks authentication without sending a test email. Authentication and network failures show different explanations.
 5. Submit a contact enquiry on the public website and confirm its arrival in the inbox. A configured status confirms settings are present, not that Google has accepted them. If delivery fails, the status panel says so and the saved enquiry retries automatically.
 
 Do not put the app password in Git, a website content field, or chat. Your ordinary Google login password will not work. If your organisation blocks app passwords, ask its Google Workspace administrator to enable an appropriate SMTP relay or provide an approved authentication method.

@@ -104,3 +104,16 @@ test("contact enquiries are saved and queued; delivery status requires Studio au
   const saved = JSON.parse((await readFile(join(server.directory, "leads", "contact.jsonl"), "utf8")).trim());
   assert.equal(saved.payload.email, "visitor@example.com"); assert.equal(saved.emailNotification, true);
 });
+test("backend publishes more than six projects and supports removing the final project", async (t) => {
+  const server = await startServer(t);
+  const content = structuredClone(defaultContent);
+  content.developments.push({ ...structuredClone(content.developments[0]), id: "seventh-project", title: "Seventh project", ctaHref: "/developments/seventh-project" });
+  assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 200);
+  assert.equal((await (await server.api("/api/cms/draft")).json()).published.developments.length, 7);
+  content.developments = [];
+  assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 200);
+  assert.equal((await (await server.api("/api/cms/draft")).json()).published.developments.length, 0);
+  assert.equal((await fetch(`${server.url}/api/contact/verify`, { method: "POST" })).status, 401);
+  const status = await (await server.api("/api/contact/verify", "POST")).json();
+  assert.equal(status.configured, false); assert.equal(status.connection.verified, false);
+});

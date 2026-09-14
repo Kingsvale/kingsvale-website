@@ -4387,3 +4387,24 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
 }
 
 .detail-intro--simple { display: block; max-width: 1000px; }
+
+.contact-form { padding: clamp(24px, 4vw, 48px); background: #fcfaf5; border-radius: 4px; box-shadow: 0 18px 60px #332d2210; gap: 24px; }
+.contact-form__heading h2 { margin: 12px 0; font: 500 clamp(28px, 3vw, 38px)/1.15 var(--font-serif); letter-spacing: -.025em; }
+.contact-form__heading > p:last-child { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 4px; }
+.contact-form__fields { display: grid; gap: 22px; padding: 0; margin: 0; min-width: 0; border: 0; }
+.contact-form__row { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 20px; }
+.contact-form label { font-size: 12px; font-weight: 600; gap: 9px; color: var(--charcoal); }
+.contact-form :is(input, textarea, select) { min-height: 52px; padding: 14px 15px; border: 1px solid #d9d1c5; border-radius: 3px; background: #fffefa; font-family: var(--font-sans); font-weight: 400; font-size: 15px; line-height: 1.5; }
+.contact-form textarea { min-height: 165px; resize: vertical; }
+.contact-form input::placeholder, .contact-form textarea::placeholder { color: #898379; opacity: 1; }
+.contact-form__submit { justify-content: space-between; padding: 18px 22px; background: #354333; color: #fffdf5; border: 0; border-radius: 3px; }
+.contact-form__submit:hover { background: #283527; }
+.contact-form__submit:disabled { opacity: .65; cursor: wait; }
+.contact-form__privacy { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.contact-form__privacy a { text-underline-offset: 3px; }
+.contact-form__feedback { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 3px; font-size: 14px; line-height: 1.6; }
+.contact-form__feedback p { margin: 0; }
+.contact-form__feedback svg { flex-shrink: 0; width: 22px; }
+.contact-form__feedback--success { color: #304c36; background: #eaf0e5; border: 1px solid #cfdbc7; }
+.contact-form__feedback--error { color: #743f30; background: #f7ece5; border: 1px solid #e5cbbb; }
+@media (max-width: 600px) { .contact-form__row { grid-template-columns: 1fr; gap: 22px; } }

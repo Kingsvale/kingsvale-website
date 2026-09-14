@@ -35,3 +35,13 @@ test("missing credentials retain enquiries; failures back off and retry successf
   await writeFile(file, JSON.stringify(entry) + "\n"); await mailer.flush();
   assert.equal(calls, 2); assert.equal((await mailer.status()).pending, 0);
 });
+test("connection diagnostics distinguish authentication failures without exposing credentials", async (t) => {
+  const path = await folder(t);
+  const mailer = createContactMailer(path, env, { verify: async () => { const error = new Error("secret raw server response"); error.code = "EAUTH"; throw error; } });
+  const status = await mailer.verify();
+  assert.equal(status.connection.verified, false);
+  assert.match(status.message, /Google rejected the sign-in/);
+  assert.ok(!JSON.stringify(status).includes("secret raw server response"));
+  const verified = await createContactMailer(path, env, { verify: async () => true }).verify();
+  assert.equal(verified.connection.verified, true);
+});

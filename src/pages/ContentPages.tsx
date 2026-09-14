@@ -1,3 +1,4 @@
+import { overviewCopy, overviewKeys } from "../data/developmentsOverview";
 import { ProjectGallery, ProjectCarousel } from "../components/ProjectImages";
 import { SiteText } from "../components/SiteText";
 import { ArrowRight, CheckCircle2, Mail, MapPin, Phone } from "lucide-react";
@@ -9,7 +10,7 @@ import { ResponsiveImage } from "../components/ResponsiveImage";
 import { Reveal } from "../components/Reveal";
 import { faqItems, faqPageSeo, guidePages, type GuidePageRoute } from "../data/answerPages";
 import type { Development, FeatureItem, ImageAsset, SiteContent } from "../lib/contentTypes";
-import { postJson, type SubmitState } from "../lib/formSubmit";
+import { FormSubmissionError, postJson, type SubmitState } from "../lib/formSubmit";
 import { studioPath } from "../lib/studioRoute";
 
 type ContentPageProps = {
@@ -20,16 +21,18 @@ export function DevelopmentsIndexPage({ content }: ContentPageProps) {
   return (
     <PublicShell content={content}>
       <InnerHero
-        eyebrow="Our developments"
-        title="Distinctive homes in carefully chosen locations."
-        body="Every Kingsvale development is shaped around setting, longevity and the quiet details that make a home feel settled from the first day."
+        eyebrow={overviewCopy.eyebrow}
+        title={overviewCopy.title}
+        body={overviewCopy.body}
+        textKeys={overviewKeys}
         image={content.hero.image}
       />
       <section className="content-band">
         <div className="content-heading">
-          <p className="eyebrow"><SiteText>Current collection</SiteText></p>
-          <h2><SiteText>Explore our homes</SiteText></h2>
+          <p className="eyebrow"><SiteText copy={overviewKeys.collectionEyebrow}>{overviewCopy.collectionEyebrow}</SiteText></p>
+          <h2><SiteText copy={overviewKeys.collectionTitle}>{overviewCopy.collectionTitle}</SiteText></h2>
         </div>
+        {content.developments.length === 0 && <p><SiteText>New projects will be shared here. Get in touch to find out more.</SiteText></p>}
         <div className="listing-grid">
           {content.developments.map((development, index) => (
             <article className="listing-card" key={development.id}>
@@ -245,10 +248,12 @@ export function FaqPage({ content }: ContentPageProps) {
 export function ContactPage({ content }: ContentPageProps) {
   const page = content.pages.contact;
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [submitError, setSubmitError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
 
     try {
       setSubmitState("submitting");
@@ -259,8 +264,9 @@ export function ContactPage({ content }: ContentPageProps) {
         message: String(form.get("message") ?? "")
       });
       setSubmitState("success");
-      event.currentTarget.reset();
-    } catch {
+      formElement.reset();
+    } catch (error) {
+      setSubmitError(error instanceof FormSubmissionError ? error.message : "We couldn’t connect. Your message has been kept—please try again.");
       setSubmitState("error");
     }
   }
@@ -289,13 +295,18 @@ export function ContactPage({ content }: ContentPageProps) {
             <SiteText>{content.footer.address}</SiteText>
           </p>
         </div>
-        <form className="contact-form" onSubmit={handleSubmit}>
+        <form className="contact-form" onSubmit={handleSubmit} aria-label="Send an enquiry">
+          <div className="contact-form__heading"><p className="eyebrow"><SiteText>Start a conversation</SiteText></p><h2><SiteText>Tell us about your plans.</SiteText></h2><p><SiteText>Whether you’re looking for a home or exploring a land opportunity, we’d love to hear from you.</SiteText></p></div>
+          <fieldset disabled={submitState === "submitting"} className="contact-form__fields">
+          <legend className="sr-only">Your enquiry</legend>
+          <div className="contact-form__row">
           <label>
-            <SiteText>Name</SiteText><input name="name" autoComplete="name" minLength={2} maxLength={80} required />
+            <SiteText>Name</SiteText><input placeholder="Your full name" name="name" autoComplete="name" minLength={2} maxLength={80} required />
           </label>
           <label>
-            <SiteText>Email</SiteText><input type="email" name="email" autoComplete="email" required />
+            <SiteText>Email</SiteText><input placeholder="you@example.com" type="email" name="email" autoComplete="email" required />
           </label>
+          </div>
           <label>
             <SiteText>Enquiry type</SiteText><select name="type" required>
               <option>Development enquiry</option>
@@ -305,18 +316,20 @@ export function ContactPage({ content }: ContentPageProps) {
             </select>
           </label>
           <label>
-            <SiteText>Message</SiteText><textarea name="message" rows={5} minLength={10} maxLength={1200} required />
+            <SiteText>Message</SiteText><textarea placeholder="Tell us a little about your enquiry…" name="message" rows={5} minLength={10} maxLength={1200} required />
           </label>
           <button
             type="submit"
-            className="button-link button-link--warm"
+            className="button-link button-link--dark contact-form__submit"
             disabled={submitState === "submitting"}
           >
             <span><SiteText>{submitState === "submitting" ? "Sending" : "Send enquiry"}</SiteText></span>
             <ArrowRight aria-hidden="true" />
           </button>
-          {submitState === "success" && <p className="form-status"><SiteText>Thank you. Your enquiry has been received.</SiteText></p>}
-          {submitState === "error" && <p className="form-status"><SiteText>Please email the team directly if this does not send.</SiteText></p>}
+          </fieldset>
+          <p className="contact-form__privacy"><SiteText>We’ll use your details to respond to your enquiry.</SiteText> <a href="/privacy"><SiteText>Privacy policy</SiteText></a></p>
+          {submitState === "success" && <div className="contact-form__feedback contact-form__feedback--success" role="status"><CheckCircle2 aria-hidden="true" /><p>Thank you. Your enquiry has been received.</p></div>}
+          {submitState === "error" && <div className="contact-form__feedback contact-form__feedback--error" role="alert"><p>{submitError}</p></div>}
         </form>
       </section>
     </PublicShell>
@@ -463,8 +476,9 @@ function InnerHero({
   eyebrow,
   title,
   body,
-  image
+  image, textKeys
 }: {
+  textKeys?: { eyebrow: string; title: string; body: string };
   eyebrow: string;
   title: string;
   body: string;
@@ -475,9 +489,9 @@ function InnerHero({
       <ResponsiveImage image={image} className="inner-hero__image" priority widthHint={1800} sizes="100vw" />
       <div className="hero__overlay" aria-hidden="true" />
       <div className="inner-hero__content">
-        <p className="eyebrow hero__eyebrow"><SiteText>{eyebrow}</SiteText></p>
-        <h1><SiteText>{title}</SiteText></h1>
-        <p><SiteText>{body}</SiteText></p>
+        <p className="eyebrow hero__eyebrow"><SiteText copy={textKeys?.eyebrow}>{eyebrow}</SiteText></p>
+        <h1><SiteText copy={textKeys?.title}>{title}</SiteText></h1>
+        <p><SiteText copy={textKeys?.body}>{body}</SiteText></p>
       </div>
     </section>
   );
