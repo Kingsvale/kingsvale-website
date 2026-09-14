@@ -49,15 +49,15 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByRole("heading", { name: "Kingsvale private studio" })).toBeVisible();
 
   await page.getByLabel("Hero title").fill("Crafted homes for modern country living.");
-  await page.getByRole("tab", { name: "Developments" }).click();
+  await page.getByRole("tab", { name: "Homepage developments" }).click();
   await page.getByLabel("Development 1 title").fill("Riverstone Mews");
-  await page.getByRole("tab", { name: "Hero" }).click();
+  await page.getByRole("tab", { name: "Homepage hero" }).click();
   await page.getByTestId("hero-image-upload").setInputFiles({
     name: "hero.png",
     mimeType: "image/png",
     buffer: onePixelPng
   });
-  await expect(page.getByLabel("Hero image URL")).toHaveValue(/data:image\/png/);
+  await expect(page.getByLabel("Hero image URL")).toHaveValue(/\/media\//);
 
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText(/Published. The public site is updated/)).toBeVisible();

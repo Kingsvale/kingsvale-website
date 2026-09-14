@@ -19,13 +19,14 @@ import {
 } from "node:crypto";
 import { basename, extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+import { storeImage } from "./image-upload.mjs";
+import { collectMedia, mediaReferences, prepareMediaRestore } from "./media-backup.mjs";
 import { syncTrackingSiteToGoogleSheet } from "./google-sheets-sync.mjs";
 import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
 
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distDir = resolve(rootDir, "dist");
-const dataDir = resolve(rootDir, "data");
+const dataDir = resolve(process.env.KINGSVALE_DATA_DIR || resolve(rootDir, "data"));
 const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
 const uploadsDir = resolve(dataDir, "uploads");
@@ -49,7 +50,7 @@ const royalMailTrackingApiUrl = process.env.ROYAL_MAIL_TRACKING_API_URL ?? "";
 const royalMailTrackingApiKey = process.env.ROYAL_MAIL_TRACKING_API_KEY ?? "";
 const maxCmsRevisions = 5;
 const maxCmsBackups = clampNumber(process.env.CMS_MAX_BACKUPS, 30, 5, 120);
-const backupImportMaxBytes = clampNumber(process.env.BACKUP_IMPORT_MAX_MB, 25, 5, 100) * 1_000_000;
+const backupImportMaxBytes = clampNumber(process.env.BACKUP_IMPORT_MAX_MB, 250, 5, 1000) * 1_000_000;
 const requestBuckets = new Map();
 const recentAnalyticsVisits = new Map();
 const analyticsDuplicateWindowMs = 2_000;
@@ -127,7 +128,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, () => {
-  console.log(`Secure Kingsvale server listening on http://127.0.0.1:${port}`);
+  console.log(`Secure Kingsvale server listening on http://127.0.0.1:${server.address().port}`);
 });
 
 async function ensureDataDirs() {
@@ -956,6 +957,7 @@ async function handleBackup(request, response) {
 
   if (request.method === "GET") {
     const backup = await buildFullBackup();
+    await saveFullBackup(backup, "export", session.user);
     await writeAudit("backup_exported", request, { user: session.user });
     sendJson(response, 200, { backup });
     return;
@@ -971,11 +973,11 @@ async function handleBackup(request, response) {
       return;
     }
 
-    await mkdir(backupDir, { recursive: true });
-    await writeFile(
-      join(backupDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-before-import-${toSlug(session.user)}.json`),
-      JSON.stringify(await buildFullBackup(), null, 2)
-    );
+    let restoreMedia;
+    try { restoreMedia = await prepareMediaRestore(backup, uploadsDir); }
+    catch (error) { sendJson(response, 400, { error: error.message }); return; }
+    await saveFullBackup(await buildFullBackup(), "before-import", session.user);
+    await restoreMedia();
     await applyFullBackup(backup, mode);
     await writeAudit("backup_imported", request, { user: session.user, mode });
     sendJson(response, 200, { ok: true, importedAt: new Date().toISOString(), mode });
@@ -1072,63 +1074,16 @@ async function handleImageUpload(request, response, session) {
     return;
   }
 
-  const body = await readRequestBody(request, 6_000_000);
+  const body = await readRequestBody(request, 12_100_000);
   const upload = parseMultipartFile(body, contentType);
-  if (!upload) {
-    sendJson(response, 400, { error: "Image file is required." });
+  let image;
+  try { image = await storeImage(upload, uploadsDir); }
+  catch (error) {
+    sendJson(response, 400, { error: error.message || "Image could not be processed." });
     return;
   }
-
-  if (!isAllowedImageType(upload.contentType)) {
-    sendJson(response, 415, { error: "Only JPEG, PNG, WebP and AVIF images are supported." });
-    return;
-  }
-
-  let metadata;
-  try {
-    metadata = await sharp(upload.data).metadata();
-  } catch {
-    sendJson(response, 400, { error: "Image bytes could not be decoded." });
-    return;
-  }
-
-  if (!metadata.width || !metadata.height || metadata.width * metadata.height > 32_000_000) {
-    sendJson(response, 400, { error: "Image dimensions are not supported." });
-    return;
-  }
-
-  const slug = toSlug(upload.filename.replace(/\.[^.]+$/, "")) || "image";
-  const id = `${Date.now()}-${randomBytes(4).toString("hex")}`;
-  const widths = [480, 960, 1440, 1920].filter((width) => width <= Math.max(metadata.width, 480));
-  const variants = [];
-
-  for (const width of widths) {
-    const filename = `${slug}-${id}-${width}.webp`;
-    await sharp(upload.data)
-      .rotate()
-      .resize({ width, withoutEnlargement: true })
-      .webp({ quality: 78, effort: 4 })
-      .toFile(join(uploadsDir, filename));
-    variants.push({ width, src: `/media/${filename}`, type: "image/webp" });
-  }
-
-  const largest = variants.at(-1);
-  await writeAudit("image_uploaded", request, {
-    user: session.user,
-    filename: upload.filename,
-    width: metadata.width,
-    height: metadata.height,
-    variants: variants.length
-  });
-
-  sendJson(response, 201, {
-    image: {
-      src: largest.src,
-      alt: upload.filename.replace(/\.[^.]+$/, ""),
-      focalPoint: "50% 50%"
-    },
-    variants
-  });
+  await writeAudit("image_uploaded", request, { user: session.user, filename: image.filename, variants: image.variants.length });
+  sendJson(response, 201, { image });
 }
 
 async function handleLetterUpload(request, response, session) {
@@ -1267,10 +1222,6 @@ function parseMultipartFile(body, contentType) {
   return null;
 }
 
-function isAllowedImageType(contentType) {
-  return ["image/jpeg", "image/png", "image/webp", "image/avif"].includes(contentType);
-}
-
 function isAllowedLetterUpload(upload) {
   if (!upload || upload.data.length > 8_000_000) {
     return false;
@@ -1400,17 +1351,26 @@ async function writeAnalyticsStore(store) {
 }
 
 async function buildFullBackup() {
+  // Read assignments before media: a concurrent upload must finish writing its
+  // files before it can be saved in any of these stores.
+  const stores = {
+    cms: await readCmsStore(),
+    tracking: await readTrackingStore(),
+    settings: await readStudioSettings(),
+    analytics: await readAnalyticsStore(),
+    leads: await readLeadStores()
+  };
+  const media = await collectMedia(uploadsDir);
+  const filenames = new Set(media.map((file) => file.filename));
+  for (const filename of mediaReferences(stores)) {
+    if (!filenames.has(filename)) throw new HttpError(409, `An uploaded file is missing from backend storage: ${filename}. Restore the file before exporting a full backup.`);
+  }
   return {
     kind: "kingsvale-full-backup",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
-    stores: {
-      cms: await readCmsStore(),
-      tracking: await readTrackingStore(),
-      settings: await readStudioSettings(),
-      analytics: await readAnalyticsStore(),
-      leads: await readLeadStores()
-    }
+    media,
+    stores
   };
 }
 
@@ -1481,10 +1441,16 @@ async function appendLeadStores(leads) {
 }
 
 async function writeCmsBackup(store, event, user) {
+  const backup = await buildFullBackup();
+  backup.stores.cms = store;
+  await saveFullBackup(backup, event, user);
+}
+
+async function saveFullBackup(backup, event, user) {
   await mkdir(backupDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `${stamp}-${toSlug(event)}-${toSlug(user || "system")}.json`;
-  await writeFile(join(backupDir, filename), encodeCmsStore(store));
+  await writeFile(join(backupDir, filename), encodeCmsStore(backup));
   await pruneCmsBackups();
 }
 
@@ -1663,9 +1629,18 @@ function validateSiteContent(content) {
       validateText(errors, `developments.${index}.ctaLabel`, development.ctaLabel, "Development CTA label", 34);
       validateUrl(errors, `developments.${index}.ctaHref`, development.ctaHref, "Development CTA link");
       validateImage(errors, `developments.${index}.image`, development.image);
+      if (development.gallery !== undefined) {
+        if (!Array.isArray(development.gallery) || development.gallery.length > 12) errors.push({ path: `developments.${index}.gallery`, message: "Use up to 12 gallery images." });
+        else development.gallery.forEach((image, i) => validateImage(errors, `developments.${index}.gallery.${i}`, image));
+      }
     });
   }
 
+  for (const [key, page] of Object.entries(content.pages ?? {})) {
+    validateImage(errors, `pages.${key}.image`, page?.image);
+    validateImage(errors, `pages.${key}.seo.image`, page?.seo?.image);
+  }
+  for (const [key, seo] of Object.entries(content.seo ?? {})) validateImage(errors, `seo.${key}.image`, seo?.image);
   validateLinks(errors, "footer.exploreLinks", content.footer?.exploreLinks, 1, 8);
   validateLinks(errors, "footer.socialLinks", content.footer?.socialLinks, 0, 4);
   validateLinks(errors, "footer.legalLinks", content.footer?.legalLinks, 1, 4);
@@ -1827,6 +1802,12 @@ function validateBackupPayload(backup) {
   }
   if (!stores.cms || typeof stores.cms !== "object") {
     errors.push({ path: "stores.cms", message: "CMS store is missing." });
+  } else {
+    const candidates = [stores.cms.published, stores.cms.draft, ...(Array.isArray(stores.cms.revisions) ? stores.cms.revisions.map(r => r?.content) : [])].filter(Boolean);
+    for (const content of candidates) {
+      try { errors.push(...validateSiteContent(content).errors); }
+      catch { errors.push({ path: "stores.cms", message: "Backup website content is invalid." }); }
+    }
   }
   if (!stores.tracking || !Array.isArray(stores.tracking.sites)) {
     errors.push({ path: "stores.tracking", message: "Tracking store is missing." });
@@ -2581,6 +2562,8 @@ function validateImage(errors, path, image) {
     return;
   }
   validateText(errors, `${path}.alt`, image.alt, "Image alt text", 150);
+  if (image.focalPoint !== undefined && (typeof image.focalPoint !== "string" || !/^(100|\d{1,2})% (100|\d{1,2})%$/.test(image.focalPoint))) errors.push({ path, message: "Choose a focal point between 0 and 100%." });
+  if (image.variants !== undefined && (!Array.isArray(image.variants) || image.variants.length > 6 || image.variants.some(v => !v || !Number.isInteger(v.width) || v.width < 1 || v.width > 2400 || typeof v.src !== "string" || !isSafeImageSource(v.src)))) errors.push({ path, message: "Image variants are invalid." });
   if (typeof image.src !== "string" || !isSafeImageSource(image.src)) {
     errors.push({ path: `${path}.src`, message: "Image source must be an approved URL or uploaded media path." });
   }
@@ -2676,9 +2659,10 @@ function isHexColor(value) {
 }
 
 function isSafeImageSource(value) {
-  if (value.startsWith("/media/") || value.startsWith("/assets/")) {
+  if (/^\/(?!\/)[a-zA-Z0-9/_.,-]+$/.test(value) && !value.includes("..")) {
     return true;
   }
+  if (/^data:image\/(jpeg|png|webp|avif);base64,[A-Za-z0-9+/]+=*$/.test(value) && value.length < 3_500_000) return true;
   try {
     const url = new URL(value);
     return url.protocol === "https:" || url.protocol === "http:";

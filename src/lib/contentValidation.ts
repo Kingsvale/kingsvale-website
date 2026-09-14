@@ -91,7 +91,7 @@ function addImageErrors(errors: ValidationError[], path: string, image?: ImageAs
     return;
   }
 
-  addRequiredTextError(errors, `${path}.src`, image.src, "Image source", 9000);
+  addRequiredTextError(errors, `${path}.src`, image.src, "Image source", image.src?.startsWith("data:") ? 3_500_000 : 9000);
   addRequiredTextError(
     errors,
     `${path}.alt`,
@@ -105,6 +105,9 @@ function addImageErrors(errors: ValidationError[], path: string, image?: ImageAs
       path: `${path}.src`,
       message: "Image source must be an image URL, relative path or uploaded data image."
     });
+  }
+  if (image.focalPoint !== undefined && !/^(100|\d{1,2})% (100|\d{1,2})%$/.test(image.focalPoint)) {
+    errors.push({ path: `${path}.focalPoint`, message: "Choose a focal point between 0 and 100%." });
   }
 }
 
@@ -171,6 +174,11 @@ function addDevelopmentErrors(errors: ValidationError[], development: Developmen
   );
   addHrefError(errors, `${path}.ctaHref`, development.ctaHref, "Development CTA link");
   addImageErrors(errors, `${path}.image`, development.image);
+  if (development.gallery !== undefined) {
+    if (!Array.isArray(development.gallery) || development.gallery.length > 12) {
+      errors.push({ path: `${path}.gallery`, message: "Use up to 12 gallery images." });
+    } else development.gallery.forEach((image, i) => addImageErrors(errors, `${path}.gallery.${i}`, image));
+  }
 }
 
 function addFooterErrors(errors: ValidationError[], footer: FooterContent) {
@@ -362,6 +370,12 @@ export function validateSiteContent(content: SiteContent): ValidationResult {
   addImageErrors(errors, "landWanted.image", content.landWanted.image);
 
   addFooterErrors(errors, content.footer);
+
+  Object.entries(content.pages ?? {}).forEach(([key, page]) => {
+    addImageErrors(errors, `pages.${key}.image`, page.image);
+    addImageErrors(errors, `pages.${key}.seo.image`, page.seo?.image);
+  });
+  Object.entries(content.seo ?? {}).forEach(([key, seo]) => addImageErrors(errors, `seo.${key}.image`, seo.image));
 
   return {
     valid: errors.length === 0,

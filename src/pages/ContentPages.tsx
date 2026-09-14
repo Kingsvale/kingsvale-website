@@ -121,9 +121,9 @@ export function DevelopmentDetailPage({
             </ul>
           </Reveal>
           <div className="gallery-grid">
-            {(development.gallery ?? [development.image]).map((image) => (
+            {(development.gallery?.length ? development.gallery : [development.image]).map((image, index) => (
               <ResponsiveImage
-                key={image.src}
+                key={`${image.src}-${index}`}
                 image={image}
                 sizes="(max-width: 860px) 100vw, 44vw"
                 widthHint={900}

@@ -1,0 +1,91 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { createHash, createDecipheriv } from "node:crypto";
+import sharp from "sharp";
+import { defaultContent } from "../../src/data/defaultContent.ts";
+
+const password = "test-only-kingsvale-images";
+const encryptionKey = "test-only-media-backup-encryption-key";
+
+async function startServer(t) {
+  const directory = await mkdtemp(join(tmpdir(), "kingsvale-media-"));
+  const child = spawn(process.execPath, ["server/secure-server.mjs"], {
+    cwd: process.cwd(), windowsHide: true,
+    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_PASSWORD: password, STUDIO_USER: "kingsvale", STUDIO_AUTH_TOKEN_SECRET: "test-only-image-auth-token-secret", CMS_ENCRYPTION_KEY: encryptionKey, STUDIO_TOTP_SECRET: "" },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  t.after(async () => {
+    if (child.exitCode === null) { const closed = new Promise((done) => child.once("exit", done)); child.kill(); await closed; }
+    assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep + "kingsvale-media-"));
+    await rm(directory, { recursive: true, force: true });
+  });
+  const url = await new Promise((done, reject) => {
+    const timer = setTimeout(() => reject(new Error("Server startup timed out")), 10000);
+    child.once("exit", (code) => { clearTimeout(timer); reject(new Error(`Server exited: ${code}`)); });
+    child.stderr.on("data", (data) => process.stderr.write(data));
+    child.stdout.on("data", (data) => { const match = data.toString().match(/http:\/\/127\.0\.0\.1:\d+/); if (match) { clearTimeout(timer); done(match[0]); } });
+  });
+  const login = await fetch(`${url}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "kingsvale", password }) });
+  assert.equal(login.status, 200);
+  const { authToken } = await login.json();
+  const api = (path, method = "GET", body) => fetch(`${url}${path}`, { method, headers: { Authorization: `Bearer ${authToken}`, ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) });
+  return { url, directory, api };
+}
+
+test("uploaded photos survive export, a fresh server restore, revisions and merge; corrupt archives cannot change content", { timeout: 60000 }, async (t) => {
+  const source = await startServer(t);
+  const destination = await startServer(t);
+  const bytes = await sharp({ create: { width: 1600, height: 1000, channels: 3, background: "#758871" } }).png().toBuffer();
+  const form = new FormData(); form.set("image", new Blob([bytes], { type: "image/png" }), "Project garden.png");
+  const upload = await source.api("/api/uploads/images", "POST", form);
+  assert.equal(upload.status, 201);
+  const { image } = await upload.json();
+  assert.equal(image.width, 1600);
+  assert.deepEqual(image.variants.map((variant) => variant.width), [480, 960, 1440, 1600]);
+  const content = structuredClone(defaultContent);
+  content.developments[0].image = { ...image, alt: "Garden at The Ridings", focalPoint: "20% 75%" };
+  content.developments[0].gallery = [{ ...image, alt: "Project garden" }];
+  assert.equal((await source.api("/api/cms/publish", "POST", { content })).status, 200);
+  const second = structuredClone(content); second.hero.title = "New project photographs";
+  assert.equal((await source.api("/api/cms/publish", "POST", { content: second })).status, 200);
+  const { backup } = await (await source.api("/api/backup")).json();
+  assert.equal(backup.version, 2);
+  assert.equal(backup.media.length, 4);
+  assert.equal(backup.stores.cms.revisions.length, 1);
+  for (const file of backup.media) assert.equal(createHash("sha256").update(Buffer.from(file.data, "base64")).digest("hex"), file.sha256);
+  const diskBackups = await readdir(join(source.directory, "backups"));
+  assert.ok(diskBackups.some((name) => name.includes("publish")));
+  assert.ok(diskBackups.some((name) => name.includes("export")));
+  const disk = JSON.parse(await readFile(join(source.directory, "backups", diskBackups.find((name) => name.includes("publish"))), "utf8"));
+  assert.equal(disk.encrypted, true);
+  const decipher = createDecipheriv("aes-256-gcm", createHash("sha256").update(encryptionKey).digest(), Buffer.from(disk.iv, "base64"));
+  decipher.setAuthTag(Buffer.from(disk.tag, "base64"));
+  const saved = JSON.parse(Buffer.concat([decipher.update(Buffer.from(disk.payload, "base64url")), decipher.final()]).toString("utf8"));
+  assert.equal(saved.media.length, 4);
+  assert.equal((await destination.api("/api/backup", "PUT", { backup, mode: "replace" })).status, 200);
+  for (const file of backup.media) {
+    const response = await fetch(`${destination.url}/media/${file.filename}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from(file.data, "base64"));
+  }
+  const restored = await (await destination.api("/api/cms/draft")).json();
+  assert.equal(restored.published.developments[0].image.focalPoint, "20% 75%");
+  assert.equal((await destination.api("/api/backup", "PUT", { backup, mode: "merge" })).status, 200);
+  const tampered = structuredClone(backup); tampered.media[0].sha256 = "0".repeat(64);
+  assert.equal((await destination.api("/api/backup", "PUT", { backup: tampered })).status, 400);
+  const traversal = structuredClone(backup); traversal.media[0].filename = "../content.json";
+  assert.equal((await destination.api("/api/backup", "PUT", { backup: traversal })).status, 400);
+  const missing = structuredClone(backup); missing.media.pop();
+  assert.equal((await destination.api("/api/backup", "PUT", { backup: missing })).status, 400);
+  const duplicate = structuredClone(backup); duplicate.media.push(duplicate.media[0]);
+  assert.equal((await destination.api("/api/backup", "PUT", { backup: duplicate })).status, 400);
+  assert.equal((await (await destination.api("/api/cms/draft")).json()).published.hero.title, second.hero.title);
+  const unauthenticated = await fetch(`${source.url}/api/uploads/images`, { method: "POST", body: form });
+  assert.equal(unauthenticated.status, 401);
+  const malformed = new FormData(); malformed.set("image", new Blob(["not an image"], { type: "image/png" }), "broken.png");
+  assert.equal((await source.api("/api/uploads/images", "POST", malformed)).status, 400);
+});

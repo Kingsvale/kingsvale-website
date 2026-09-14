@@ -16,6 +16,8 @@ import { loadPublishedContent, savePublishedContent } from "./storage";
 import { normalizeSiteContent } from "./contentNormalize";
 import { validateSiteContent } from "./contentValidation";
 import { validateTrackingSite } from "./trackingValidation";
+import { readImageFile } from "./imageUtils";
+import { websiteDraftKey } from "./websiteDraft";
 import {
   loadLocalStudioSettings,
   normalizeStudioSettings,
@@ -209,26 +211,42 @@ export async function restoreCmsRevision(id: string) {
   return (await response.json()) as { content: SiteContent };
 }
 
-export async function uploadCmsImage(file: File): Promise<ImageAsset | null> {
+export async function uploadCmsImage(file: File): Promise<ImageAsset> {
+  if (!["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type)) throw new Error("Choose a JPEG, PNG, WebP or AVIF image.");
+  if (file.size > 12_000_000) throw new Error("Images must be 12 MB or smaller.");
+  let response: Response;
   try {
     const formData = new FormData();
     formData.set("image", file);
-    const response = await fetch("/api/uploads/images", {
+    response = await fetch("/api/uploads/images", {
       method: "POST",
       credentials: "same-origin",
       headers: authHeaders(),
       body: formData
     });
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as { image: ImageAsset };
-    return payload.image;
   } catch {
-    return null;
+    // Only the standalone local demo may store an embedded image. A server session must never fall back.
+    if (isLocalDemoRuntime() && !authToken) return { src: await readImageFile(file), alt: file.name.replace(/\.[^.]+$/, "").slice(0, 150), focalPoint: "50% 50%" };
+    throw new Error("Upload could not reach the server. Your current image has been kept. Try again.");
   }
+  if (!response.ok) throw new Error(await apiError(response, "Image upload failed. Try again."));
+  if (!isJsonResponse(response)) {
+    if (isLocalDemoRuntime() && !authToken) return { src: await readImageFile(file), alt: file.name.replace(/\.[^.]+$/, "").slice(0, 150), focalPoint: "50% 50%" };
+    throw new Error("The server did not confirm the upload. Sign in again and retry.");
+  }
+  const payload = (await response.json()) as { image: ImageAsset };
+  if (!payload.image?.src?.startsWith("/media/")) throw new Error("The server did not return a stored image.");
+  return payload.image;
+}
+
+async function apiError(response: Response, fallback: string) {
+  if (response.status === 401 || response.status === 403) return "Your Studio session has expired. Sign in again, then retry.";
+  if (response.status === 413) return "This file is larger than the server allows. Use a smaller file or increase the server import limit.";
+  try {
+    const payload = await response.json();
+    return payload.error || payload.errors?.[0]?.message || fallback;
+  } catch { return fallback; }
 }
 
 export type UploadedLetterFile = {
@@ -592,102 +610,64 @@ export type KingsvaleBackup = {
   kind: "kingsvale-full-backup";
   version: number;
   exportedAt: string;
-    stores: {
-      cms: unknown;
-      tracking: { sites: TrackingSite[]; updatedAt: string | null };
-      settings?: StudioSettings;
-      analytics: unknown;
+  media?: { filename: string; bytes: number; sha256: string; data: string }[];
+  stores: {
+    cms: unknown;
+    tracking: { sites: TrackingSite[]; updatedAt: string | null };
+    settings?: StudioSettings;
+    analytics: unknown;
     leads: { contact: string; newsletter: string };
   };
 };
 
+export function hasServerSession() { return Boolean(authToken); }
+
 export async function exportFullBackup(): Promise<KingsvaleBackup> {
-  if (isLocalDemoRuntime() && !authToken) {
-    return buildLocalFullBackup();
-  }
-
-  try {
-    const response = await fetch("/api/backup", {
-      credentials: "same-origin",
-      headers: authHeaders({ Accept: "application/json" })
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      throw new Error(backupSessionError);
-    }
-
-    if (response.ok && isJsonResponse(response)) {
-      const payload = (await response.json()) as { backup: KingsvaleBackup };
-      return payload.backup;
-    }
-  } catch (error) {
-    if (isBackupSessionError(error)) {
-      throw error;
-    }
-    if (!isLocalDemoRuntime()) {
-      throw error;
-    }
-    return buildLocalFullBackup();
-  }
-
-  if (isLocalDemoRuntime()) {
-    return buildLocalFullBackup();
-  }
-
-  throw new Error("Backup could not be exported.");
+  if (isLocalDemoRuntime() && !authToken) return buildLocalFullBackup();
+  const response = await fetch("/api/backup", {
+    credentials: "same-origin", headers: authHeaders({ Accept: "application/json" })
+  });
+  if (response.status === 401 || response.status === 403) throw new Error(backupSessionError);
+  if (!response.ok || !isJsonResponse(response)) throw new Error(await apiError(response, "Backup could not be exported."));
+  const payload = await response.json() as { backup: KingsvaleBackup };
+  return payload.backup;
 }
 
 export async function importFullBackup(backup: KingsvaleBackup, mode: "replace" | "merge") {
-  if (isLocalDemoRuntime() && !authToken) {
-    return importLocalFullBackup(backup, mode);
-  }
-
-  try {
-    const response = await fetch("/api/backup", {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
-      body: JSON.stringify({ backup, mode })
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      throw new Error(backupSessionError);
-    }
-
-    if (response.ok && isJsonResponse(response)) {
-      return (await response.json()) as { ok: true; importedAt: string; mode: "replace" | "merge" };
-    }
-  } catch (error) {
-    if (isBackupSessionError(error)) {
-      throw error;
-    }
-    if (!isLocalDemoRuntime()) {
-      throw error;
-    }
-    return importLocalFullBackup(backup, mode);
-  }
-
-  if (isLocalDemoRuntime()) {
-    return importLocalFullBackup(backup, mode);
-  }
-
-  throw new Error("Backup could not be imported.");
+  if (isLocalDemoRuntime() && !authToken) return importLocalFullBackup(backup, mode);
+  const response = await fetch("/api/backup", {
+    method: "PUT", credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+    body: JSON.stringify({ backup, mode })
+  });
+  if (response.status === 401 || response.status === 403) throw new Error(backupSessionError);
+  if (!response.ok || !isJsonResponse(response)) throw new Error(await apiError(response, "Backup could not be imported."));
+  return await response.json() as { ok: true; importedAt: string; mode: "replace" | "merge" };
 }
 
 async function buildLocalFullBackup(): Promise<KingsvaleBackup> {
   const now = new Date().toISOString();
   const published = loadPublishedContent();
+  let draft = published;
+  try { const saved = localStorage.getItem(websiteDraftKey); if (saved) draft = normalizeSiteContent(JSON.parse(saved)); } catch { /* Use published content if no draft can be read. */ }
   const trackingSites = await listTrackingSites();
   const settings = loadLocalStudioSettings();
+  let media: KingsvaleBackup["media"] = [];
+  const response = await fetch("/api/backup/media").catch(() => null);
+  if (response?.ok && isJsonResponse(response)) media = (await response.json()).media;
+  else if (JSON.stringify({ published, draft, trackingSites, settings }).includes("/media/")) {
+    throw new Error("Uploaded files could not be backed up. Start the local server and try again.");
+  }
 
   return {
     kind: "kingsvale-full-backup",
-    version: 1,
+    version: 2,
     exportedAt: now,
+    media,
     stores: {
       cms: {
         published,
-        draft: published,
+        draft,
         revisions: [],
         updatedAt: now
       },
@@ -717,6 +697,8 @@ async function importLocalFullBackup(backup: KingsvaleBackup, mode: "replace" | 
   await importLocalTrackingBackup(backup, importedSites, mode);
   saveLocalStudioSettings(settings);
   savePublishedContent(content);
+  const cms = backup.stores.cms as { draft?: SiteContent };
+  localStorage.setItem(websiteDraftKey, JSON.stringify(cms.draft ?? content));
   saveLocalAnalyticsVisits(
     mode === "merge"
       ? dedupeVisits([...importedVisits, ...loadLocalAnalyticsVisits()]).slice(0, 500)
@@ -769,9 +751,12 @@ async function importLocalTrackingBackup(
       markTrackingStorageServer("dev-file");
       return;
     }
-  } catch {
+  } catch (error) {
+    if (backup.media?.length || JSON.stringify(backup.stores).includes("/media/")) throw error;
     // Fall through to browser-only storage when no development API is available.
   }
+
+  if (backup.media?.length || JSON.stringify(backup.stores).includes("/media/")) throw new Error("Uploaded files could not be restored. Start the local server and try again.");
 
   const existingSites = loadLocalTrackingSites();
   const nextSites = mode === "merge"
@@ -799,9 +784,6 @@ function isJsonResponse(response: Response) {
   return response.headers.get("content-type")?.includes("application/json") ?? false;
 }
 
-function isBackupSessionError(error: unknown) {
-  return error instanceof Error && error.message === backupSessionError;
-}
 
 function authHeaders(headers: Record<string, string> = {}) {
   return authToken

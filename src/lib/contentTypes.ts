@@ -10,6 +10,10 @@ export type ImageAsset = {
   src: string;
   alt: string;
   focalPoint?: string;
+  width?: number;
+  height?: number;
+  filename?: string;
+  variants?: { src: string; width: number }[];
 };
 
 export type SeoContent = {

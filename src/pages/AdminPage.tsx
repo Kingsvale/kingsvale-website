@@ -16,12 +16,10 @@ import {
   ShieldCheck,
   Smartphone,
   Tablet,
-  Trash2,
-  UploadCloud
+  Trash2
 } from "lucide-react";
 import {
   type CSSProperties,
-  type ChangeEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -39,7 +37,6 @@ import type {
   Development,
   FeatureItem,
   IconKey,
-  ImageAsset,
   NavLink,
   SeoContent,
   SiteContent
@@ -49,7 +46,6 @@ import {
   validateSiteContent,
   type ValidationError
 } from "../lib/contentValidation";
-import { readImageFile } from "../lib/imageUtils";
 import {
   cloneContent,
   resetPublishedContent,
@@ -59,12 +55,12 @@ import { saveEncryptedEditorSnapshot } from "../lib/studioSecurity";
 import {
   fetchCmsDraft,
   getTrackingStorageStatus,
+  hasServerSession,
   listCmsRevisions,
   publishCmsContent,
   restoreCmsRevision,
   saveCmsDraft,
-  subscribeTrackingStorageStatus,
-  uploadCmsImage
+  subscribeTrackingStorageStatus
 } from "../lib/cmsApi";
 import {
   buildStudioPreviewUrl,
@@ -76,6 +72,13 @@ import { AdminBackupPanel } from "./AdminBackupPanel";
 import { AdminMailingPanel } from "./AdminMailingPanel";
 import { AdminSettingsPanel } from "./AdminSettingsPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
+import { ImageEditor, ImageUploadContext } from "./AdminImageEditor";
+import { AdminImagesPanel } from "./AdminImagesPanel";
+import { ProjectGallery } from "./AdminProjectGallery";
+import { isLocalDemoRuntime } from "../lib/runtimeMode";
+import { normalizeSiteContent } from "../lib/contentNormalize";
+import { websiteDraftKey } from "../lib/websiteDraft";
+import "../studio-media.css";
 
 type AdminPageProps = {
   publishedContent: SiteContent;
@@ -92,12 +95,13 @@ type RevisionSummary = {
 };
 
 type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup" | "settings";
-type PreviewRoute = "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
+type PreviewRoute = `/developments/${string}` | "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 
 const emptyLink: NavLink = { label: "New link", href: "#" };
 
 const editorSections = [
+  { id: "images", label: "Images & galleries" },
   { id: "hero", label: "Homepage hero" },
   { id: "features", label: "Homepage highlights" },
   { id: "legacy", label: "Homepage/about" },
@@ -139,7 +143,7 @@ const previewDevices = [
 type PreviewDeviceConfig = (typeof previewDevices)[number];
 type EditorSectionId = (typeof editorSections)[number]["id"];
 
-const previewRoutePanels: Record<PreviewRoute, EditorSectionId> = {
+const previewRoutePanels: Partial<Record<PreviewRoute, EditorSectionId>> = {
   "/": "hero",
   "/design-build": "design",
   "/land-wanted": "land",
@@ -155,7 +159,12 @@ export function AdminPage({
   encryptedSnapshotSummary = "Encrypted snapshot updates after publishing.",
   onLogout
 }: AdminPageProps) {
-  const [draft, setDraft] = useState<SiteContent>(() => cloneContent(publishedContent));
+  const [draft, setDraft] = useState<SiteContent>(() => {
+    if (isLocalDemoRuntime()) {
+      try { const saved = localStorage.getItem(websiteDraftKey); if (saved) return normalizeSiteContent(JSON.parse(saved)); } catch { /* Start from published content if the local draft is unavailable. */ }
+    }
+    return cloneContent(publishedContent);
+  });
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
   const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>("website");
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
@@ -163,7 +172,15 @@ export function AdminPage({
   const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const [previewKey, setPreviewKey] = useState(0);
+  const [selectedProjectId, setSelectedProjectId] = useState(draft.developments[0].id);
+  const selectedProject = draft.developments.find((project) => project.id === selectedProjectId) ?? draft.developments[0];
   const [serverMode, setServerMode] = useState(false);
+  const [checkingStorage, setCheckingStorage] = useState(true);
+  const [savedDraft, setSavedDraft] = useState(() => JSON.stringify(draft));
+  const [uploadsPending, setUploadsPending] = useState(0);
+  const unsaved = JSON.stringify(draft) !== savedDraft;
+  const storageUnavailable = !checkingStorage && !serverMode && (!isLocalDemoRuntime() || hasServerSession());
+  const availablePreviewRoutes = [...previewRoutes, ...draft.developments.map((development) => ({ value: `/developments/${development.id}` as PreviewRoute, label: development.title }))];
   const [trackingStorageStatus, setTrackingStorageStatus] = useState(() => getTrackingStorageStatus());
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState("");
@@ -172,7 +189,7 @@ export function AdminPage({
   const validation = useMemo(() => validateSiteContent(draft), [draft]);
   const errorsByPath = useMemo(() => toErrorMap(validation.errors), [validation.errors]);
   const activePanelLabel = editorSections.find((section) => section.id === activePanel)?.label ?? "Hero";
-  const previewRouteLabel = previewRoutes.find((route) => route.value === previewRoute)?.label ?? "selected page";
+  const previewRouteLabel = availablePreviewRoutes.find((route) => route.value === previewRoute)?.label ?? "selected page";
   const previewDeviceConfig = previewDevices.find((device) => device.id === previewDevice) ?? previewDevices[0];
 
   useEffect(() => {
@@ -186,7 +203,9 @@ export function AdminPage({
         }
         setServerMode(true);
         if (payload.draft) {
-          setDraft(cloneContent(payload.draft));
+          const loaded = normalizeSiteContent(payload.draft);
+          setDraft(loaded);
+          setSavedDraft(JSON.stringify(loaded));
         }
         const revisionList = await listCmsRevisions();
         if (active) {
@@ -200,8 +219,9 @@ export function AdminPage({
       } catch {
         if (active) {
           setServerMode(false);
+          if (!isLocalDemoRuntime()) setStatus("The backend is unavailable. Sign in again or retry before saving.");
         }
-      }
+      } finally { if (active) setCheckingStorage(false); }
     }
 
     void loadServerDraft();
@@ -225,6 +245,32 @@ export function AdminPage({
 
   useEffect(() => subscribeTrackingStorageStatus(setTrackingStorageStatus), []);
 
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => { if (unsaved || uploadsPending) event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved, uploadsPending]);
+
+  async function saveDraft() {
+    if (storageUnavailable) return;
+    setBusy(true);
+    try {
+      if (serverMode) await saveCmsDraft(draft);
+      else if (isLocalDemoRuntime()) localStorage.setItem(websiteDraftKey, JSON.stringify(draft));
+      else throw new Error("Backend unavailable");
+      setSavedDraft(JSON.stringify(draft));
+      setStatus(serverMode ? "Draft saved on the backend. The live website has not changed." : "Draft saved on this browser. The live website has not changed.");
+    } catch { setStatus("Draft could not be saved. Your edits are still here; check the connection and retry."); }
+    finally { setBusy(false); }
+  }
+
+  function selectEditorSection(section: EditorSectionId) {
+    setActivePanel(section);
+    const route = Object.entries(previewRoutePanels).find(([, panel]) => panel === section)?.[0];
+    if (route) setPreviewRoute(route as PreviewRoute);
+    if (section === "images") setPreviewRoute(`/developments/${draft.developments[0].id}`);
+  }
+
   function updateDraft(recipe: (content: SiteContent) => void) {
     setDraft((current) => {
       const next = cloneContent(current);
@@ -234,6 +280,7 @@ export function AdminPage({
   }
 
   async function publish() {
+    if (storageUnavailable || checkingStorage || uploadsPending) return;
     const result = validateSiteContent(draft);
     if (!result.valid) {
       setStatus("Resolve the validation issues before publishing.");
@@ -247,10 +294,12 @@ export function AdminPage({
         await saveCmsDraft(draft);
         await publishCmsContent(draft);
         setRevisions(await listCmsRevisions());
-      } else {
+      } else if (isLocalDemoRuntime()) {
         savePublishedContent(draft);
+        localStorage.setItem(websiteDraftKey, JSON.stringify(draft));
         await saveEncryptedEditorSnapshot(draft, studioSecret);
       }
+      setSavedDraft(JSON.stringify(draft));
       window.dispatchEvent(new Event("kingsvale-content-updated"));
       setStatus(
         serverMode
@@ -267,6 +316,7 @@ export function AdminPage({
   }
 
   async function resetToDefaults() {
+    if (!window.confirm("Restore all default website content and placeholder photographs? This will update the live website.")) return;
     const defaults = cloneContent(defaultContent);
     setDraft(defaults);
     setBusy(true);
@@ -277,8 +327,10 @@ export function AdminPage({
         setRevisions(await listCmsRevisions());
       } else {
         resetPublishedContent();
+        localStorage.setItem(websiteDraftKey, JSON.stringify(defaults));
       }
       window.dispatchEvent(new Event("kingsvale-content-updated"));
+      setSavedDraft(JSON.stringify(defaults));
       setStatus("Default Kingsvale content restored.");
     } catch {
       setStatus("Reset failed. Check the server session.");
@@ -296,6 +348,7 @@ export function AdminPage({
     try {
       const payload = await restoreCmsRevision(selectedRevision);
       setDraft(cloneContent(payload.content));
+      setSavedDraft(JSON.stringify(payload.content));
       setRevisions(await listCmsRevisions());
       setSelectedRevision("");
       setShowRevisionHistory(false);
@@ -310,10 +363,12 @@ export function AdminPage({
 
   function handlePreviewRouteChange(route: PreviewRoute) {
     setPreviewRoute(route);
-    setActivePanel(previewRoutePanels[route]);
+    if (route.startsWith("/developments/")) setSelectedProjectId(route.split("/")[2]);
+    setActivePanel((current) => current === "images" ? current : previewRoutePanels[route] ?? "developments");
   }
 
   return (
+    <ImageUploadContext.Provider value={(delta) => setUploadsPending((count) => count + delta)}>
     <div className="admin-page">
       <header className="admin-topbar">
         <div>
@@ -334,6 +389,7 @@ export function AdminPage({
                 role="tab"
                 aria-selected={activeRootTab === tab.id}
                 aria-controls={`admin-root-panel-${tab.id}`}
+                disabled={uploadsPending > 0 || busy}
                 onClick={() => setActiveRootTab(tab.id)}
               >
                 {tab.label}
@@ -344,7 +400,7 @@ export function AdminPage({
         <div className="admin-actions">
           <div className="admin-secure-pill">
             <ShieldCheck aria-hidden="true" />
-            <span>{serverMode ? "Server CMS session active" : encryptedSnapshotSummary}</span>
+            <span>{checkingStorage ? "Connecting to storage…" : serverMode ? "Images & drafts stored on the backend" : isLocalDemoRuntime() ? "Local studio · browser drafts" : encryptedSnapshotSummary}</span>
           </div>
           <div className={`admin-storage-pill admin-storage-pill--${trackingStorageStatus.mode}`} role="status">
             {trackingStorageStatus.mode === "local" || trackingStorageStatus.mode === "unavailable" ? (
@@ -371,23 +427,14 @@ export function AdminPage({
                 <Eye aria-hidden="true" />
                 Open site
               </a>
-              <button type="button" className="admin-ghost" onClick={resetToDefaults} disabled={busy}>
+              <button type="button" className="admin-ghost" onClick={resetToDefaults} disabled={busy || uploadsPending > 0 || checkingStorage || storageUnavailable}>
                 <RotateCcw aria-hidden="true" />
                 Reset
-              </button>
-              <button
-                type="button"
-                className="admin-save"
-                onClick={publish}
-                disabled={!validation.valid || busy}
-              >
-                <Save aria-hidden="true" />
-                {busy ? "Working" : "Publish"}
               </button>
             </>
           )}
           {onLogout && (
-            <button type="button" className="admin-ghost" onClick={onLogout}>
+            <button type="button" className="admin-ghost" disabled={busy || uploadsPending > 0} onClick={() => { if (!unsaved || window.confirm("Lock Studio and discard unsaved changes? Save a draft first to keep them.")) onLogout(); }}>
               <LogOut aria-hidden="true" />
               Lock
             </button>
@@ -458,6 +505,7 @@ export function AdminPage({
             <span><strong>{activePanelLabel}</strong> - {status}</span>
           </div>
 
+          <p className="draft-state" role="status">{uploadsPending ? "Uploading images — wait before saving or publishing." : unsaved ? "Unsaved changes · save a draft to come back later" : "Draft is up to date"}</p>
           {!validation.valid && (
             <div className="admin-errors" role="alert" aria-label="Validation issues">
               <h2>Content guardrails</h2>
@@ -469,6 +517,7 @@ export function AdminPage({
             </div>
           )}
 
+          <fieldset className="admin-edit-fields" disabled={busy || checkingStorage || uploadsPending > 0}>
           <div className="admin-tabs" role="tablist" aria-label="Editor sections">
             {editorSections.map((section) => (
               <button
@@ -477,18 +526,18 @@ export function AdminPage({
                 role="tab"
                 aria-selected={activePanel === section.id}
                 aria-controls={`editor-panel-${section.id}`}
-                onClick={() => setActivePanel(section.id)}
+                disabled={uploadsPending > 0 || busy || checkingStorage}
+                onClick={() => selectEditorSection(section.id)}
               >
                 {section.label}
               </button>
             ))}
           </div>
           <p className="admin-panel__note">
-            Homepage content is edited in the first five tabs: hero, highlights,
-            about, developments and land wanted. The live preview page selector
-            opens the matching editor tab automatically.
+            Start with Images & galleries to replace sample photographs. Edit your text by section, save a draft, then publish when you are happy with the preview.
           </p>
 
+          {activePanel === "images" && <AdminImagesPanel content={draft} updateContent={updateDraft} onPreview={(route) => setPreviewRoute(route as PreviewRoute)} />}
           {activePanel === "brand" && (
           <EditorPanel title="Header and navigation" id="editor-panel-brand">
             <div className="admin-grid admin-grid--two">
@@ -675,18 +724,20 @@ export function AdminPage({
                 type="button"
                 className="admin-small"
                 disabled={draft.developments.length >= 6}
-                onClick={() =>
-                  updateDraft((content) => {
-                    content.developments.push(createDevelopment());
-                  })
-                }
+                onClick={() => {
+                  const project = createDevelopment();
+                  updateDraft((content) => { content.developments.push(project); });
+                  setSelectedProjectId(project.id);
+                  setPreviewRoute(`/developments/${project.id}`);
+                }}
               >
                 <Plus aria-hidden="true" />
                 Add
               </button>
             </div>
+            <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setSelectedProjectId(id); setPreviewRoute(`/developments/${id}`); }} />
             <div className="admin-stack">
-              {draft.developments.map((development, index) => (
+              {draft.developments.map((development, index) => development.id === selectedProject.id && (
                 <DevelopmentEditor
                   key={development.id}
                   development={development}
@@ -869,6 +920,7 @@ export function AdminPage({
             />
           </EditorPanel>
           )}
+          </fieldset>
         </section>
 
         <aside className="admin-preview" aria-label={`Live ${previewRouteLabel} preview`}>
@@ -880,10 +932,11 @@ export function AdminPage({
             <label className="sr-only" htmlFor="preview-route">Preview page</label>
             <select
               id="preview-route"
+              disabled={uploadsPending > 0}
               value={previewRoute}
               onChange={(event) => handlePreviewRouteChange(event.target.value as PreviewRoute)}
             >
-              {previewRoutes.map((route) => (
+              {availablePreviewRoutes.map((route) => (
                 <option key={route.value} value={route.value}>
                   {route.label}
                 </option>
@@ -926,6 +979,20 @@ export function AdminPage({
             title={`Live ${previewRouteLabel} ${previewDeviceConfig.label} preview`}
           />
         </aside>
+        <div className="studio-draftbar" aria-label="Website draft actions" role="region">
+          <span>{uploadsPending ? "Uploading photographs…" : unsaved ? "Changes ready to save" : "Draft saved"}<small>Publish when you are ready to update the live website.</small></span>
+              <button type="button" className="admin-ghost" onClick={saveDraft} disabled={!unsaved || !validation.valid || busy || uploadsPending > 0 || checkingStorage || storageUnavailable}><Save aria-hidden="true" />Save draft</button>
+              <button
+                type="button"
+                className="admin-save"
+                onClick={publish}
+                disabled={!validation.valid || busy || uploadsPending > 0 || checkingStorage || storageUnavailable}
+              >
+                <Save aria-hidden="true" />
+                {busy ? "Working" : "Publish"}
+              </button>
+
+        </div>
       </main>
       )}
       {activeRootTab === "sites" && (
@@ -945,7 +1012,12 @@ export function AdminPage({
       )}
       {activeRootTab === "backup" && (
       <main className="admin-root-main" id="admin-root-panel-backup" role="tabpanel">
-        <AdminBackupPanel />
+          <AdminBackupPanel onImported={async () => {
+            const restored = serverMode ? (await fetchCmsDraft()).draft : JSON.parse(localStorage.getItem(websiteDraftKey) ?? "null");
+            if (restored) { const content = normalizeSiteContent(restored); setDraft(content); setSavedDraft(JSON.stringify(content)); }
+            window.dispatchEvent(new Event("kingsvale-content-updated"));
+            setStatus("Imported website draft loaded. Review your images before editing further.");
+          }} />
       </main>
       )}
       {activeRootTab === "settings" && (
@@ -954,6 +1026,7 @@ export function AdminPage({
       </main>
       )}
     </div>
+    </ImageUploadContext.Provider>
   );
 }
 
@@ -1045,85 +1118,6 @@ function EditorPanel({
       <h2>{title}</h2>
       {children}
     </section>
-  );
-}
-
-function ImageEditor({
-  title,
-  image,
-  onChange,
-  error
-}: {
-  title: string;
-  image: ImageAsset;
-  onChange: (image: ImageAsset) => void;
-  error?: string;
-}) {
-  const [fileError, setFileError] = useState("");
-
-  async function handleFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    try {
-      const uploadedImage = await uploadCmsImage(file);
-      if (uploadedImage) {
-        setFileError("");
-        onChange({
-          ...image,
-          ...uploadedImage,
-          alt: image.alt || uploadedImage.alt || file.name.replace(/\.[^.]+$/, "")
-        });
-        return;
-      }
-
-      const dataUrl = await readImageFile(file);
-      setFileError("");
-      onChange({
-        ...image,
-        src: dataUrl,
-        alt: image.alt || file.name.replace(/\.[^.]+$/, "")
-      });
-    } catch (caughtError) {
-      setFileError(caughtError instanceof Error ? caughtError.message : "Image upload failed.");
-    }
-  }
-
-  return (
-    <div className="image-editor">
-      <div className="image-editor__preview">
-        <img src={image.src} alt={image.alt || ""} />
-      </div>
-      <div className="image-editor__fields">
-        <h3>{title}</h3>
-        <TextInput
-          label={`${title} URL`}
-          value={image.src}
-          onChange={(value) => onChange({ ...image, src: value })}
-          maxLength={9000}
-          error={error}
-        />
-        <TextInput
-          label={`${title} alt text`}
-          value={image.alt}
-          onChange={(value) => onChange({ ...image, alt: value })}
-          maxLength={fieldLimits.imageAlt}
-        />
-        <label className="admin-upload">
-          <UploadCloud aria-hidden="true" />
-          <span>Upload replacement image</span>
-          <input
-            type="file"
-            data-testid={`${toId(title)}-upload`}
-            accept="image/jpeg,image/png,image/webp,image/avif"
-            onChange={handleFile}
-          />
-        </label>
-        {fileError && <p className="admin-field__error">{fileError}</p>}
-      </div>
-    </div>
   );
 }
 
@@ -1513,6 +1507,7 @@ function DevelopmentEditor({
         }
         onChange={(image) => onChange({ ...development, image })}
       />
+      <ProjectGallery title={development.title} images={development.gallery ?? []} onChange={(gallery) => onChange({ ...development, gallery })} />
     </article>
   );
 }
@@ -1661,8 +1656,4 @@ function toErrorMap(errors: ValidationError[]) {
     map[error.path] = error.message;
     return map;
   }, {});
-}
-
-function toId(label: string) {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

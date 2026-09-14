@@ -25,7 +25,7 @@ export function ResponsiveImage({
       {...props}
       className={className}
       src={getOptimizedImageUrl(image.src, widthHint)}
-      srcSet={getResponsiveSrcSet(image.src)}
+      srcSet={image.variants?.map((variant) => `${variant.src} ${variant.width}w`).join(", ") || getResponsiveSrcSet(image.src)}
       sizes={sizes}
       alt={image.alt}
       loading={loading ?? (priority ? "eager" : "lazy")}

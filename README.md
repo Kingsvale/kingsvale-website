@@ -26,7 +26,7 @@ A responsive luxury real estate homepage and structured admin editor inspired by
 - `npm run serve:secure` is the production-style path: published content, drafts, revisions, uploaded media, audit logs and leads persist under `data/`.
 - For a real multi-user production launch, replace local `data/` persistence with a database/CMS and object storage without changing the typed `SiteContent` schema.
 - Managed production storage is still a deployment choice: this repo now isolates and documents the secure local store, but a real launch should place CMS rows, media, lead records and audit events in managed database/object/logging services.
-- Default photography uses remote optimized image URLs. Local Vite uploads are data URLs; secure-server uploads are decoded and converted to WebP variants in `/media/`.
+- Default photography uses remote optimized image URLs. Local Vite and secure-server uploads are saved under `data/uploads/`, decoded and converted to responsive WebP variants in `/media/`. Only a standalone browser demo without an API uses embedded data images (2.5 MB maximum).
 - The client passphrase gate is retained for Vite-only use. Secure mode verifies the same passphrase server-side and returns a short-lived bearer token for CMS, tracking, analytics and upload APIs.
 
 ## Setup
@@ -69,7 +69,7 @@ Optional hardening:
 $env:STUDIO_TOTP_SECRET="BASE32-TOTP-SECRET"
 $env:CMS_MAX_REVISIONS="5"
 $env:CMS_MAX_BACKUPS="30"
-$env:BACKUP_IMPORT_MAX_MB="25"
+$env:BACKUP_IMPORT_MAX_MB="250"
 ```
 
 Optional Royal Mail or third-party tracking lookup:
@@ -161,7 +161,7 @@ Optional variables:
 STUDIO_TOTP_SECRET=
 CMS_MAX_REVISIONS=5
 CMS_MAX_BACKUPS=30
-BACKUP_IMPORT_MAX_MB=25
+BACKUP_IMPORT_MAX_MB=250
 ROYAL_MAIL_TRACKING_API_URL=
 ROYAL_MAIL_TRACKING_API_KEY=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
@@ -207,7 +207,7 @@ Move local Studio data to the deployed instance:
 3. In the production Studio on Portainer, open `Backup`, choose the exported JSON, and import it.
 4. Use `Replace everything` when production should exactly match local content, or `Merge sites, visits and leads` when production records should be kept.
 
-The Docker image and the editable Studio data are intentionally separate. The image carries code and default placeholders; the backup JSON carries website edits, Sites/QR pages, mailing workflow data, analytics and lead logs. Keep the `kingsvale_data` Docker volume and `CMS_ENCRYPTION_KEY` stable between redeploys so existing production data remains readable.
+The Docker image and the editable Studio data are intentionally separate. The image carries code and default placeholders; the backup JSON carries website edits, Sites/QR pages, mailing workflow data, analytics and lead logs, plus every uploaded photograph, responsive image variant and document. Keep the `kingsvale_data` Docker volume and `CMS_ENCRYPTION_KEY` stable between redeploys so existing production data remains readable.
 
 Portainer GHCR deployment:
 
@@ -266,3 +266,25 @@ If you run behind a reverse proxy such as Traefik, Nginx Proxy Manager, Caddy, o
 
 - Hero stone-accent home: [Unsplash photo by Justin Wolff](https://unsplash.com/photos/modern-luxury-house-with-stone-accents-at-sunset-7qD-iDyrdHY)
 - Additional editable default imagery is served from Unsplash image URLs and can be replaced in the admin editor.
+
+## Project photographs in Studio
+
+Open **Website → Images & galleries** to find every project cover, development gallery, page photograph and social preview. The initial content has 30 placeholder image placements across six projects and the website pages; the Kingsvale logo remains a site asset. Filter by project or search by page, select an image, and upload its replacement. Existing content is preserved until an editor changes it.
+
+- Upload JPEG, PNG, WebP or AVIF files up to 12 MB and 32 million pixels. Landscape photographs around 2,400 px wide are ideal. The backend rotates images using camera orientation, strips metadata and produces WebP sizes without enlarging small images.
+- Review the photograph's description (alt text), adjust its focal point and check wide, card and phone crops. Replacement images start with a filename-based description instead of keeping the unrelated placeholder description. Undo replacement restores the previous image within the current editor session.
+- Each development supports up to 12 gallery photographs, batch upload, ordering and removal from the page. An empty gallery uses the cover photograph. Removing a gallery entry does not delete files needed by earlier revisions.
+- **Save draft** keeps work without publishing. Production drafts live on the backend; Vite development drafts live in the browser. **Publish** updates the public website. Do not close Studio during an upload; failed uploads preserve the current image and can be retried.
+- The preview selector includes individual development pages and desktop, tablet and phone sizes. Image files and responsive variants remain attached to the image when moved or restored.
+
+### Backups with images
+
+Version 2 full backups contain all uploaded files as base64 with byte counts and SHA-256 checksums, alongside CMS drafts, published content, revisions, tracking, settings, analytics and leads. This includes images uploaded but not yet used in published content. Remote image URLs, including Unsplash placeholders, are retained as links; their remote bytes are not downloaded. Save the website draft before exporting so the assignments and captions are current.
+
+On the secure server, publishing and exporting save full recovery archives under `data/backups/`; these use `CMS_ENCRYPTION_KEY` when configured and obey `CMS_MAX_BACKUPS` retention. Import checks all media checksums, filenames, references and conflicts before writing media or changing stores, and saves a recovery archive before applying content. Uploaded media retains its URL so restored pages and revisions keep working. Existing media is preserved during either import mode. Merge replaces website content and drafts while combining site records, visits and leads.
+
+Version 1 backups remain supported when any referenced uploaded files already exist on the destination. Otherwise import explains which file is missing and asks for a new export from the original server. Server recovery files are encrypted; Studio's downloaded JSON is the portable format for import.
+
+The default import request limit is 250 MB, configurable with `BACKUP_IMPORT_MAX_MB` (5–1,000). Base64 adds roughly one third to media size. Reverse proxies must also allow the selected request size. Keep the Docker data volume and encryption key between deployments.
+
+Run `npm run test:media` for a fresh-server upload/export/restore test (including archive corruption checks), and `npm run test:e2e -- tests/e2e/website-images.spec.ts` for the desktop/mobile Studio workflow. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of Playwright's bundled Chromium.

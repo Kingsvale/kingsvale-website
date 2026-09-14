@@ -4,6 +4,8 @@ import { createReadStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, normalize, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { storeImage } from "./server/image-upload.mjs";
+import { collectMedia, prepareMediaRestore } from "./server/media-backup.mjs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ViteDevServer } from "vite";
 import { normalizeTrackingSite } from "./src/lib/trackingNormalize";
@@ -20,6 +22,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalizedId = id.replaceAll("\\", "/");
+
+          if (normalizedId.includes("/src/components/AdminFields")) return "studio";
 
           if (
             normalizedId.includes("vite/preload-helper") ||
@@ -91,6 +95,23 @@ function devTrackingApi(): Plugin {
         const url = new URL(request.url ?? "/", "http://127.0.0.1");
         if (url.pathname.startsWith("/media/")) {
           await serveDevMedia(url.pathname, response);
+          return;
+        }
+
+        if (url.pathname === "/api/uploads/images" && request.method === "POST") {
+          try {
+            const body = await readDevRequestBody(request, 12_100_000);
+            const image = await storeImage(parseDevMultipartFile(body, request.headers["content-type"] ?? ""), devUploadsDir);
+            sendDevJson(response, 201, { image });
+          } catch (error) {
+            sendDevJson(response, 400, { error: error instanceof Error ? error.message : "Image upload failed." });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/backup/media" && request.method === "GET") {
+          try { sendDevJson(response, 200, { media: await collectMedia(devUploadsDir) }); }
+          catch { sendDevJson(response, 500, { error: "Uploaded files could not be backed up." }); }
           return;
         }
 
@@ -276,7 +297,7 @@ async function handleDevTrackingRequest(request: IncomingMessage, response: Serv
 }
 
 async function handleDevBackupImport(request: IncomingMessage, response: ServerResponse) {
-  const payload = await readDevJsonBody(request, 25_000_000);
+  const payload = await readDevJsonBody(request, 250_000_000);
   const backup = payload.backup as { stores?: { tracking?: { sites?: TrackingSite[] } } } | undefined;
   const mode = payload.mode === "merge" ? "merge" : "replace";
   const importedSites = Array.isArray(backup?.stores?.tracking?.sites)
@@ -286,6 +307,12 @@ async function handleDevBackupImport(request: IncomingMessage, response: ServerR
 
   if (!backup || invalidSite) {
     sendDevJson(response, 400, { error: "Backup tracking records are invalid." });
+    return;
+  }
+
+  try { await (await prepareMediaRestore(backup, devUploadsDir))(); }
+  catch (error) {
+    sendDevJson(response, 400, { error: error instanceof Error ? error.message : "Media restore failed." });
     return;
   }
 
@@ -448,7 +475,7 @@ function parseDevMultipartFile(body: Buffer, contentType: string) {
       const fieldName = rawHeaders.match(/name="([^"]+)"/)?.[1];
       const partContentType = rawHeaders.match(/Content-Type:\s*([^\r\n]+)/i)?.[1];
 
-      if (filename && (fieldName === "file" || fieldName === "letter")) {
+      if (filename && (fieldName === "file" || fieldName === "letter" || fieldName === "image")) {
         return {
           filename: basename(filename),
           contentType: partContentType ?? "application/octet-stream",
