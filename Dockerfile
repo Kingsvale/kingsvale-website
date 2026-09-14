@@ -32,6 +32,9 @@ COPY --from=build /app/src/lib/landMap.js ./src/lib/landMap.js
 COPY server ./server
 COPY public ./public
 
+ARG APP_REVISION=unknown
+ENV APP_REVISION=$APP_REVISION
+
 RUN mkdir -p /app/data \
   && chown -R node:node /app
 

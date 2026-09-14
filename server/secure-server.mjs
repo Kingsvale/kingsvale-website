@@ -193,8 +193,10 @@ async function handleApiRequest(request, response, url) {
       return;
     }
 
+    response.setHeader("Cache-Control", "no-store");
     sendJson(response, 200, {
       ok: Boolean(studioPassword),
+      revision: /^[a-f0-9]{40}$/.test(process.env.APP_REVISION ?? "") ? process.env.APP_REVISION : "unknown",
       generatedAt: new Date().toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
       storage: {

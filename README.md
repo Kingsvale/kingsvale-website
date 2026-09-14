@@ -251,11 +251,13 @@ Portainer GHCR deployment:
 
 Automatic redeploy from GitHub:
 
-1. In GitHub, open `Kingsvale/kingsvale-website` -> `Settings` -> `Secrets and variables` -> `Actions`.
-2. Add a repository secret named `PORTAINER_WEBHOOK_URL` containing the Portainer stack webhook URL.
-3. Push to `main`, or run the `Publish Docker image` workflow manually.
-4. The workflow builds and pushes `ghcr.io/kingsvale/kingsvale-website:latest`.
-5. After the image push succeeds, the workflow posts to the Portainer webhook so the stack redeploys and pulls the new image.
+1. Configure the existing stack to track `refs/heads/production` with its Git webhook enabled.
+2. Set GitHub Actions secret `PORTAINER_WEBHOOK_URL` to its publicly reachable HTTPS stack webhook.
+3. Push to `main`, or run the `Publish Docker image` workflow on `main`.
+4. The workflow publishes a commit-specific image, updates the `production` deployment manifest, then triggers Portainer. This works with Community Edition.
+5. The action verifies the live health endpoint's release SHA before reporting success.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, diagnostics and rollback instructions.
 
 Keep the `kingsvale_data` volume attached so redeploys keep Studio data. Do not commit Portainer webhook URLs, Studio passwords, CMS encryption keys or GHCR tokens to this public repository.
 

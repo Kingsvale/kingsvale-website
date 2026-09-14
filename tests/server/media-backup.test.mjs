@@ -12,6 +12,18 @@ import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
 const password = "test-only-kingsvale-images";
 const encryptionKey = "test-only-media-backup-encryption-key";
 
+test("public health identifies the running release without caching or exposing credentials", async (t) => {
+  const server = await startServer(t);
+  const response = await fetch(`${server.url}/api/ops/health`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const status = await response.json();
+  assert.equal(status.ok, true);
+  assert.equal(status.revision, "a".repeat(40));
+  assert.ok(!JSON.stringify(status).includes(password));
+  assert.ok(!JSON.stringify(status).includes(encryptionKey));
+});
+
 test("Drive backup settings require Studio authentication and persist encrypted outside exports", async (t) => {
   const server = await startServer(t);
   const denied = await fetch(`${server.url}/api/drive-backup`);
@@ -50,7 +62,7 @@ async function startServer(t) {
   const directory = await mkdtemp(join(tmpdir(), "kingsvale-media-"));
   const child = spawn(process.execPath, ["server/secure-server.mjs"], {
     cwd: process.cwd(), windowsHide: true,
-    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_PASSWORD: password, STUDIO_USER: "kingsvale", STUDIO_AUTH_TOKEN_SECRET: "test-only-image-auth-token-secret", CMS_ENCRYPTION_KEY: encryptionKey, STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "" },
+    env: { ...process.env, APP_REVISION: "a".repeat(40), PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_PASSWORD: password, STUDIO_USER: "kingsvale", STUDIO_AUTH_TOKEN_SECRET: "test-only-image-auth-token-secret", CMS_ENCRYPTION_KEY: encryptionKey, STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "" },
     stdio: ["ignore", "pipe", "pipe"]
   });
   t.after(async () => {

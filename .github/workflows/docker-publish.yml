@@ -7,8 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
+
+concurrency:
+  group: kingsvale-production
+  cancel-in-progress: false
 
 env:
   IMAGE_NAME: ghcr.io/kingsvale/kingsvale-website
@@ -16,10 +20,20 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Require the latest main commit
+        run: |
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current_main" != "$GITHUB_SHA" ]; then
+            echo "::error::This run is for an older commit. Run the workflow for the latest main commit instead."
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -35,6 +49,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation
           npm ci --no-audit --no-fund
+          node --test tests/server/deployment.test.mjs
+          node --import tsx --test --test-name-pattern="public health" tests/server/media-backup.test.mjs
           node --test tests/server/drive-backup.test.mjs
           node scripts/verify-letter-preview.mjs
 
@@ -67,22 +83,38 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          build-args: |
+            APP_REVISION=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger Portainer redeploy
+      - name: Publish the production deployment manifest
+        run: |
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current_main" != "$GITHUB_SHA" ]; then
+            echo "::error::A newer commit arrived during the build. Its workflow will deploy the latest release."
+            exit 1
+          fi
+          deployment_dir="$RUNNER_TEMP/kingsvale-deployment"
+          production_ref=$(git ls-remote origin refs/heads/production | cut -f1)
+          if [ -n "$production_ref" ]; then
+            git fetch origin production
+            git worktree add --detach "$deployment_dir" FETCH_HEAD
+          else
+            git worktree add --detach "$deployment_dir" "$GITHUB_SHA"
+          fi
+          node scripts/deployment-manifest.mjs "$deployment_dir/docker-compose.portainer.yml" "$GITHUB_SHA"
+          git -C "$deployment_dir" add docker-compose.portainer.yml
+          git -C "$deployment_dir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit --allow-empty -m "Deploy $GITHUB_SHA (run $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT)"
+          git -C "$deployment_dir" push origin HEAD:refs/heads/production
+
+      - name: Deploy and verify the live release
+        timeout-minutes: 12
         env:
           PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+          EXPECTED_REVISION: ${{ github.sha }}
+          DEPLOY_HEALTH_URL: https://kingsvalehomes.co.uk/api/ops/health
         run: |
-          if [ -z "$PORTAINER_WEBHOOK_URL" ]; then
-            echo "::notice::PORTAINER_WEBHOOK_URL is not configured; the image was published but Portainer was not triggered."
-            exit 0
-          fi
-
-          curl --fail --silent --show-error --location \
-            --retry 3 \
-            --retry-delay 5 \
-            --request POST \
-            "$PORTAINER_WEBHOOK_URL"
+          node scripts/deploy-portainer.mjs
