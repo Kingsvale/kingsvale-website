@@ -9,6 +9,10 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   let site = { ...createTrackingSite(), title: "Oakley letter test", reference: "KV-TEST-042", customerName: "Test Owner",
     siteAddress: "72 Pardown, Oakley, Hampshire, RG23 7DZ", siteAddressParts: { line1: "72 Pardown", line2: "", town: "Oakley", county: "Hampshire", postcode: "RG23 7DZ" } };
   let generated: Buffer;
+  let serverPreview = false;
+  await context.route("**/api/letters/preview", (route) => serverPreview
+    ? route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } })
+    : route.fulfill({ status: 404, json: { error: "Local renderer unavailable" } }));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await context.route("**/api/studio-settings", (route) => route.fulfill({ json: { settings: defaultStudioSettings() } }));
@@ -52,8 +56,10 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   expect(site.lastMailedAt).not.toBe("");
   expect(site.remailReminderDate > site.lastMailedAt).toBe(true);
+  serverPreview = true;
   await page.getByRole("button", { name: "Preview letter", exact: true }).click();
-  await expect(page.getByRole("dialog").getByRole("status")).toContainText("Preview ready");
+  await expect(page.getByRole("dialog").getByRole("status")).toContainText("Print layout preview");
+  await expect(page.getByRole("img", { name: "Document page 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close preview", exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(2);
   expect(errors).toEqual([]);

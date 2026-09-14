@@ -76,6 +76,13 @@ describe("styled tracking QR renderer", () => {
     expect(tokens.get("{{county}}")).toBe("");
     expect(tokens.get("{{postal_code}}")).toBe("SL4 5HS");
     expect(tokens.get("{{full_address}}")).toBe("6 Petworth Court, Helston Lane, Windsor, SL4 5HS");
+    const blankLine = buildLetterTokens({
+      siteAddress: "72 Pardown, Oakley, Hampshire, RG23 7DZ",
+      siteAddressParts: { line1: "72 Pardown", line2: "", town: "Oakley", county: "Hampshire", postcode: "RG23 7DZ" }
+    }, "");
+    expect(blankLine.get("{{address_line_2}}")).toBe("");
+    expect(blankLine.get("{{town}}")).toBe("Oakley");
+    expect(blankLine.get("{{county}}")).toBe("Hampshire");
   });
 });
 

@@ -316,8 +316,9 @@ export async function previewLetterDocument(url: string): Promise<{ pages: strin
     headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
     signal: AbortSignal.timeout(100000), body: JSON.stringify({ url })
   });
-  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("Preview unavailable");
+  if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("Preview unavailable");
   const result = await response.json();
+  if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Preview unavailable");
   if (!Array.isArray(result.pages) || !result.pages.length || result.pages.length > 12 || !result.pages.every((page: unknown) => typeof page === "string" && /^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(page))) throw new Error("Invalid preview");
   return result;
 }

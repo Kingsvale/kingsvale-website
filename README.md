@@ -317,3 +317,14 @@ Version 1 backups remain supported when any referenced uploaded files already ex
 The default import request limit is 250 MB, configurable with `BACKUP_IMPORT_MAX_MB` (5–1,000). Base64 adds roughly one third to media size. Reverse proxies must also allow the selected request size. Keep the Docker data volume and encryption key between deployments.
 
 Run `npm run test:media` for a fresh-server upload/export/restore test (including archive corruption checks), and `npm run test:e2e -- tests/e2e/website-images.spec.ts` for the desktop/mobile Studio workflow. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of Playwright's bundled Chromium.
+
+
+### Letter previews and mailing
+
+Sites saves pending edits before opening the same record in Mailing. Mailing lets you check the recipient and address, choose a starter or uploaded DOCX, generate and preview the completed letter, and download it. Posting dates and follow-up reminders are entered separately from generation; Mark posted today schedules the next reminder from the latest posting date.
+
+Settings supports previewing, renaming and replacing reusable templates and choosing their default recipient mode. Use {{date}} for the generated date and the documented address tokens for variable text. To identify a QR image explicitly, set a PNG image's description in Word to KINGSVALE_QR; older templates retain the existing image-detection fallback. Sites → QR Code Design → Use Kingsvale letter style applies the new deep-green, white-background design to an existing site.
+
+The Docker image includes LibreOffice Writer, Poppler and compatible fonts. Authenticated document previews render on the server into page images (up to 12 pages); no external document viewer receives contact details. Temporary files are removed after conversion, and a small in-memory cache avoids repeated work. A local developer environment without LibreOffice offers a labelled, simplified DOCX preview. The GitHub publishing workflow verifies rendering of both starter letters and saves sample page images as an artifact before publishing the image.
+
+Image descriptions are optional and tucked into an expandable section in the image editor. Empty descriptions never block publishing; existing descriptions are retained.

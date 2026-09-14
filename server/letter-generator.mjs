@@ -109,6 +109,11 @@ export function buildLetterTokens(site, publicLink) {
 }
 
 export function replacePlaceholdersInWordXml(xml, replacements) {
+  // A deliberately blank second address line must not leave a gap in a letter.
+  xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragraph) => {
+    const text = [...paragraph.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)].map((match) => decodeXml(match[1])).join("").trim();
+    return ["{{address_line_2}}", "{{county}}", "{{address_line_3}}"].includes(text) && replacements.get(text) === "" ? "" : paragraph;
+  });
   const nodes = [];
   let match;
 
@@ -455,11 +460,11 @@ function cleanText(value) {
 function normalizeAddressParts(parts = {}, fallbackAddress = "") {
   const parsed = parseAddress(fallbackAddress);
   return {
-    line1: cleanText(parts?.line1) || parsed.line1,
-    line2: cleanText(parts?.line2) || parsed.line2,
-    town: cleanText(parts?.town) || parsed.town,
-    county: cleanText(parts?.county) || parsed.county,
-    postcode: (cleanText(parts?.postcode) || parsed.postcode).toUpperCase()
+    line1: typeof parts?.line1 === "string" ? cleanText(parts.line1) : parsed.line1,
+    line2: typeof parts?.line2 === "string" ? cleanText(parts.line2) : parsed.line2,
+    town: typeof parts?.town === "string" ? cleanText(parts.town) : parsed.town,
+    county: typeof parts?.county === "string" ? cleanText(parts.county) : parsed.county,
+    postcode: (typeof parts?.postcode === "string" ? cleanText(parts.postcode) : parsed.postcode).toUpperCase()
   };
 }
 

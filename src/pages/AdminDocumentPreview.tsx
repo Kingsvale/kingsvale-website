@@ -15,6 +15,7 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
   const [status, setStatus] = useState("Loading preview…");
   const [failed, setFailed] = useState(false);
   const [renderedPages, setRenderedPages] = useState<string[]>([]);
+  const [attempt, setAttempt] = useState(0);
   const isDocx = /\.docx$/i.test(file.name) || file.url.startsWith("data:application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   const isPdf = /\.pdf$/i.test(file.name);
   const isImage = /\.(png|jpe?g|webp)$/i.test(file.name);
@@ -40,8 +41,8 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
             setStatus(`${preview.pageCount} ${preview.pageCount === 1 ? "page" : "pages"} · Print layout preview`);
           }
           return;
-        } catch {
-          if (!isLocalDemoRuntime() || isPdf) throw new Error("Print preview unavailable");
+        } catch (error) {
+          if (!isLocalDemoRuntime() || isPdf) throw error;
         }
         const [response, { renderAsync }] = await Promise.all([
           fetch(file.url, { credentials: "same-origin", signal: controller.signal }),
@@ -74,13 +75,13 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
         resize = new ResizeObserver(fit);
         if (frame.current) resize.observe(frame.current);
         setStatus("Preview ready · Simplified local preview. Word shapes and pagination may differ; the deployed Studio uses a server-rendered print preview.");
-      } catch {
-        if (active) { setFailed(true); setStatus("This document could not be previewed. You can still download it below."); }
+      } catch (error) {
+        if (active) { setFailed(true); setStatus(error instanceof Error && /preview|document/i.test(error.message) ? error.message : "This document could not be previewed. You can still download it."); }
       }
     }
     void render();
     return () => { active = false; controller.abort(); resize?.disconnect(); };
-  }, [file.url, isDocx, isPdf, ready, safeUrl]);
+  }, [file.url, isDocx, isPdf, ready, safeUrl, attempt]);
 
   return <dialog ref={dialog} className="document-preview" aria-labelledby="document-preview-title" onCancel={onClose}>
     <header className="document-preview__bar">
@@ -92,6 +93,7 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
     </header>
     {safeUrl && (isDocx || isPdf) ? <>
       <p className="document-preview__status" role={failed ? "alert" : "status"}>{status}</p>
+      {failed && <button type="button" className="admin-small" onClick={() => { setFailed(false); setStatus("Loading preview…"); setAttempt((value) => value + 1); }}>Retry preview</button>}
       {renderedPages.length ? <div className="document-preview__pages">{renderedPages.map((page, index) => <figure key={index}><img src={page} alt={`Document page ${index + 1}`} /><figcaption>Page {index + 1} of {renderedPages.length}</figcaption></figure>)}</div>
         : <iframe ref={frame} title="Letter document" sandbox="allow-same-origin" srcDoc={previewShell} onLoad={() => setReady(true)} />}
     </>
