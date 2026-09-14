@@ -46,7 +46,7 @@ export function ProjectGallery({ title, images, onChange }: { title: string; ima
 
   return <section className="project-gallery" aria-label={`${title} gallery`}>
     <div className="studio-image__heading"><h3>Project gallery</h3><span>{images.length} / 12 images</span></div>
-    <p className="studio-image__hint">Homepage cards rotate through the cover and these photos. Visitors can scroll through them in the project gallery. Add several at once, then select a thumbnail to adjust it.</p>
+    <p className="studio-image__hint">Mix portrait and landscape photographs freely. The project gallery shows each image in full; homepage cards use a cropped preview. Add several at once, then select a thumbnail to adjust it.</p>
     <div className="gallery-thumbnails" aria-label="Gallery photographs">
       {images.map((image, i) => <button key={i} type="button" disabled={busy} aria-pressed={index === i} aria-label={`Edit ${title} gallery image ${i + 1}`} onClick={() => setSelected(i)}>
         <img src={image.src} alt="" /><span>{i + 1}</span>

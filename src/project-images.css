@@ -15,17 +15,17 @@
 .project-gallery-public__arrows button { border: 1px solid #afa28b; }
 .project-gallery-public__strip { position: relative; display: flex; width: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; overscroll-behavior-x: contain; }
 .project-gallery-public__strip figure { position: relative; flex: 0 0 100%; margin: 0; scroll-snap-align: start; scroll-snap-stop: always; background: #e7e1d5; }
-.project-gallery-public__strip figure > img { display: block; width: 100%; height: clamp(280px, 58vw, 650px); object-fit: cover; }
+.project-gallery-public__strip figure > img { display: block; width: 100%; height: clamp(360px, 70svh, 720px); object-fit: contain; object-position: center !important; }
 .project-gallery-public__strip figcaption { padding: 14px 18px; min-height: 48px; font-size: 13px; line-height: 1.5; background: #f7f3eb; }
 .project-gallery-public__expand { position: absolute; top: 15px; right: 15px; background: #20231edb; color: white; }
 .project-gallery-public__thumbs { display: flex; gap: 9px; overflow-x: auto; padding: 12px 2px; }
 .project-gallery-public__thumbs button { flex: 0 0 100px; padding: 3px; border: 2px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
 .project-gallery-public__thumbs button[aria-pressed="true"] { border-color: #4a6249; }
-.project-gallery-public__thumbs img { width: 100%; aspect-ratio: 1.5; object-fit: cover; }
+.project-gallery-public__thumbs img { display: block; width: 100%; aspect-ratio: 1.5; object-fit: contain; background: #e7e1d5; }
 .development-story { max-width: 800px; margin: auto; }
 .project-lightbox { width: min(96vw, 1600px); max-width: 96vw; max-height: 94dvh; padding: 18px; border: 1px solid #777; background: #181b16; color: white; overflow: auto; }
 .project-lightbox::backdrop { background: #000d; }
-.project-lightbox > img { width: 100%; height: 72dvh; object-fit: contain; }
+.project-lightbox > img { width: 100%; height: 72dvh; object-fit: contain; object-position: center !important; }
 .project-lightbox > p { text-align: center; font-size: 13px; }
 .project-lightbox .project-gallery-public__arrows { justify-content: center; }
 .project-lightbox__close { position: absolute; z-index: 2; top: 10px; right: 10px; background: #000b; }

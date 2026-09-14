@@ -16,7 +16,7 @@ export function ImageEditor({ title, image, onChange, error }: {
   const [fileError, setFileError] = useState("");
   const [broken, setBroken] = useState(false);
   const [previous, setPrevious] = useState<ImageAsset | null>(null);
-  const [shape, setShape] = useState("16 / 9");
+  const [shape, setShape] = useState("full");
   const [url, setUrl] = useState(image.src);
   const inputId = useId();
   const changePending = useContext(ImageUploadContext);
@@ -47,13 +47,13 @@ export function ImageEditor({ title, image, onChange, error }: {
     onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragging(false); }}
     onDrop={(event) => { event.preventDefault(); setDragging(false); void upload(event.dataTransfer.files); }}>
     <div className="studio-image__heading"><h3>{title}</h3><span className={`image-badge ${imageStatus(image) === "Placeholder" ? "image-badge--placeholder" : ""}`}>{imageStatus(image)}</span></div>
-    <div className="studio-image__canvas" style={{ aspectRatio: shape, maxWidth: shape === "3 / 4" ? "240px" : undefined, marginInline: "auto" }}>
+    <div className="studio-image__canvas" data-full-image={shape === "full"} style={{ aspectRatio: shape === "full" ? undefined : shape, maxWidth: shape === "3 / 4" ? "240px" : undefined, marginInline: "auto" }}>
       {!broken ? <img src={image.src} alt={image.alt} style={{ objectPosition: image.focalPoint }} onError={() => setBroken(true)} />
         : <div className="studio-image__missing"><ImagePlus aria-hidden="true" /><span>Image unavailable. Upload a replacement below.</span></div>}
       {uploading && <div className="studio-image__loading">Preparing your image…</div>}
     </div>
     <div className="studio-image__shapes" role="group" aria-label={`${title} crop preview`}>
-      {[["16 / 9", "Wide"], ["4 / 3", "Card"], ["3 / 4", "Phone"]].map(([value, label]) => <button type="button" key={value} aria-pressed={shape === value} onClick={() => setShape(value)}>{label}</button>)}
+      {[["full", "Full image"], ["16 / 9", "Wide"], ["4 / 3", "Card"], ["3 / 4", "Phone"]].map(([value, label]) => <button type="button" key={value} aria-pressed={shape === value} onClick={() => setShape(value)}>{label}</button>)}
       {image.width && <small>{image.width} × {image.height} px</small>}
     </div>
     <label className="studio-image__drop" htmlFor={inputId}>
@@ -63,7 +63,7 @@ export function ImageEditor({ title, image, onChange, error }: {
         data-testid={`${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-upload`}
         accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => { if (event.target.files) void upload(event.target.files); event.target.value = ""; }} />
     </label>
-    <p className="studio-image__hint">Use a landscape photo, ideally 2,400 px wide. Check the crop on each device before publishing.</p>
+    <p className="studio-image__hint">Portrait and landscape photographs are supported. Galleries show the full image. Use Wide, Card or Phone to preview cropped placements elsewhere on the website.</p>
     <details className="studio-image__details">
       <summary>Image description (optional)</summary>
       <AdminTextInput label={`${title} alt text`} value={image.alt ?? ""} onChange={(alt) => onChange({ ...image, alt })} maxLength={150}
