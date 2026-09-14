@@ -89,7 +89,7 @@ export function AdminBackupPanel({ onImported }: { onImported?: () => void | Pro
             <li>Published website content, draft content and revision history.</li>
             <li>Uploaded project photographs, gallery images and every responsive image size — the actual files, not just links.</li>
             <li>Sites, QR links, map embeds, private notes, Searchland links and uploaded letters.</li>
-            <li>Mailing statuses, reminders, Royal Mail tracking fields and mailing notes.</li>
+            <li>Mailing statuses, posting dates, reminders and mailing notes.</li>
             <li>Analytics visit records and contact/newsletter lead logs.</li>
           </ul>
           <p className="backup-intro">External photography, including the Unsplash placeholders, stays as links. Upload your project photographs to include their files. Keep backup files private: they contain your Studio records.</p>

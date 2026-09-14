@@ -12,10 +12,10 @@ export const defaultSeoDescription =
 export function usePageSeo(content: SiteContent, route: string) {
   useEffect(() => {
     const development = route.startsWith("/developments/")
-      ? content.developments.find((item) => item.id === route.split("/").filter(Boolean)[1])
+      ? content.developments.find((item) => item.ctaHref === route || item.id === route.split("/").filter(Boolean)[1])
       : undefined;
     const metadata = getRouteMetadata(content, route, development);
-    const canonical = `${siteOrigin}${route === "/" ? "/" : route}`;
+    const canonical = `${siteOrigin}${development?.ctaHref ?? (route === "/" ? "/" : route)}`;
 
     document.title = metadata.title;
     setMeta("name", "description", metadata.description);

@@ -39,20 +39,6 @@ export function DevelopmentsIndexPage({ content }: ContentPageProps) {
                 <h2><SiteText>{development.title}</SiteText></h2>
                 <p className="listing-card__location"><SiteText>{development.location}</SiteText></p>
                 <p><SiteText>{development.heroBody ?? development.description}</SiteText></p>
-                <dl className="mini-specs">
-                  <div>
-                    <dt><SiteText>Homes</SiteText></dt>
-                    <dd><SiteText>{development.homes}</SiteText></dd>
-                  </div>
-                  <div>
-                    <dt><SiteText>Bedrooms</SiteText></dt>
-                    <dd><SiteText>{development.bedrooms}</SiteText></dd>
-                  </div>
-                  <div>
-                    <dt><SiteText>Guide</SiteText></dt>
-                    <dd><SiteText>{development.priceGuide}</SiteText></dd>
-                  </div>
-                </dl>
                 <ButtonLink href={development.ctaHref} variant="dark">
                   <SiteText>View development</SiteText></ButtonLink>
               </div>
@@ -76,25 +62,11 @@ export function DevelopmentDetailPage({
         body={development.heroBody ?? development.description}
         image={development.image}
       />
-      <section className="detail-intro">
+      <section className="detail-intro detail-intro--simple">
         <div>
           <p className="eyebrow"><SiteText>{development.location}</SiteText></p>
           <h2><SiteText>{development.description}</SiteText></h2>
         </div>
-        <dl className="spec-panel">
-          <div>
-            <dt><SiteText>Homes</SiteText></dt>
-            <dd><SiteText>{development.homes}</SiteText></dd>
-          </div>
-          <div>
-            <dt><SiteText>Bedrooms</SiteText></dt>
-            <dd><SiteText>{development.bedrooms}</SiteText></dd>
-          </div>
-          <div>
-            <dt><SiteText>Price guide</SiteText></dt>
-            <dd><SiteText>{development.priceGuide}</SiteText></dd>
-          </div>
-        </dl>
       </section>
       <ProjectGallery project={development} index={content.developments.findIndex((item) => item.id === development.id)} />
       <section className="content-band content-band--warm">

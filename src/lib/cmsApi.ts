@@ -616,7 +616,7 @@ export type KingsvaleBackup = {
     tracking: { sites: TrackingSite[]; updatedAt: string | null };
     settings?: StudioSettings;
     analytics: unknown;
-    leads: { contact: string; newsletter: string };
+    leads: { contact: string; newsletter: string; emailDelivery?: string };
   };
 };
 
@@ -887,4 +887,10 @@ function markLocalPostalSyncAttempt(id: string) {
     trackingLastCheckedAt: new Date().toISOString(),
     mailingLastUpdatedAt: new Date().toISOString()
   });
+}
+
+export async function fetchContactEmailStatus(): Promise<{ configured: boolean; recipient: string; sender: string; pending: number; lastStatus: string | null; message: string }> {
+  const response = await fetch("/api/contact/status", { credentials: "same-origin", headers: authHeaders({ Accept: "application/json" }) });
+  if (!response.ok || !isJsonResponse(response)) throw new Error("Email status unavailable");
+  return response.json();
 }

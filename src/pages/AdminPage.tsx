@@ -1,3 +1,4 @@
+import { AdminContactDelivery } from "./AdminContactDelivery";
 import {
   AlertCircle,
   ArrowRight,
@@ -194,7 +195,7 @@ export function AdminPage({
   const [uploadsPending, setUploadsPending] = useState(0);
   const unsaved = JSON.stringify(draft) !== savedDraft;
   const storageUnavailable = !checkingStorage && !serverMode && (!isLocalDemoRuntime() || hasServerSession());
-  const availablePreviewRoutes = [...previewRoutes, ...draft.developments.map((development) => ({ value: `/developments/${development.id}` as PreviewRoute, label: development.title }))];
+  const availablePreviewRoutes = [...previewRoutes, ...draft.developments.map((development) => ({ value: development.ctaHref as PreviewRoute, label: development.title }))];
   const [trackingStorageStatus, setTrackingStorageStatus] = useState(() => getTrackingStorageStatus());
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState("");
@@ -281,9 +282,10 @@ export function AdminPage({
   function selectEditorSection(section: EditorSectionId) {
     setActivePanel(section);
     const route = Object.entries(previewRoutePanels).find(([, panel]) => panel === section)?.[0];
+    if (section === "developments") setPreviewRoute("/developments");
     if (section === "legacy") { setPreviewRoute("/"); setScrollSection("legacy"); }
     else if (route) setPreviewRoute(route as PreviewRoute);
-    if (section === "images") setPreviewRoute(`/developments/${draft.developments[0].id}`);
+    if (section === "images") setPreviewRoute(draft.developments[0].ctaHref);
   }
 
   function updateDraft(recipe: (content: SiteContent) => void) {
@@ -378,7 +380,7 @@ export function AdminPage({
 
   function handlePreviewRouteChange(route: PreviewRoute) {
     setPreviewRoute(route);
-    if (route.startsWith("/developments/")) setSelectedProjectId(route.split("/")[2]);
+    if (route.startsWith("/developments/")) setSelectedProjectId(draft.developments.find((project) => project.ctaHref === route || project.id === route.split("/")[2])?.id ?? selectedProjectId);
     setActivePanel((current) => current === "images" ? current : previewRoutePanels[route] ?? "developments");
   }
 
@@ -697,7 +699,8 @@ export function AdminPage({
           )}
 
           {activePanel === "developments" && (
-          <EditorPanel title="Homepage developments" id="editor-panel-developments">
+          <EditorPanel title="Developments & project pages" id="editor-panel-developments">
+            <details className="studio-image__details"><summary>Homepage section heading & link</summary>
             <TextInput
               label="Section eyebrow"
               value={draft.developmentsIntro.eyebrow}
@@ -737,8 +740,10 @@ export function AdminPage({
                 error={errorsByPath["developmentsIntro.viewAllHref"]}
               />
             </div>
+            </details>
             <div className="admin-section-heading">
-              <h3>Development cards</h3>
+              <h3>Projects</h3>
+              <button type="button" className="admin-small" onClick={() => setPreviewRoute("/developments")}>Edit developments overview</button>
               <button
                 type="button"
                 className="admin-small"
@@ -754,7 +759,9 @@ export function AdminPage({
                 Add
               </button>
             </div>
-            <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setSelectedProjectId(id); setPreviewRoute(`/developments/${id}`); }} />
+            <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setSelectedProjectId(id); setPreviewRoute(draft.developments.find((project) => project.id === id)!.ctaHref); }} />
+            <p className="admin-note">Choose a project below to edit its page, photographs and introduction. Click any text in the preview to edit the overview or the story below its gallery.</p>
+            <button type="button" className="admin-small" onClick={() => { setPreviewRoute(selectedProject.ctaHref); setScrollSection("gallery"); }}>Edit selected project page & gallery</button>
             <div className="admin-stack">
               {draft.developments.map((development, index) => development.id === selectedProject.id && (
                 <DevelopmentEditor
@@ -775,11 +782,10 @@ export function AdminPage({
                       content.developments.splice(index, 1);
                     })
                   }
-                  onChange={(nextDevelopment) =>
-                    updateDraft((content) => {
-                      content.developments[index] = nextDevelopment;
-                    })
-                  }
+                  onChange={(nextDevelopment) => {
+                    updateDraft((content) => { content.developments[index] = nextDevelopment; });
+                    if (nextDevelopment.ctaHref !== development.ctaHref && /^\/developments\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nextDevelopment.ctaHref)) setPreviewRoute(nextDevelopment.ctaHref);
+                  }}
                 />
               ))}
             </div>
@@ -795,7 +801,8 @@ export function AdminPage({
           />
           )}
 
-          {activePanel === "contact" && (
+          {activePanel === "contact" && (<>
+          <AdminContactDelivery />
           <StaticPageEditor
             title="Contact page"
             id="editor-panel-contact"
@@ -803,7 +810,7 @@ export function AdminPage({
             onChange={(next) => updateDraft((content) => { content.pages.contact = next; })}
             compact
           />
-          )}
+          </>)}
 
           {activePanel === "seo" && (
           <EditorPanel title="SEO and social sharing" id="editor-panel-seo">
@@ -1552,13 +1559,15 @@ function DevelopmentEditor({
           error={errorsByPath[`developments.${index}.ctaLabel`]}
         />
         <TextInput
-          label={`Development ${index + 1} CTA link`}
+          label="Project page address"
           value={development.ctaHref}
           onChange={(value) => onChange({ ...development, ctaHref: value })}
           maxLength={120}
           error={errorsByPath[`developments.${index}.ctaHref`]}
         />
       </div>
+      <p className="admin-note">Use /developments/ followed by your project name. The homepage and project list will use this address.</p>
+      <button type="button" className="admin-small" onClick={() => onChange({ ...development, ctaHref: `/developments/${development.title.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || development.id}` })}>Use project name for page address</button>
       <ImageEditor
         title={`Development ${index + 1} image`}
         image={development.image}
@@ -1570,7 +1579,7 @@ function DevelopmentEditor({
       />
       <details className="studio-image__details"><summary>Project details & page text</summary>
         <div className="admin-grid admin-grid--two">
-          {(["status", "priceGuide", "homes", "bedrooms"] as const).map((field) => <TextInput key={field} label={`Project ${field === "priceGuide" ? "price guide" : field}`} value={development[field] ?? ""} maxLength={120} onChange={(value) => onChange({ ...development, [field]: value })} />)}
+          {(["status"] as const).map((field) => <TextInput key={field} label={`Project ${field}`} value={development[field] ?? ""} maxLength={120} onChange={(value) => onChange({ ...development, [field]: value })} />)}
         </div>
         <Textarea label="Project page introduction" value={development.heroBody ?? development.description} maxLength={600} onChange={(heroBody) => onChange({ ...development, heroBody })} />
         <Textarea label="Project highlights (one per line)" value={(development.highlights ?? []).join("\n")} maxLength={1800} onChange={(value) => onChange({ ...development, highlights: value.split("\n") })} />

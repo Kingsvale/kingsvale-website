@@ -15,7 +15,7 @@ async function startServer(t) {
   const directory = await mkdtemp(join(tmpdir(), "kingsvale-media-"));
   const child = spawn(process.execPath, ["server/secure-server.mjs"], {
     cwd: process.cwd(), windowsHide: true,
-    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_PASSWORD: password, STUDIO_USER: "kingsvale", STUDIO_AUTH_TOKEN_SECRET: "test-only-image-auth-token-secret", CMS_ENCRYPTION_KEY: encryptionKey, STUDIO_TOTP_SECRET: "" },
+    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_PASSWORD: password, STUDIO_USER: "kingsvale", STUDIO_AUTH_TOKEN_SECRET: "test-only-image-auth-token-secret", CMS_ENCRYPTION_KEY: encryptionKey, STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "" },
     stdio: ["ignore", "pipe", "pipe"]
   });
   t.after(async () => {
@@ -92,4 +92,15 @@ test("uploaded photos survive export, a fresh server restore, revisions and merg
   assert.equal(unauthenticated.status, 401);
   const malformed = new FormData(); malformed.set("image", new Blob(["not an image"], { type: "image/png" }), "broken.png");
   assert.equal((await source.api("/api/uploads/images", "POST", malformed)).status, 400);
+});
+
+test("contact enquiries are saved and queued; delivery status requires Studio authentication", async (t) => {
+  const server = await startServer(t);
+  assert.equal((await fetch(`${server.url}/api/contact/status`)).status, 401);
+  const response = await fetch(`${server.url}/api/contact`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Test Visitor", email: "visitor@example.com", type: "Development enquiry", message: "Please contact me about your development." }) });
+  assert.equal(response.status, 202);
+  const status = await (await server.api("/api/contact/status")).json();
+  assert.equal(status.configured, false); assert.equal(status.pending, 1);
+  const saved = JSON.parse((await readFile(join(server.directory, "leads", "contact.jsonl"), "utf8")).trim());
+  assert.equal(saved.payload.email, "visitor@example.com"); assert.equal(saved.emailNotification, true);
 });

@@ -1,3 +1,4 @@
+import { createContactMailer } from "./contact-mail.mjs";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import {
@@ -29,6 +30,7 @@ const distDir = resolve(rootDir, "dist");
 const dataDir = resolve(process.env.KINGSVALE_DATA_DIR || resolve(rootDir, "data"));
 const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
+const contactMailer = createContactMailer(leadsDir);
 const uploadsDir = resolve(dataDir, "uploads");
 const trackingDir = resolve(dataDir, "tracking-sites");
 const analyticsDir = resolve(dataDir, "analytics");
@@ -127,7 +129,10 @@ const server = createServer(async (request, response) => {
   }
 });
 
+const mailTimer = setInterval(() => { void contactMailer.flush().catch(() => console.error("Contact email queue unavailable.")); }, 60000);
+mailTimer.unref();
 server.listen(port, () => {
+  void contactMailer.flush().catch(() => console.error("Contact email queue unavailable."));
   console.log(`Secure Kingsvale server listening on http://127.0.0.1:${server.address().port}`);
 });
 
@@ -232,6 +237,13 @@ async function handleApiRequest(request, response, url) {
       content: store.published,
       updatedAt: store.updatedAt ?? null
     });
+    return;
+  }
+
+  if (url.pathname === "/api/contact/status") {
+    if (!requireSession(request, response)) return;
+    if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    sendJson(response, 200, await contactMailer.status());
     return;
   }
 
@@ -647,11 +659,13 @@ async function handlePublicLeadRequest(request, response, path) {
     id: randomBytes(8).toString("hex"),
     createdAt: new Date().toISOString(),
     kind,
+    emailNotification: kind === "contact",
     payload: sanitizeLeadPayload(payload),
     ip: request.socket.remoteAddress,
     userAgent: request.headers["user-agent"]
   };
   await appendFile(join(leadsDir, `${kind}.jsonl`), `${JSON.stringify(record)}\n`);
+  if (kind === "contact") void contactMailer.flush().catch(() => console.error("Contact email queue unavailable."));
   await forwardLead(kind, record);
   await writeAudit("lead_received", request, { kind, id: record.id });
   sendJson(response, 202, { ok: true, id: record.id });
@@ -1412,6 +1426,7 @@ async function applyFullBackup(backup, mode) {
 async function readLeadStores() {
   return {
     contact: await readTextFile(join(leadsDir, "contact.jsonl")),
+    emailDelivery: await readTextFile(join(leadsDir, "email-delivery.jsonl")),
     newsletter: await readTextFile(join(leadsDir, "newsletter.jsonl"))
   };
 }
@@ -1427,11 +1442,13 @@ async function readTextFile(path) {
 async function writeLeadStores(leads) {
   await mkdir(leadsDir, { recursive: true });
   await writeFile(join(leadsDir, "contact.jsonl"), String(leads?.contact ?? ""));
+  await writeFile(join(leadsDir, "email-delivery.jsonl"), String(leads?.emailDelivery ?? ""));
   await writeFile(join(leadsDir, "newsletter.jsonl"), String(leads?.newsletter ?? ""));
 }
 
 async function appendLeadStores(leads) {
   await mkdir(leadsDir, { recursive: true });
+  if (leads?.emailDelivery) await appendFile(join(leadsDir, "email-delivery.jsonl"), String(leads.emailDelivery));
   if (leads?.contact) {
     await appendFile(join(leadsDir, "contact.jsonl"), String(leads.contact));
   }
@@ -1631,6 +1648,7 @@ function validateSiteContent(content) {
     errors.push({ path: "developments", message: "Use between one and six developments." });
   } else {
     content.developments.forEach((development, index) => {
+      if (content.developments.some((other, i) => i !== index && (other.ctaHref === development.ctaHref || development.ctaHref === `/developments/${other.id}`))) errors.push({ path: `developments.${index}.ctaHref`, message: "Choose a unique project page address." });
       validateText(errors, `developments.${index}.title`, development.title, "Development title", 42);
       validateText(errors, `developments.${index}.location`, development.location, "Development location", 44);
       validateText(errors, `developments.${index}.description`, development.description, "Development description", 130);
@@ -1642,6 +1660,7 @@ function validateSiteContent(content) {
     if (value !== undefined && (typeof value !== "string" || value.length > limit)) errors.push({ path: `developments.${index}.${key}`, message: `Use up to ${limit} characters.` });
   }
   if (development.highlights !== undefined && (!Array.isArray(development.highlights) || development.highlights.length > 20 || development.highlights.some((value) => typeof value !== "string" || value.length > 300))) errors.push({ path: `developments.${index}.highlights`, message: "Use up to 20 highlights of 300 characters each." });
+  if (!/^\/developments\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(development.ctaHref)) errors.push({ path: `developments.${index}.ctaHref`, message: "Use /developments/project-name with lowercase letters, numbers and hyphens." });
   if (development.gallery !== undefined) {
         if (!Array.isArray(development.gallery) || development.gallery.length > 12) errors.push({ path: `developments.${index}.gallery`, message: "Use up to 12 gallery images." });
         else development.gallery.forEach((image, i) => validateImage(errors, `developments.${index}.gallery.${i}`, image));

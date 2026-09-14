@@ -6,6 +6,8 @@ type ContextValue = { content: SiteContent; bindings: ReturnType<typeof contentB
 export const SiteEditingContext = createContext<ContextValue | null>(null);
 
 export function SiteContentProvider({ content, route, children }: { content: SiteContent; route: string; children: ReactNode }) {
+  const project = content.developments.find((item) => item.ctaHref === route || route === `/developments/${item.id}`);
+  if (project) route = `/developments/${project.id}`;
   const bindings = useMemo(() => contentBindings(content), [content]);
   return <SiteEditingContext.Provider value={{ content, bindings, route }}>{children}</SiteEditingContext.Provider>;
 }

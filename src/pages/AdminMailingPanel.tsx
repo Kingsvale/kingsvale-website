@@ -1,13 +1,11 @@
-import { Clock, ExternalLink, FileText, Mail, RefreshCw, Save, Search } from "lucide-react";
+import { Clock, ExternalLink, FileText, Mail, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AdminDateField as DateField,
   AdminSelectField as SelectField,
-  AdminTextInput as TextInput,
   AdminTextarea as Textarea
 } from "../components/AdminFields";
 import {
-  checkMailingTrackingStatus,
   fetchStudioSettings,
   generateLetterFromTemplate,
   listTrackingSites,
@@ -130,7 +128,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
           site.title,
           site.siteAddress,
           site.customerName,
-          site.royalMailTrackingNumber,
           site.mailingNotes
         ].some((value) => value.toLowerCase().includes(normalizedQuery));
       }),
@@ -192,28 +189,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       setStatus("Mailing details saved.");
     } catch {
       setStatus("Mailing details could not be saved.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function checkTracking() {
-    if (!draft) {
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const synced = await checkMailingTrackingStatus(draft.id);
-      if (!synced) {
-        setStatus("Tracking unavailable.");
-        return;
-      }
-      setSites((current) => sortMailingSites(current.map((site) => (site.id === synced.id ? synced : site)), sortMode));
-      setDraft(synced);
-      setStatus(synced.trackingStatus);
-    } catch {
-      setStatus("Tracking lookup failed.");
     } finally {
       setBusy(false);
     }
@@ -453,13 +428,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                   onChange={(value) => updateDraft((site) => { site.mailingStatus = value as MailingStatus; })}
                   options={mailingStatuses.map((item) => [item, mailingStatusLabels[item]] as const)}
                 />
-                <TextInput
-                  id="royal-mail-tracking-number"
-                  label="Royal Mail tracking number"
-                  value={draft.royalMailTrackingNumber}
-                  maxLength={trackingFieldLimits.royalMailTrackingNumber}
-                  onChange={(value) => updateDraft((site) => { site.royalMailTrackingNumber = value; })}
-                />
               </div>
 
               <div className="admin-grid admin-grid--three">
@@ -508,21 +476,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                 overdue={isRemailReminderOverdue(draft)}
               />
 
-              <div className="mailing-tracking-box">
-                <div>
-                  <span>Postage/tracking status</span>
-                  <strong>{draft.trackingStatus || "Tracking unavailable"}</strong>
-                  <small>
-                    {draft.trackingLastCheckedAt
-                      ? `Checked ${new Date(draft.trackingLastCheckedAt).toLocaleString()}`
-                      : "Not checked yet"}
-                  </small>
-                </div>
-                <button type="button" className="admin-ghost" onClick={checkTracking} disabled={busy}>
-                  <RefreshCw aria-hidden="true" />
-                  Check tracking
-                </button>
-              </div>
+              <p className="admin-note">Second class stamped post has no delivery tracking. Use the mailing dates and reminders to plan your follow-up.</p>
 
               <div className="letter-template">
                 <div className="letter-template__intro">

@@ -50,3 +50,15 @@ describe("content validation", () => {
     expect(isValidHref("javascript:alert(1)")).toBe(false);
   });
 });
+
+it("requires distinct project addresses without breaking stable project IDs", () => {
+  const content = cloneContent(defaultContent);
+  content.developments[0].ctaHref = "/developments/amber-grove";
+  expect(validateSiteContent(content).valid).toBe(true);
+  content.developments[1].ctaHref = content.developments[0].ctaHref;
+  expect(validateSiteContent(content).valid).toBe(false);
+  content.developments[1].ctaHref = "/developments/ridings";
+  expect(validateSiteContent(content).valid).toBe(false);
+  content.developments[1].ctaHref = "/contact";
+  expect(validateSiteContent(content).valid).toBe(false);
+});

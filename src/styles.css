@@ -4385,3 +4385,5 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
     transform: none;
   }
 }
+
+.detail-intro--simple { display: block; max-width: 1000px; }

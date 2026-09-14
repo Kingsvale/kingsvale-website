@@ -120,7 +120,7 @@ function Page({ content, route }: { content: SiteContent; route: string }) {
 
   if (route.startsWith("/developments/")) {
     const developmentId = route.split("/").filter(Boolean)[1];
-    const development = content.developments.find((item) => item.id === developmentId);
+    const development = content.developments.find((item) => item.ctaHref === route || item.id === developmentId);
     return (
       <RouteBoundary>
         {development ? (

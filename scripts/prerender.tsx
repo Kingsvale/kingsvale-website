@@ -49,7 +49,7 @@ console.log(`Prerendered ${publicRoutes.length} public routes.`);
 
 function buildHtml(route: string, appHtml: string) {
   const development = route.startsWith("/developments/")
-    ? defaultContent.developments.find((item) => item.id === route.split("/").filter(Boolean)[1])
+    ? defaultContent.developments.find((item) => item.ctaHref === route || item.id === route.split("/").filter(Boolean)[1])
     : undefined;
   const metadata = getRouteMetadata(defaultContent, route, development);
   const canonical = `${siteOrigin}${route === "/" ? "/" : route}`;

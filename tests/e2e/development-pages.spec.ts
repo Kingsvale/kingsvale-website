@@ -1,0 +1,32 @@
+import { expect, test } from "@playwright/test";
+
+test("project pages are directly editable and their renamed addresses work", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
+  await page.getByRole("button", { name: "Unlock studio" }).click();
+  await page.getByRole("tab", { name: "Our developments", exact: true }).click();
+  await expect(page.getByLabel("Preview page")).toHaveValue("/developments");
+  await page.getByRole("button", { name: "Edit selected project page & gallery" }).click();
+  const preview = page.frameLocator(".admin-preview__frame");
+  const story = preview.getByText("Designed around daily life, long-term value and place.", { exact: true });
+  await story.click();
+  await preview.getByRole("textbox", { name: "Edit website text" }).fill("A place to feel at home.");
+  await preview.getByRole("textbox", { name: "Edit website text" }).press("Enter");
+  await expect(page.getByLabel("Text selected in preview")).toHaveValue("A place to feel at home.");
+  await page.getByLabel("Development 1 title", { exact: true }).fill("Amber Grove");
+  await page.getByRole("button", { name: "Use project name for page address" }).click();
+  await expect(page.getByLabel("Project page address")).toHaveValue("/developments/amber-grove");
+  await expect(page.getByLabel("Preview page")).toHaveValue("/developments/amber-grove");
+  await expect(preview.getByText("A place to feel at home.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText(/Published\. The public site/)).toBeVisible();
+  await page.goto("/developments");
+  await expect(page.locator(".mini-specs")).toHaveCount(0);
+  await page.getByRole("link", { name: "View Amber Grove gallery" }).click();
+  await expect(page).toHaveURL(/amber-grove#gallery$/);
+  await expect(page.getByRole("heading", { name: "Amber Grove", exact: true })).toBeVisible();
+  await expect(page.locator(".spec-panel")).toHaveCount(0);
+  await expect(page.getByText("A place to feel at home.", { exact: true })).toBeVisible();
+  await page.goto("/developments/ridings");
+  await expect(page.getByRole("heading", { name: "Amber Grove", exact: true })).toBeVisible();
+});

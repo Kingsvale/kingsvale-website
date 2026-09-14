@@ -179,6 +179,7 @@ function addDevelopmentErrors(errors: ValidationError[], development: Developmen
     if (value !== undefined && (typeof value !== "string" || value.length > limit)) errors.push({ path: `developments.${index}.${key}`, message: `Use up to ${limit} characters.` });
   }
   if (development.highlights !== undefined && (!Array.isArray(development.highlights) || development.highlights.length > 20 || development.highlights.some((value: string) => typeof value !== "string" || value.length > 300))) errors.push({ path: `developments.${index}.highlights`, message: "Use up to 20 highlights of 300 characters each." });
+  if (!/^\/developments\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(development.ctaHref)) errors.push({ path: `developments.${index}.ctaHref`, message: "Use /developments/project-name with lowercase letters, numbers and hyphens." });
   if (development.gallery !== undefined) {
     if (!Array.isArray(development.gallery) || development.gallery.length > 12) {
       errors.push({ path: `${path}.gallery`, message: "Use up to 12 gallery images." });
@@ -280,6 +281,8 @@ export function validateSiteContent(content: SiteContent): ValidationResult {
     addImageErrors(errors, `imageOverrides.${key}`, image);
   });
 
+  const projectRoutes = Array.isArray(content.developments) ? content.developments.map((project) => project.ctaHref) : [];
+  if (Array.isArray(content.developments)) content.developments.forEach((project, index) => { if (projectRoutes.indexOf(project.ctaHref) !== index || content.developments.some((other, i) => i !== index && project.ctaHref === `/developments/${other.id}`)) errors.push({ path: `developments.${index}.ctaHref`, message: "Choose a unique project page address." }); });
   addRequiredTextError(errors, "brandName", content.brandName, "Brand name", fieldLimits.brandName);
   addRequiredTextError(errors, "brandSuffix", content.brandSuffix, "Brand suffix", fieldLimits.brandSuffix);
   validateLinkCollection(errors, "navLinks", content.navLinks, 3, 8);

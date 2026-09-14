@@ -23,7 +23,7 @@ export function imageSlots(content: SiteContent): ImageSlot[] {
     add(`pages.${key}.seo.image`, `${pages[key][0]} social preview`, "Social previews", pages[key][1], content.pages[key].seo.image);
   }
   content.developments.forEach((development, index) => {
-    const route = `/developments/${development.id}`;
+    const route = development.ctaHref;
     add(`developments.${index}.image`, `${development.title} — cover`, development.title, route, development.image);
     development.gallery?.forEach((image, i) => add(`developments.${index}.gallery.${i}`, `${development.title} — gallery ${i + 1}`, development.title, route, image));
   });
