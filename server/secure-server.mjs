@@ -1,4 +1,5 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { renderLetterPreview } from "./letter-preview.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
@@ -97,6 +98,12 @@ if (process.env.NODE_ENV === "production" && !cmsEncryptionKey) {
 }
 
 await ensureDataDirs();
+const driveBackup = await createDriveBackup({
+  directory: join(dataDir, "private"), buildBackup: buildScheduledDriveBackup,
+  encode: encodeCmsStore, decode: decodeCmsStore, encryptionAvailable: Boolean(cmsEncryptionKey),
+  maxRawBytes: backupImportMaxBytes,
+  origin: process.env.PUBLIC_SITE_URL || process.env.SITE_URL || "https://kingsvalehomes.co.uk"
+});
 
 const server = createServer(async (request, response) => {
   try {
@@ -134,7 +141,10 @@ const server = createServer(async (request, response) => {
 
 const mailTimer = setInterval(() => { void contactMailer.flush().catch(() => console.error("Contact email queue unavailable.")); }, 60000);
 mailTimer.unref();
+const driveBackupTimer = setInterval(() => { void driveBackup.tick().catch(() => console.error("Google Drive backup scheduler could not save its state.")); }, 60_000);
+driveBackupTimer.unref();
 server.listen(port, () => {
+  void driveBackup.tick().catch(() => console.error("Google Drive backup scheduler could not save its state."));
   void contactMailer.flush().catch(() => console.error("Contact email queue unavailable."));
   console.log(`Secure Kingsvale server listening on http://127.0.0.1:${server.address().port}`);
 });
@@ -173,6 +183,10 @@ function allowRequest(clientId) {
 }
 
 async function handleApiRequest(request, response, url) {
+  if (url.pathname.startsWith("/api/drive-backup")) {
+    await handleDriveBackup(request, response, url);
+    return;
+  }
   if (url.pathname === "/api/ops/health") {
     if (request.method !== "GET") {
       sendJson(response, 405, { error: "Method not allowed." });
@@ -991,6 +1005,44 @@ async function handleAnalyticsSummary(request, response) {
   });
 }
 
+async function handleDriveBackup(request, response, url) {
+  response.setHeader("Cache-Control", "no-store");
+  const cookieName = "kingsvale_drive_connect";
+  const cookieFlags = `Path=/api/drive-backup; HttpOnly; SameSite=Lax${driveBackup.status().redirectUri.startsWith("https:") ? "; Secure" : ""}`;
+  if (url.pathname === "/api/drive-backup/callback" && request.method === "GET") {
+    const browser = (request.headers.cookie || "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
+    response.setHeader("Set-Cookie", `${cookieName}=; Max-Age=0; ${cookieFlags}`);
+    try {
+      await driveBackup.callback(url.searchParams, browser);
+      void driveBackup.run().catch(() => console.error("Google Drive initial backup could not save its state."));
+      response.writeHead(303, { Location: "/studio?tab=backup&drive=connected" }); response.end();
+    } catch {
+      response.writeHead(303, { Location: "/studio?tab=backup&drive=failed" }); response.end();
+    }
+    return;
+  }
+  const session = requireSession(request, response);
+  if (!session) return;
+  try {
+    if (url.pathname === "/api/drive-backup" && request.method === "GET") { sendJson(response, 200, driveBackup.status()); return; }
+    if (url.pathname === "/api/drive-backup" && request.method === "PUT") {
+      sendJson(response, 200, await driveBackup.configure(await readJsonBody(request, 4096))); return;
+    }
+    if (url.pathname === "/api/drive-backup/connect" && request.method === "POST") {
+      const connection = driveBackup.connect();
+      response.setHeader("Set-Cookie", `${cookieName}=${connection.browser}; Max-Age=600; ${cookieFlags}`);
+      sendJson(response, 200, { url: connection.url }); return;
+    }
+    if (url.pathname === "/api/drive-backup/run" && request.method === "POST") {
+      void driveBackup.run().catch(() => console.error("Google Drive backup could not save its state."));
+      await writeAudit("drive_backup_requested", request, { user: session.user });
+      sendJson(response, 202, driveBackup.status()); return;
+    }
+    if (url.pathname === "/api/drive-backup/disconnect" && request.method === "POST") { sendJson(response, 200, await driveBackup.disconnect()); return; }
+    sendJson(response, 405, { error: "Method not allowed." });
+  } catch (error) { sendJson(response, 400, { error: error.message }); }
+}
+
 async function handleBackup(request, response) {
   const session = requireSession(request, response);
   if (!session) {
@@ -1391,6 +1443,18 @@ async function readAnalyticsStore() {
 async function writeAnalyticsStore(store) {
   await mkdir(analyticsDir, { recursive: true });
   await writeFile(analyticsStoreFile, encodeCmsStore(store));
+}
+
+async function buildScheduledDriveBackup() {
+  // Refuse oversized image libraries before loading their base64 contents into
+  // the web server's memory. The complete JSON size is checked again by the job.
+  let mediaBytes = 0;
+  for (const entry of await readdir(uploadsDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    mediaBytes += Math.ceil((await stat(join(uploadsDir, entry.name))).size / 3) * 4;
+    if (mediaBytes > backupImportMaxBytes - 1000) throw new Error("This image library exceeds the server restore limit. Increase BACKUP_IMPORT_MAX_MB before creating a larger backup.");
+  }
+  return buildFullBackup();
 }
 
 async function buildFullBackup() {

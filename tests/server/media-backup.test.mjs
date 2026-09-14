@@ -12,6 +12,26 @@ import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
 const password = "test-only-kingsvale-images";
 const encryptionKey = "test-only-media-backup-encryption-key";
 
+test("Drive backup settings require Studio authentication and persist encrypted outside exports", async (t) => {
+  const server = await startServer(t);
+  const denied = await fetch(`${server.url}/api/drive-backup`);
+  assert.equal(denied.status, 401);
+  const setup = { clientId: "test-client.apps.googleusercontent.com", clientSecret: "test-only-drive-secret", budgetGb: 3 };
+  const saved = await server.api("/api/drive-backup", "PUT", setup);
+  assert.equal(saved.status, 200);
+  const status = await saved.json();
+  assert.equal(status.configured, true);
+  assert.equal(status.connected, false);
+  assert.ok(!JSON.stringify(status).includes(setup.clientSecret));
+  const stored = await readFile(join(server.directory, "private", "google-drive-backup.json"), "utf8");
+  assert.equal(JSON.parse(stored).encrypted, true);
+  assert.ok(!stored.includes(setup.clientSecret));
+  assert.equal((await server.api("/api/drive-backup/run", "POST", {})).status, 400);
+  const exported = await server.api("/api/backup", "GET");
+  assert.equal(exported.status, 200);
+  assert.ok(!(await exported.text()).includes(setup.clientSecret));
+});
+
 test("starter letters generate on the backend and document previews require authentication", async (t) => {
   const server = await startServer(t);
   const site = { ...createTrackingSite(), reference: "KV-LETTER-TEST", letterTemplateUrl: "/templates/kingsvale-initial-letter-template.docx" };

@@ -179,7 +179,7 @@ export function AdminPage({
     return cloneContent(publishedContent);
   });
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
-  const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>("website");
+  const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "backup" ? "backup" : "website");
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
   const [selectedMailingSiteId, setSelectedMailingSiteId] = useState("");
   const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");

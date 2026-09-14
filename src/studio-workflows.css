@@ -39,3 +39,27 @@
 .document-preview__pages img{display:block;width:100%;height:auto;box-shadow:0 4px 20px #0002}
 .document-preview__pages figcaption{text-align:center;padding:12px;font-size:12px;color:#62665d}
 @media(max-width:800px){.mailing-list{position:static;max-height:400px}.workflow-savebar{bottom:5px;padding:10px!important}.document-preview__bar{padding:14px;align-items:flex-start;flex-direction:column}.document-preview__actions{width:100%;justify-content:space-between}.workflow-heading{margin-top:22px}.settings-preset__content{min-width:0;flex-basis:100%}}
+.drive-backup {
+  border-top: 4px solid #0b4b35;
+  padding: clamp(18px, 3vw, 32px);
+}
+.drive-backup__heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.drive-backup__heading h2 { margin: 0; font-family: var(--font-serif); font-size: clamp(28px, 3vw, 38px); font-weight: 500; }
+.drive-backup__badge { padding: 8px 14px; border-radius: 30px; background: #e2eee7; color: #174a36; font-size: 13px; font-weight: 700; }
+.drive-backup__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #ded8cc; border: 1px solid #ded8cc; margin: 24px 0; }
+.drive-backup__metrics > div { padding: 18px; background: #fbf9f3; }
+.drive-backup__metrics dt { font-size: 12px; font-weight: 600; color: #6c6256; }
+.drive-backup__metrics dd { margin: 6px 0 0; font-size: 16px; overflow-wrap: anywhere; }
+.drive-backup__actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 20px 0; }
+.drive-backup__retention { padding: 22px; margin: 24px 0; background: #f2eee5; line-height: 1.65; }
+.drive-backup__retention p { margin: 8px 0 0; color: #625c52; font-size: 14px; }
+.drive-backup__setup { border-top: 1px solid #ded8cc; padding-top: 20px; margin-top: 20px; line-height: 1.65; }
+.drive-backup__setup summary { cursor: pointer; font-weight: 700; margin-bottom: 18px; }
+.drive-backup__setup code { overflow-wrap: anywhere; font-size: 13px; }
+.drive-backup__uri { display: block; padding: 14px; margin-top: 10px; background: #f2eee5; user-select: all; }
+.drive-backup fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.drive-backup__notice { background: #e8eee9; padding: 16px; border-left: 3px solid #27543e; }
+.drive-backup__notice--error { background: #faeee8; border-color: #a44a34; }
+.drive-backup__history { list-style: none; padding: 0; }
+.drive-backup__history li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #ded8cc; }
+@media (max-width: 600px) { .drive-backup__metrics { grid-template-columns: 1fr; } }

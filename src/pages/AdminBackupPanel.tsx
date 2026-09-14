@@ -2,6 +2,8 @@ import { Download, FileArchive, UploadCloud } from "lucide-react";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { exportFullBackup, importFullBackup, type KingsvaleBackup } from "../lib/cmsApi";
 import { parseBackup } from "../lib/backupValidation";
+import { AdminDriveBackup } from "./AdminDriveBackup";
+import { readBackupFile } from "../lib/backupFile";
 
 type ImportMode = "replace" | "merge";
 
@@ -38,7 +40,7 @@ export function AdminBackupPanel({ onImported }: { onImported?: () => void | Pro
     if (file.size > 1_000_000_000) { setStatus("This backup exceeds the maximum 1 GB import size."); return; }
     setStatus(`Reading ${file.name}…`);
     try {
-      const parsed = parseBackup(JSON.parse(await file.text()));
+      const parsed = parseBackup(JSON.parse(await readBackupFile(file)));
       if (selection !== fileSelection.current) return;
       setPendingBackup(parsed);
       setStatus(`Backup loaded from ${file.name}. Review the summary before importing.`);
@@ -67,6 +69,7 @@ export function AdminBackupPanel({ onImported }: { onImported?: () => void | Pro
 
   return (
     <section className="backup-admin" aria-label="Backup and restore">
+      <AdminDriveBackup />
       <div className="sites-admin__toolbar">
         <div className="admin-status sites-admin__status" role="status">
           <FileArchive aria-hidden="true" />
@@ -100,8 +103,8 @@ export function AdminBackupPanel({ onImported }: { onImported?: () => void | Pro
           <h2 id="backup-import-title">Import backup</h2>
           <label className="backup-drop">
             <UploadCloud aria-hidden="true" />
-            <span>Choose Kingsvale backup JSON</span>
-            <input className="sr-only" type="file" accept="application/json,.json" disabled={busy} onChange={handleFileChange} />
+            <span>Choose Kingsvale backup (.json or .json.gz)</span>
+            <input className="sr-only" type="file" accept="application/json,application/gzip,.json,.gz" disabled={busy} onChange={handleFileChange} />
           </label>
           <label className="admin-field" htmlFor="backup-mode">
             <span className="admin-field__label">Import mode</span>

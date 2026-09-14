@@ -804,6 +804,17 @@ function authHeaders(headers: Record<string, string> = {}) {
     : headers;
 }
 
+export async function driveBackupRequest<T>(path = "", method = "GET", body?: unknown): Promise<T> {
+  const response = await fetch(`/api/drive-backup${path}`, {
+    method, credentials: "same-origin", headers: authHeaders({ "Content-Type": "application/json" }),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+  });
+  if (!isJsonResponse(response)) throw new Error("Google Drive backups are available on the deployed secure server.");
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "The Google Drive backup request failed.");
+  return result as T;
+}
+
 function readStoredAuthToken() {
   if (typeof window === "undefined") {
     return "";
