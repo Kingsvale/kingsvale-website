@@ -79,6 +79,7 @@ import { isLocalDemoRuntime } from "../lib/runtimeMode";
 import { normalizeSiteContent } from "../lib/contentNormalize";
 import { websiteDraftKey } from "../lib/websiteDraft";
 import "../studio-media.css";
+import { applyTextEdit, readField, previewReadyMessage, previewEditMessage, previewSelectMessage, previewModeMessage, previewScrollMessage } from "../lib/siteEditing";
 
 type AdminPageProps = {
   publishedContent: SiteContent;
@@ -95,7 +96,7 @@ type RevisionSummary = {
 };
 
 type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup" | "settings";
-type PreviewRoute = `/developments/${string}` | "/" | "/design-build" | "/land-wanted" | "/vision-process" | "/about" | "/developments" | "/contact";
+type PreviewRoute = string;
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 
 const emptyLink: NavLink = { label: "New link", href: "#" };
@@ -104,8 +105,8 @@ const editorSections = [
   { id: "images", label: "Images & galleries" },
   { id: "hero", label: "Homepage hero" },
   { id: "features", label: "Homepage highlights" },
-  { id: "legacy", label: "Homepage/about" },
-  { id: "developments", label: "Homepage developments" },
+  { id: "legacy", label: "Our Legacy" },
+  { id: "developments", label: "Our developments" },
   { id: "land", label: "Land wanted" },
   { id: "brand", label: "Header/nav" },
   { id: "design", label: "Design page" },
@@ -131,7 +132,16 @@ const previewRoutes: { value: PreviewRoute; label: string }[] = [
   { value: "/vision-process", label: "Our Vision & Process" },
   { value: "/about", label: "About Us" },
   { value: "/developments", label: "Our Developments" },
-  { value: "/contact", label: "Contact Us" }
+  { value: "/contact", label: "Contact Us" },
+  { value: "/faq", label: "Frequently asked questions" },
+  { value: "/new-homes-south-england", label: "New homes in the South" },
+  { value: "/real-estate-development", label: "Real estate development" },
+  { value: "/land-opportunities", label: "Land opportunities" },
+  { value: "/land-seller-guide", label: "Land seller guide" },
+  { value: "/privacy", label: "Privacy policy" },
+  { value: "/terms", label: "Terms and conditions" },
+  { value: "/plot-lookup", label: "Plot lookup" },
+  { value: "/security-review", label: "Security information" }
 ];
 
 const previewDevices = [
@@ -172,6 +182,10 @@ export function AdminPage({
   const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const [previewKey, setPreviewKey] = useState(0);
+  const [inlineEdit, setInlineEdit] = useState(true);
+  const [imageSelection, setImageSelection] = useState("");
+  const [textSelection, setTextSelection] = useState<{ path: string; value: string } | null>(null);
+  const [scrollSection, setScrollSection] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState(draft.developments[0].id);
   const selectedProject = draft.developments.find((project) => project.id === selectedProjectId) ?? draft.developments[0];
   const [serverMode, setServerMode] = useState(false);
@@ -267,7 +281,8 @@ export function AdminPage({
   function selectEditorSection(section: EditorSectionId) {
     setActivePanel(section);
     const route = Object.entries(previewRoutePanels).find(([, panel]) => panel === section)?.[0];
-    if (route) setPreviewRoute(route as PreviewRoute);
+    if (section === "legacy") { setPreviewRoute("/"); setScrollSection("legacy"); }
+    else if (route) setPreviewRoute(route as PreviewRoute);
     if (section === "images") setPreviewRoute(`/developments/${draft.developments[0].id}`);
   }
 
@@ -534,10 +549,14 @@ export function AdminPage({
             ))}
           </div>
           <p className="admin-panel__note">
-            Start with Images & galleries to replace sample photographs. Edit your text by section, save a draft, then publish when you are happy with the preview.
+            Click any text in the preview to type directly on the page. Press Enter to apply or Escape to cancel. Click a photograph to open its image editor.
           </p>
 
-          {activePanel === "images" && <AdminImagesPanel content={draft} updateContent={updateDraft} onPreview={(route) => setPreviewRoute(route as PreviewRoute)} />}
+          {textSelection && <section className="inline-selection" aria-label="Selected preview text">
+            <div className="studio-image__heading"><h2>Selected text</h2><button type="button" className="admin-small" onClick={() => setTextSelection(null)}>Close text editor</button></div>
+            <Textarea label="Text selected in preview" value={String(readField(draft, textSelection.path) ?? textSelection.value)} maxLength={2400} onChange={(value) => updateDraft((next) => { applyTextEdit(next, textSelection.path, value); })} helper="Edit here or directly in the preview. Changes stay in your draft until you publish." />
+          </section>}
+          {activePanel === "images" && <AdminImagesPanel requestedPath={imageSelection} content={draft} updateContent={updateDraft} onPreview={(route) => setPreviewRoute(route as PreviewRoute)} />}
           {activePanel === "brand" && (
           <EditorPanel title="Header and navigation" id="editor-panel-brand">
             <div className="admin-grid admin-grid--two">
@@ -967,12 +986,30 @@ export function AdminPage({
               Open
             </a>
           </div>
+          <div className="admin-preview__editbar">
+            <div role="group" aria-label="Preview interaction mode"><button type="button" aria-pressed={inlineEdit} onClick={() => setInlineEdit(true)}>Click to edit</button><button type="button" aria-pressed={!inlineEdit} onClick={() => setInlineEdit(false)}>Browse website</button></div>
+            <span>{inlineEdit ? "Click text to type · Enter to apply · click images to replace" : "Follow links and try the galleries. Switch back to edit text."}</span>
+            {previewRoute === "/" && <label>Jump to section<select aria-label="Jump to homepage section" value={scrollSection} onChange={(event) => setScrollSection(event.target.value)}><option value="">Choose a section</option><option value="home">Homepage hero</option><option value="legacy">Our Legacy</option><option value="developments">Our developments</option><option value="land-wanted">Land wanted</option><option value="contact">Footer</option></select></label>}
+          </div>
           <div className="admin-preview__url">
             <span>{previewRoute}</span>
             <span>{previewDeviceConfig.width} x {previewDeviceConfig.height}</span>
           </div>
           <PreviewFrame
             content={draft}
+            editMode={inlineEdit && !busy && uploadsPending === 0}
+            scrollSection={scrollSection}
+            onEdit={(path, value) => { updateDraft((next) => { applyTextEdit(next, path, value); }); setStatus("Preview text updated in your draft. Save or publish when ready."); }}
+            onSelect={(selection) => {
+              if (busy || uploadsPending) return;
+              if (selection.kind === "text") { setTextSelection({ path: selection.path, value: selection.value ?? "" }); }
+              else {
+                if (/^imageOverrides\.[a-zA-Z0-9_-]{1,160}$/.test(selection.path) && !["__proto__", "constructor", "prototype"].includes(selection.path.slice(15)) && !readField(draft, selection.path) && selection.src && !selection.src.startsWith("data:")) {
+                  updateDraft((next) => { next.imageOverrides ??= {}; next.imageOverrides[selection.path.slice(15)] = { src: selection.src!, alt: selection.alt || "Website image", focalPoint: "50% 50%" }; });
+                }
+                setTextSelection(null); setImageSelection(selection.path); setActivePanel("images");
+              }
+            }}
             device={previewDeviceConfig}
             refreshKey={previewKey}
             route={previewRoute}
@@ -1031,13 +1068,17 @@ export function AdminPage({
 }
 
 function PreviewFrame({
-  content,
+  content, editMode, scrollSection, onEdit, onSelect,
   device,
   refreshKey,
   route,
   title
 }: {
   content: SiteContent;
+  editMode: boolean;
+  scrollSection: string;
+  onEdit: (path: string, value: string) => void;
+  onSelect: (selection: { kind: "text" | "image"; path: string; value?: string; src?: string; alt?: string }) => void;
   device: PreviewDeviceConfig;
   refreshKey: number;
   route: PreviewRoute;
@@ -1047,6 +1088,26 @@ function PreviewFrame({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(1);
   const previewUrl = buildStudioPreviewUrl(route, refreshKey);
+  const callbacks = useRef({ onEdit, onSelect }); callbacks.current = { onEdit, onSelect };
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
+      const data = event.data;
+      if (data?.type === previewReadyMessage) {
+        iframeRef.current?.contentWindow?.postMessage({ type: previewModeMessage, enabled: editMode }, window.location.origin);
+        if (scrollSection) iframeRef.current?.contentWindow?.postMessage({ type: previewScrollMessage, id: scrollSection }, window.location.origin);
+        return;
+      }
+      if (!editMode) return;
+      if (typeof data?.path !== "string" || data.path.length > 200) return;
+      if (data.type === previewEditMessage && typeof data.value === "string") callbacks.current.onEdit(data.path, data.value);
+      if (data.type === previewSelectMessage && ["image", "text"].includes(data.kind)) callbacks.current.onSelect(data);
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [editMode, scrollSection]);
+  useEffect(() => { iframeRef.current?.contentWindow?.postMessage({ type: previewModeMessage, enabled: editMode }, window.location.origin); }, [editMode]);
+  useEffect(() => { if (scrollSection) iframeRef.current?.contentWindow?.postMessage({ type: previewScrollMessage, id: scrollSection }, window.location.origin); }, [scrollSection, route]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -1097,7 +1158,7 @@ function PreviewFrame({
           className="admin-preview__frame"
           title={title}
           src={previewUrl}
-          onLoad={sendPreviewContent}
+          onLoad={() => { sendPreviewContent(); iframeRef.current?.contentWindow?.postMessage({ type: previewModeMessage, enabled: editMode }, window.location.origin); if (scrollSection) iframeRef.current?.contentWindow?.postMessage({ type: previewScrollMessage, id: scrollSection }, window.location.origin); }}
         />
       </div>
     </div>
@@ -1507,6 +1568,13 @@ function DevelopmentEditor({
         }
         onChange={(image) => onChange({ ...development, image })}
       />
+      <details className="studio-image__details"><summary>Project details & page text</summary>
+        <div className="admin-grid admin-grid--two">
+          {(["status", "priceGuide", "homes", "bedrooms"] as const).map((field) => <TextInput key={field} label={`Project ${field === "priceGuide" ? "price guide" : field}`} value={development[field] ?? ""} maxLength={120} onChange={(value) => onChange({ ...development, [field]: value })} />)}
+        </div>
+        <Textarea label="Project page introduction" value={development.heroBody ?? development.description} maxLength={600} onChange={(heroBody) => onChange({ ...development, heroBody })} />
+        <Textarea label="Project highlights (one per line)" value={(development.highlights ?? []).join("\n")} maxLength={1800} onChange={(value) => onChange({ ...development, highlights: value.split("\n") })} />
+      </details>
       <ProjectGallery title={development.title} images={development.gallery ?? []} onChange={(gallery) => onChange({ ...development, gallery })} />
     </article>
   );

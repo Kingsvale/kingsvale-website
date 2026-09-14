@@ -47,6 +47,8 @@ test("uploaded photos survive export, a fresh server restore, revisions and merg
   assert.equal(image.width, 1600);
   assert.deepEqual(image.variants.map((variant) => variant.width), [480, 960, 1440, 1600]);
   const content = structuredClone(defaultContent);
+  content.textOverrides = { about_heading: "Homes made with care" };
+  content.imageOverrides = { logo: { ...image, alt: "Custom studio logo" } };
   content.developments[0].image = { ...image, alt: "Garden at The Ridings", focalPoint: "20% 75%" };
   content.developments[0].gallery = [{ ...image, alt: "Project garden" }];
   assert.equal((await source.api("/api/cms/publish", "POST", { content })).status, 200);
@@ -74,6 +76,8 @@ test("uploaded photos survive export, a fresh server restore, revisions and merg
   }
   const restored = await (await destination.api("/api/cms/draft")).json();
   assert.equal(restored.published.developments[0].image.focalPoint, "20% 75%");
+  assert.deepEqual(restored.published.textOverrides, content.textOverrides);
+  assert.deepEqual(restored.published.imageOverrides, content.imageOverrides);
   assert.equal((await destination.api("/api/backup", "PUT", { backup, mode: "merge" })).status, 200);
   const tampered = structuredClone(backup); tampered.media[0].sha256 = "0".repeat(64);
   assert.equal((await destination.api("/api/backup", "PUT", { backup: tampered })).status, 400);

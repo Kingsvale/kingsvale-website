@@ -297,7 +297,7 @@ async function handleApiRequest(request, response, url) {
     }
 
     if (request.method === "PUT") {
-      const payload = await readJsonBody(request, 450_000);
+      const payload = await readJsonBody(request, 2_000_000);
       const validation = validateSiteContent(payload.content);
       if (!validation.valid) {
         sendJson(response, 400, { errors: validation.errors });
@@ -328,7 +328,7 @@ async function handleApiRequest(request, response, url) {
       return;
     }
 
-    const payload = await readJsonBody(request, 450_000);
+    const payload = await readJsonBody(request, 2_000_000);
     const nextContent = payload.content;
     const validation = validateSiteContent(nextContent);
     if (!validation.valid) {
@@ -1587,6 +1587,14 @@ function validateSiteContent(content) {
     return { valid: false, errors: [{ path: "content", message: "Content is required." }] };
   }
 
+  if (content.textOverrides && (typeof content.textOverrides !== "object" || Array.isArray(content.textOverrides) || Object.keys(content.textOverrides).length > 512 || Object.entries(content.textOverrides).some(([key, value]) => (["__proto__", "constructor", "prototype"].includes(key) || !/^[a-zA-Z0-9_-]{1,160}$/.test(key)) || typeof value !== "string" || value.length > 2400))) errors.push({ path: "textOverrides", message: "Page text is invalid." });
+  if (content.imageOverrides) {
+    if (typeof content.imageOverrides !== "object" || Array.isArray(content.imageOverrides) || Object.keys(content.imageOverrides).length > 128) errors.push({ path: "imageOverrides", message: "Page images are invalid." });
+    else for (const [key, image] of Object.entries(content.imageOverrides)) {
+      if (["__proto__", "constructor", "prototype"].includes(key) || !/^[a-zA-Z0-9_-]{1,160}$/.test(key)) errors.push({ path: "imageOverrides", message: "Page image key is invalid." });
+      validateImage(errors, `imageOverrides.${key}`, image);
+    }
+  }
   validateText(errors, "brandName", content.brandName, "Brand name", 24);
   validateText(errors, "brandSuffix", content.brandSuffix, "Brand suffix", 16);
   validateLinks(errors, "navLinks", content.navLinks, 3, 8);
@@ -1629,7 +1637,12 @@ function validateSiteContent(content) {
       validateText(errors, `developments.${index}.ctaLabel`, development.ctaLabel, "Development CTA label", 34);
       validateUrl(errors, `developments.${index}.ctaHref`, development.ctaHref, "Development CTA link");
       validateImage(errors, `developments.${index}.image`, development.image);
-      if (development.gallery !== undefined) {
+      for (const [key, limit] of [["status", 120], ["priceGuide", 120], ["homes", 120], ["bedrooms", 120], ["heroBody", 600]]) {
+    const value = development[key];
+    if (value !== undefined && (typeof value !== "string" || value.length > limit)) errors.push({ path: `developments.${index}.${key}`, message: `Use up to ${limit} characters.` });
+  }
+  if (development.highlights !== undefined && (!Array.isArray(development.highlights) || development.highlights.length > 20 || development.highlights.some((value) => typeof value !== "string" || value.length > 300))) errors.push({ path: `developments.${index}.highlights`, message: "Use up to 20 highlights of 300 characters each." });
+  if (development.gallery !== undefined) {
         if (!Array.isArray(development.gallery) || development.gallery.length > 12) errors.push({ path: `developments.${index}.gallery`, message: "Use up to 12 gallery images." });
         else development.gallery.forEach((image, i) => validateImage(errors, `developments.${index}.gallery.${i}`, image));
       }

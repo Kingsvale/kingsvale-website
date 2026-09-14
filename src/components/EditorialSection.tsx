@@ -1,3 +1,4 @@
+import { SiteText } from "./SiteText";
 import type { EditorialSection as EditorialContent } from "../lib/contentTypes";
 import { ButtonLink } from "./ButtonLink";
 import { ResponsiveImage } from "./ResponsiveImage";
@@ -19,10 +20,10 @@ export function EditorialSection({ content }: EditorialSectionProps) {
         />
       </div>
       <Reveal className="editorial-split__copy">
-        <p className="eyebrow">{content.eyebrow}</p>
-        <h2 id="legacy-title">{content.title}</h2>
-        <p>{content.body}</p>
-        <ButtonLink href={content.ctaHref}>{content.ctaLabel}</ButtonLink>
+        <p className="eyebrow"><SiteText field={`about.eyebrow`}>{content.eyebrow}</SiteText></p>
+        <h2 id="legacy-title"><SiteText field={`about.title`}>{content.title}</SiteText></h2>
+        <p><SiteText field={`about.body`}>{content.body}</SiteText></p>
+        <ButtonLink href={content.ctaHref}><SiteText field={`about.ctaLabel`}>{content.ctaLabel}</SiteText></ButtonLink>
       </Reveal>
     </section>
   );

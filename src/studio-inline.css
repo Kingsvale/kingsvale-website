@@ -1,0 +1,8 @@
+html[data-studio-inline="true"] [data-cms-text] { cursor: text; border-radius: 3px; }
+html[data-studio-inline="true"] [data-cms-text]:hover { outline: 2px dashed #a7ba8f; outline-offset: 4px; }
+html[data-studio-inline="true"] [data-cms-text][contenteditable] { outline: 2px solid #91bb74; outline-offset: 5px; background: #82946622; min-width: 1ch; white-space: pre-wrap; }
+html[data-studio-inline="true"] [data-cms-image] { cursor: pointer; }
+html[data-studio-inline="true"] [data-cms-image]:hover { outline: 4px solid #a7ba8f; outline-offset: -4px; }
+html[data-studio-inline="true"] .reveal { opacity: 1; transform: none; }
+
+html[data-studio-inline="true"] [data-cms-text][contenteditable] { text-transform: none !important; }

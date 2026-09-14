@@ -13,8 +13,9 @@ export function imageStatus(image: ImageAsset) {
 export function imageSlots(content: SiteContent): ImageSlot[] {
   const slots: ImageSlot[] = [];
   const add = (path: string, title: string, group: string, route: string, image: ImageAsset) => slots.push({ path, title, group, route, image });
+  Object.entries(content.imageOverrides ?? {}).forEach(([key, image]) => add(`imageOverrides.${key}`, key === "logo" ? "Kingsvale logo" : image.alt || "Additional page image", "Additional page images", key === "logo" ? "/" : key.slice(0, key.lastIndexOf("_")).replaceAll("_", "/") || "/", image));
   add("hero.image", "Homepage hero", "Website pages", "/", content.hero.image);
-  add("about.image", "About / homepage story", "Website pages", "/about", content.about.image);
+  add("about.image", "Our Legacy / About Us", "Website pages", "/about", content.about.image);
   add("landWanted.image", "Land wanted", "Website pages", "/land-wanted", content.landWanted.image);
   const pages = { designBuild: ["Design & build", "/design-build"], visionProcess: ["Vision & process", "/vision-process"], contact: ["Contact", "/contact"] };
   for (const key of Object.keys(pages) as (keyof typeof pages)[]) {

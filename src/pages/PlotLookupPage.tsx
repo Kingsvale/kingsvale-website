@@ -1,3 +1,4 @@
+import { SiteText } from "../components/SiteText";
 import { type FormEvent, useState } from "react";
 import { Footer } from "../components/Footer";
 import { Header } from "../components/Header";
@@ -37,17 +38,15 @@ export function PlotLookupPage({ content }: PlotLookupPageProps) {
           <ResponsiveImage image={content.hero.image} className="lookup-hero__image" priority widthHint={1800} sizes="100vw" />
           <div className="hero__overlay" aria-hidden="true" />
           <div className="lookup-hero__content">
-            <p className="eyebrow hero__eyebrow">Received a Kingsvale letter?</p>
-            <h1 id="lookup-title">View the plot map for your reference.</h1>
-            <p>Enter the reference number from your letter and the postcode for the addressed property.</p>
+            <p className="eyebrow hero__eyebrow"><SiteText>Received a Kingsvale letter?</SiteText></p>
+            <h1 id="lookup-title"><SiteText>View the plot map for your reference.</SiteText></h1>
+            <p><SiteText>Enter the reference number from your letter and the postcode for the addressed property.</SiteText></p>
           </div>
         </section>
 
         <section className="lookup-panel" aria-label="Plot lookup form">
           <form className="plot-lookup__form" onSubmit={handleSubmit}>
-            <label>
-              Reference number
-              <input
+            <label><SiteText>Reference number</SiteText><input
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
                 autoComplete="off"
@@ -56,9 +55,7 @@ export function PlotLookupPage({ content }: PlotLookupPageProps) {
                 required
               />
             </label>
-            <label>
-              Postcode
-              <input
+            <label><SiteText>Postcode</SiteText><input
                 value={postcode}
                 onChange={(event) => setPostcode(event.target.value)}
                 autoComplete="postal-code"
@@ -70,8 +67,8 @@ export function PlotLookupPage({ content }: PlotLookupPageProps) {
             <button type="submit" disabled={status === "checking"}>
               {status === "checking" ? "Checking" : "Open map"}
             </button>
-            {status === "not-found" && <p role="status">No matching plot map was found for those details.</p>}
-            {status === "error" && <p role="status">Lookup is unavailable. Please contact Kingsvale directly.</p>}
+            {status === "not-found" && <p role="status"><SiteText>No matching plot map was found for those details.</SiteText></p>}
+            {status === "error" && <p role="status"><SiteText>Lookup is unavailable. Please contact Kingsvale directly.</SiteText></p>}
           </form>
         </section>
       </main>

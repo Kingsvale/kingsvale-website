@@ -1,6 +1,7 @@
 import type { Development, SiteContent } from "../lib/contentTypes";
 import { ButtonLink } from "./ButtonLink";
-import { ResponsiveImage } from "./ResponsiveImage";
+import { ProjectCarousel } from "./ProjectImages";
+import { SiteText } from "./SiteText";
 import { Reveal } from "./Reveal";
 
 type DevelopmentsProps = {
@@ -12,16 +13,17 @@ export function Developments({ intro, developments }: DevelopmentsProps) {
   return (
     <section className="developments" id="developments" aria-labelledby="developments-title">
       <div className="section-heading">
-        <p className="eyebrow">{intro.eyebrow}</p>
-        <h2 id="developments-title">{intro.title}</h2>
+        <p className="eyebrow"><SiteText field="developmentsIntro.eyebrow">{intro.eyebrow}</SiteText></p>
+        <h2 id="developments-title"><SiteText field="developmentsIntro.title">{intro.title}</SiteText></h2>
         <ButtonLink href={intro.viewAllHref} variant="dark" className="section-heading__link">
-          {intro.viewAllLabel}
+          <SiteText field="developmentsIntro.viewAllLabel">{intro.viewAllLabel}</SiteText>
         </ButtonLink>
       </div>
       <div className="development-grid">
         {developments.map((development, index) => (
           <DevelopmentCard
             development={development}
+            index={index}
             delay={index * 90}
             key={development.id}
           />
@@ -33,9 +35,11 @@ export function Developments({ intro, developments }: DevelopmentsProps) {
 
 function DevelopmentCard({
   development,
+  index,
   delay
 }: {
   development: Development;
+  index: number;
   delay: number;
 }) {
   const specs = [
@@ -46,32 +50,27 @@ function DevelopmentCard({
 
   return (
     <Reveal className="development-card" delay={delay}>
-      <a href={development.ctaHref} className="development-card__media">
-        <ResponsiveImage
-          image={development.image}
-          sizes="(max-width: 720px) 100vw, (max-width: 1180px) 50vw, 25vw"
-          widthHint={720}
-        />
+      <ProjectCarousel project={development} index={index}>
         {development.status && (
-          <span className="development-card__status">{development.status}</span>
+          <span className="development-card__status"><SiteText field={`developments.${index}.status`}>{development.status}</SiteText></span>
         )}
-      </a>
+      </ProjectCarousel>
       <div className="development-card__body">
-        <h3>{development.title}</h3>
-        <p className="development-card__location">{development.location}</p>
-        <p>{development.description}</p>
+        <h3><SiteText field={`developments.${index}.title`}>{development.title}</SiteText></h3>
+        <p className="development-card__location"><SiteText field={`developments.${index}.location`}>{development.location}</SiteText></p>
+        <p><SiteText field={`developments.${index}.description`}>{development.description}</SiteText></p>
         {specs.length > 0 && (
           <dl className="development-card__specs">
             {specs.map((spec) => (
               <div key={spec.label}>
-                <dt>{spec.label}</dt>
-                <dd>{spec.value}</dd>
+                <dt><SiteText copy={`project_spec_${spec.label}`}>{spec.label}</SiteText></dt>
+                <dd><SiteText field={`developments.${index}.${spec.label === "Guide" ? "priceGuide" : spec.label.toLowerCase()}`}>{spec.value}</SiteText></dd>
               </div>
             ))}
           </dl>
         )}
         <ButtonLink href={development.ctaHref} variant="dark" className="development-card__link">
-          {development.ctaLabel}
+          <SiteText field={`developments.${index}.ctaLabel`}>{development.ctaLabel}</SiteText>
         </ButtonLink>
       </div>
     </Reveal>

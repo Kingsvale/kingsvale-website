@@ -174,6 +174,11 @@ function addDevelopmentErrors(errors: ValidationError[], development: Developmen
   );
   addHrefError(errors, `${path}.ctaHref`, development.ctaHref, "Development CTA link");
   addImageErrors(errors, `${path}.image`, development.image);
+  for (const [key, limit] of [["status", 120], ["priceGuide", 120], ["homes", 120], ["bedrooms", 120], ["heroBody", 600]] as const) {
+    const value = development[key];
+    if (value !== undefined && (typeof value !== "string" || value.length > limit)) errors.push({ path: `developments.${index}.${key}`, message: `Use up to ${limit} characters.` });
+  }
+  if (development.highlights !== undefined && (!Array.isArray(development.highlights) || development.highlights.length > 20 || development.highlights.some((value: string) => typeof value !== "string" || value.length > 300))) errors.push({ path: `developments.${index}.highlights`, message: "Use up to 20 highlights of 300 characters each." });
   if (development.gallery !== undefined) {
     if (!Array.isArray(development.gallery) || development.gallery.length > 12) {
       errors.push({ path: `${path}.gallery`, message: "Use up to 12 gallery images." });
@@ -265,6 +270,15 @@ export function isValidImageSource(src: string): boolean {
 
 export function validateSiteContent(content: SiteContent): ValidationResult {
   const errors: ValidationError[] = [];
+
+  if (content.textOverrides && (typeof content.textOverrides !== "object" || Array.isArray(content.textOverrides) || Object.keys(content.textOverrides).length > 512 || Object.entries(content.textOverrides).some(([key, value]) => (["__proto__", "constructor", "prototype"].includes(key) || !/^[a-zA-Z0-9_-]{1,160}$/.test(key)) || typeof value !== "string" || value.length > 2400))) {
+    errors.push({ path: "textOverrides", message: "Page text must be plain text of 2,400 characters or fewer per field." });
+  }
+  if (content.imageOverrides && (typeof content.imageOverrides !== "object" || Array.isArray(content.imageOverrides) || Object.keys(content.imageOverrides).length > 128)) errors.push({ path: "imageOverrides", message: "Page images are invalid." });
+  else Object.entries(content.imageOverrides ?? {}).forEach(([key, image]) => {
+    if (["__proto__", "constructor", "prototype"].includes(key) || !/^[a-zA-Z0-9_-]{1,160}$/.test(key)) errors.push({ path: "imageOverrides", message: "Page image key is invalid." });
+    addImageErrors(errors, `imageOverrides.${key}`, image);
+  });
 
   addRequiredTextError(errors, "brandName", content.brandName, "Brand name", fieldLimits.brandName);
   addRequiredTextError(errors, "brandSuffix", content.brandSuffix, "Brand suffix", fieldLimits.brandSuffix);

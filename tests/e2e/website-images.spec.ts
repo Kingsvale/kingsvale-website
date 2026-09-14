@@ -35,7 +35,7 @@ test("studio image workspace uploads, saves drafts, previews projects and export
   await expect(page.getByLabel("Preview page")).toHaveValue("/developments/ridings");
   await page.getByRole("button", { name: "Phone", exact: true }).last().click();
   await expect(page.getByTitle("Live The Ridings Phone preview")).toBeVisible();
-  await expect(page.frameLocator(".admin-preview__frame").getByAltText("The Ridings garden and landscaped borders")).toBeVisible();
+  await expect(page.frameLocator(".admin-preview__frame").getByAltText("The Ridings garden and landscaped borders").first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("studio-image-editor.png"), fullPage: true });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
@@ -51,5 +51,5 @@ test("studio image workspace uploads, saves drafts, previews projects and export
   expect(cover.focalPoint).toBe("1% 50%");
   expect(backup.media.find((file: { filename: string }) => `/media/${file.filename}` === cover.src).data.length).toBeGreaterThan(0);
   await page.goto("/developments/ridings");
-  await expect(page.getByAltText("The Ridings garden and landscaped borders")).toBeVisible();
+  await expect(page.getByAltText("The Ridings garden and landscaped borders").first()).toBeVisible();
 });

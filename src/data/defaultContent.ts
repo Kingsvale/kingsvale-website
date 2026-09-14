@@ -55,7 +55,7 @@ export const defaultContent: SiteContent = {
   about: {
     eyebrow: "Our legacy",
     title: "Building homes. Creating legacies.",
-    body: "At Kingsvale Homes, we believe a home is more than a place to live. It is a foundation for life. For over a decade, we have been designing and building exceptional homes and communities across the South, combining timeless architecture with modern living.",
+    body: "At Kingsvale Homes, we believe a home is more than a place to live. It is a foundation for life. We have over 25 years of experience designing and building exceptional homes and communities across the South, combining timeless architecture with modern living.",
     ctaLabel: "Our vision & process",
     ctaHref: "/vision-process",
     image: {

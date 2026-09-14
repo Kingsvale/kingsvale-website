@@ -49,7 +49,7 @@ test("views homepage, edits admin content, uploads an image and verifies publica
   await expect(page.getByRole("heading", { name: "Kingsvale private studio" })).toBeVisible();
 
   await page.getByLabel("Hero title").fill("Crafted homes for modern country living.");
-  await page.getByRole("tab", { name: "Homepage developments" }).click();
+  await page.getByRole("tab", { name: "Our developments" }).click();
   await page.getByLabel("Development 1 title").fill("Riverstone Mews");
   await page.getByRole("tab", { name: "Homepage hero" }).click();
   await page.getByTestId("hero-image-upload").setInputFiles({

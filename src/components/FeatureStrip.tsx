@@ -1,3 +1,4 @@
+import { SiteText } from "./SiteText";
 import type { FeatureItem } from "../lib/contentTypes";
 import { IconRenderer } from "./IconRenderer";
 import { Reveal } from "./Reveal";
@@ -14,8 +15,8 @@ export function FeatureStrip({ features }: FeatureStripProps) {
           <Reveal className="feature" delay={index * 80} key={feature.id}>
             <IconRenderer icon={feature.icon} className="feature__icon" />
             <div>
-              <h2>{feature.title}</h2>
-              <p>{feature.description}</p>
+              <h2><SiteText field={`features.${index}.title`}>{feature.title}</SiteText></h2>
+              <p><SiteText field={`features.${index}.description`}>{feature.description}</SiteText></p>
             </div>
           </Reveal>
         ))}

@@ -1,18 +1,20 @@
 import { ImageIcon, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SiteContent } from "../lib/contentTypes";
 import { imageSlots, imageStatus, replaceImageSlot } from "../lib/imageInventory";
 import { ImageEditor } from "./AdminImageEditor";
 import { ProjectGallery } from "./AdminProjectGallery";
 
-export function AdminImagesPanel({ content, updateContent, onPreview }: {
+export function AdminImagesPanel({ content, updateContent, onPreview, requestedPath }: {
   content: SiteContent; updateContent: (recipe: (content: SiteContent) => void) => void; onPreview: (route: string) => void;
+  requestedPath?: string;
 }) {
   const slots = useMemo(() => imageSlots(content), [content]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All images");
   const [browsing, setBrowsing] = useState(true);
   const [selectedPath, setSelectedPath] = useState(slots.find((slot) => slot.path.startsWith("developments."))?.path ?? slots[0].path);
+  useEffect(() => { if (requestedPath) { setSelectedPath(requestedPath); setBrowsing(false); } }, [requestedPath]);
   const selected = slots.find((slot) => slot.path === selectedPath) ?? slots[0];
   const placeholders = slots.filter((slot) => imageStatus(slot.image) === "Placeholder").length;
   const filtered = slots.filter((slot) => (filter === "All images" || (filter === "Placeholders" ? imageStatus(slot.image) === "Placeholder" : slot.group === filter))
@@ -44,7 +46,7 @@ export function AdminImagesPanel({ content, updateContent, onPreview }: {
     <div className="image-workspace__selection">
       <div className="studio-image__heading"><p className="eyebrow">Selected image</p><button className="admin-small" type="button" onClick={() => onPreview(selected.route)}>Preview this page</button></div>
       <ImageEditor key={selected.path} title={selected.title} image={selected.image} onChange={(image) => updateContent((next) => replaceImageSlot(next, selected.path, image))} />
-      {project && selected.path.endsWith(".image") && <ProjectGallery key={project.id} title={project.title} images={project.gallery ?? []} onChange={(images) => updateContent((next) => { next.developments[projectIndex].gallery = images; })} />}
+      {project && <ProjectGallery key={project.id} title={project.title} images={project.gallery ?? []} onChange={(images) => updateContent((next) => { next.developments[projectIndex].gallery = images; })} />}
     </div>
     <p className="studio-image__hint">Uploaded photographs and their web sizes are included in full backups. Sample photographs and other external image links remain links.</p>
   </section>;

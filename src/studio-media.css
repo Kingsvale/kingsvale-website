@@ -68,7 +68,15 @@
 .admin-editor, .admin-panel, .admin-subcard { min-width: 0; }
 .admin-edit-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
 .admin-topbar { position: relative; }
-.admin-preview { top: 0; height: 100vh; }
+.admin-preview { top: 0; height: 100vh; grid-template-rows: auto auto auto minmax(0, 1fr); }
+.admin-preview__editbar { padding: 12px 16px; background: #e8ede1; color: #263626; font-size: 12px; display: grid; gap: 10px; border-bottom: 1px solid #9baa91; }
+.admin-preview__editbar [role="group"] { display: flex; gap: 8px; }
+.admin-preview__editbar button { padding: 8px 12px; border-radius: 5px; border: 1px solid #9daa90; background: transparent; color: #263626; cursor: pointer; }
+.admin-preview__editbar button[aria-pressed="true"] { background: #3e563e; color: white; border-color: #3e563e; }
+.admin-preview__editbar label { display: flex; align-items: center; gap: 12px; }
+.admin-preview__editbar select { padding: 6px; min-width: 0; color: #263626; background: white; border: 1px solid #9daa90; border-radius: 4px; }
+.inline-selection { background: #f7fbf1; border: 2px solid #829970; border-radius: 8px; padding: 18px; margin: 0 0 20px; }
+.inline-selection h2 { margin: 0; font-size: 18px; }
 .admin-tabs { gap: 6px; }
 .admin-tabs button { border-radius: 5px; min-height: 40px; }
 .admin-tabs button:disabled { opacity: .55; }

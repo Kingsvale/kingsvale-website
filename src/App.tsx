@@ -4,6 +4,7 @@ import { useSiteContent } from "./hooks/useSiteContent";
 import { studioPath } from "./lib/studioRoute";
 import { usePageSeo } from "./lib/seo";
 import { isStudioPreviewRequest } from "./lib/studioPreview";
+import { SiteContentProvider } from "./components/SiteText";
 import {
   recordAnalyticsVisit,
   shouldRecordAnalyticsVisit,
@@ -76,6 +77,18 @@ export function App() {
     });
   }, [route]);
 
+  useEffect(() => {
+    if (!isStudioPreviewRequest() || window.parent === window) return;
+    let stop: (() => void) | undefined;
+    let active = true;
+    void import("./pages/studioInlineEditing").then(({ enableInlineEditing }) => { if (active) stop = enableInlineEditing(); });
+    return () => { active = false; stop?.(); };
+  }, []);
+
+  return <SiteContentProvider content={content} route={route}><Page content={content} route={route} /></SiteContentProvider>;
+}
+
+function Page({ content, route }: { content: SiteContent; route: string }) {
   if (route === "/") {
     return <Homepage content={content} />;
   }

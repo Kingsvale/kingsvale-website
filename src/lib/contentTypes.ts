@@ -105,6 +105,8 @@ export type FooterContent = {
 };
 
 export type SiteContent = {
+  textOverrides?: Record<string, string>;
+  imageOverrides?: Record<string, ImageAsset>;
   brandName: string;
   brandSuffix: string;
   navLinks: NavLink[];

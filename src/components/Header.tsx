@@ -1,3 +1,4 @@
+import { SiteText } from "./SiteText";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import type { NavLink } from "../lib/contentTypes";
@@ -27,14 +28,14 @@ export function Header({ brandName, brandSuffix, navLinks }: HeaderProps) {
           {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
         </button>
         <nav className="primary-nav" data-open={open} aria-label="Primary navigation">
-          {navLinks.map((link) => (
+          {navLinks.map((link, index) => (
             <a
               key={`${link.href}-${link.label}`}
               href={link.href}
               aria-current={isActiveLink(link.href, currentPath) ? "page" : undefined}
               onClick={() => setOpen(false)}
             >
-              {link.label}
+              <SiteText field={`navLinks.${index}.label`}>{link.label}</SiteText>
             </a>
           ))}
           <a
@@ -42,8 +43,7 @@ export function Header({ brandName, brandSuffix, navLinks }: HeaderProps) {
             aria-current={currentPath === "/plot-lookup" ? "page" : undefined}
             onClick={() => setOpen(false)}
           >
-            Lookup
-          </a>
+            <SiteText copy="header_lookup">Lookup</SiteText></a>
         </nav>
       </div>
     </header>

@@ -22,8 +22,9 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalizedId = id.replaceAll("\\", "/");
+          if (normalizedId.includes("/src/pages/studioInlineEditing")) return "studio-inline";
 
-          if (normalizedId.includes("/src/components/AdminFields")) return "studio";
+          if ((normalizedId.includes("/src/components/AdminFields") || normalizedId.includes("/src/components/TrackingQrCode"))) return "studio";
 
           if (
             normalizedId.includes("vite/preload-helper") ||
