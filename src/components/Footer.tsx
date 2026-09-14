@@ -90,12 +90,16 @@ export function Footer({ brandName, brandSuffix, footer }: FooterProps) {
               <ArrowRight aria-hidden="true" />
             </button>
           </form>
+          <p className="footer__privacy"><SiteText copy="footer_newsletter_consent">By subscribing, you agree to receive Kingsvale email updates. Email us to unsubscribe at any time.</SiteText> <a href="/privacy"><SiteText>Privacy policy</SiteText></a></p>
           {submitState === "success" && <p className="footer__thanks"><SiteText copy="footer_thank_you_for_joining_">Thank you for joining.</SiteText></p>}
           {submitState === "error" && <p className="footer__thanks"><SiteText copy="footer_please_email_us_directly_">Please email us directly.</SiteText></p>}
         </div>
       </div>
       <div className="footer__bar">
-        <p><SiteText copy="footer_copyright">{`© 2026 ${brandName} ${brandSuffix}. All rights reserved.`}</SiteText></p>
+        <div className="footer__identity">
+          <p><SiteText copy="footer_copyright">{`© 2026 ${brandName} ${brandSuffix}. All rights reserved.`}</SiteText></p>
+          <p className="footer__company"><SiteText copy="footer_company_registration">Kingsvale Homes is a trading name of Kingsvale Ltd, registered in England and Wales, no. 17289813.</SiteText></p>
+        </div>
         <div>
           {footer.legalLinks.map((link, index) => (
             <a key={`${link.href}-${link.label}`} href={link.href}>

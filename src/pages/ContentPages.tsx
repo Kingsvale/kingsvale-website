@@ -1,4 +1,5 @@
 import { overviewCopy, overviewKeys } from "../data/developmentsOverview";
+import { legalEmail, legalUpdated, privacySections, termsSections } from "../data/legalPages";
 import { ProjectGallery, ProjectCarousel } from "../components/ProjectImages";
 import { SiteText } from "../components/SiteText";
 import { ArrowRight, CheckCircle2, Mail, MapPin, Phone } from "lucide-react";
@@ -341,6 +342,7 @@ export function LegalPage({
   kind
 }: ContentPageProps & { kind: "privacy" | "terms" }) {
   const isPrivacy = kind === "privacy";
+  const sections = isPrivacy ? privacySections : termsSections;
   return (
     <PublicShell content={content}>
       <InnerHero
@@ -354,35 +356,25 @@ export function LegalPage({
         image={content.hero.image}
       />
       <section className="content-band">
-        <div className="legal-copy">
-          <h2><SiteText>{isPrivacy ? "Privacy principles" : "Website terms"}</SiteText></h2>
-          <p>
-            <SiteText>This page should be reviewed by a qualified legal adviser before public launch. It gives Kingsvale a complete, coherent structure for launch preparation, but it is not a substitute for formal advice.</SiteText></p>
-          {isPrivacy ? (
-            <>
-              <h3><SiteText>Information we collect</SiteText></h3>
-              <p>
-                <SiteText>Enquiry forms and newsletter sign-ups collect only the details needed to respond: name, email address, enquiry type, message content and basic request metadata used for fraud prevention and service reliability.</SiteText></p>
-              <h3><SiteText>How information is used</SiteText></h3>
-              <p>
-                <SiteText>Kingsvale should use personal information to respond to enquiries, manage development interest, send requested updates and maintain website security. Personal data should not be sold.</SiteText></p>
-              <h3><SiteText>Retention and choices</SiteText></h3>
-              <p>
-                <SiteText>Enquiry records should be retained only for a proportionate period. Newsletter subscribers should be able to unsubscribe, request correction or ask for deletion where legally available.</SiteText></p>
-            </>
-          ) : (
-            <>
-              <h3><SiteText>Website information</SiteText></h3>
-              <p>
-                <SiteText>Development details, imagery, availability, price guides and specifications are provided for general guidance and may change. They should not be treated as a binding offer or representation.</SiteText></p>
-              <h3><SiteText>Intellectual property</SiteText></h3>
-              <p>
-                <SiteText>The Kingsvale name, site design, text, imagery and brand assets should remain protected. Visitors may view the site for personal use but should not reproduce material without permission.</SiteText></p>
-              <h3><SiteText>Enquiries and reliance</SiteText></h3>
-              <p>
-                <SiteText>Buyers, landowners and clients should confirm all material facts with the Kingsvale team and their advisers before making a decision based on website content.</SiteText></p>
-            </>
-          )}
+        <div className="legal-copy legal-document">
+          <p className="legal-document__date"><SiteText copy={`legal_${kind}_updated`}>{`Last updated: ${legalUpdated}`}</SiteText></p>
+          <nav className="legal-document__contents" aria-label="On this page">
+            <p><SiteText copy="legal_contents">On this page</SiteText></p>
+            <ol>{sections.map((section) => <li key={section.id}><a href={`#${section.id}`}><SiteText copy={`legal_${kind}_${section.id}_title`}>{section.title}</SiteText></a></li>)}</ol>
+          </nav>
+          {sections.map((section) => (
+            <section className="legal-document__section" id={section.id} key={section.id}>
+              <h2><SiteText copy={`legal_${kind}_${section.id}_title`}>{section.title}</SiteText></h2>
+              {section.paragraphs.map((paragraph, index) => <p key={index}><SiteText copy={`legal_${kind}_${section.id}_${index}`}>{paragraph}</SiteText></p>)}
+              {isPrivacy && section.id === "rights" && <p><a href="https://ico.org.uk/make-a-complaint/"><SiteText copy="legal_ico_link">Raise a concern with the ICO</SiteText></a></p>}
+            </section>
+          ))}
+          <aside className="legal-document__contact" aria-label="Contact Kingsvale">
+            <h2><SiteText copy="legal_contact_title">Contact Kingsvale</SiteText></h2>
+            <p><a href={`mailto:${legalEmail}`}>{legalEmail}</a></p>
+            <p><a href="https://find-and-update.company-information.service.gov.uk/company/17289813"><SiteText copy="legal_company_link">Kingsvale Ltd · Company number 17289813</SiteText></a></p>
+            <a href={isPrivacy ? "/terms" : "/privacy"}><SiteText>{isPrivacy ? "Read our website terms" : "Read our privacy policy"}</SiteText></a>
+          </aside>
         </div>
       </section>
     </PublicShell>
