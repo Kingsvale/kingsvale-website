@@ -1555,6 +1555,15 @@ function DevelopmentEditor({
           error={errorsByPath[`developments.${index}.location`]}
         />
       </div>
+      <TextInput
+        label="Development label"
+        value={development.status ?? ""}
+        onChange={(status) => onChange({ ...development, status })}
+        maxLength={120}
+        placeholder="e.g. Coming soon, Now selling or Sold"
+        helper="The text above this development’s name on its page and in the developments list. Write any wording you like, or leave blank for no label."
+        error={errorsByPath[`developments.${index}.status`]}
+      />
       <Textarea
         label={`Development ${index + 1} description`}
         value={development.description}
@@ -1591,9 +1600,6 @@ function DevelopmentEditor({
         onChange={(image) => onChange({ ...development, image })}
       />
       <details className="studio-image__details"><summary>Project details & page text</summary>
-        <div className="admin-grid admin-grid--two">
-          {(["status"] as const).map((field) => <TextInput key={field} label={`Project ${field}`} value={development[field] ?? ""} maxLength={120} onChange={(value) => onChange({ ...development, [field]: value })} />)}
-        </div>
         <Textarea label="Project page introduction" value={development.heroBody ?? development.description} maxLength={600} onChange={(heroBody) => onChange({ ...development, heroBody })} />
         <Textarea label="Project highlights (one per line)" value={(development.highlights ?? []).join("\n")} maxLength={1800} onChange={(value) => onChange({ ...development, highlights: value.split("\n") })} />
       </details>
