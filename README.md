@@ -31,6 +31,35 @@ A responsive luxury real estate homepage and structured admin editor inspired by
 
 ## Setup
 
+### Land maps on customer QR pages
+
+In **Studio → Sites**, open a site and use its **Land map** panel. Upload or drop a
+Searchland KML (up to 5 MB), or find a UK postcode and draw an area directly. Imported
+polygons receive the red outline and translucent fill automatically. **Draw a replacement
+area** selects a smaller portion while retaining the imported outline as an editing guide;
+**Use whole imported plot** restores the original selection. Multiple polygons and KML holes
+are supported. Finish corner edits before saving; Undo restores the previous map change.
+
+**Save map to QR page** saves the whole site record through the existing tracking API.
+The QR token stays the same, so already printed letters open the updated, view-only map
+on the next visit. Public lookups are not cached. Geometry is included in normal backups
+and encrypted storage. The original KML metadata and markup are not published. Imported
+reference outlines are omitted from the public API unless their display checkbox is enabled.
+Existing Google My Maps embeds remain the fallback for records without a native land map.
+
+The viewer uses Leaflet, Esri World Imagery satellite tiles and OpenStreetMap street tiles;
+postcode lookup uses Postcodes.io. Provider credits are shown on the map. These external
+services require connectivity; tile failures offer a background switch and postcode failures
+leave manual navigation available. Server and static-host CSP headers allow only the required
+map hosts. Leaflet and the Studio-only Geoman drawing tools are loaded separately from the
+marketing pages. No map API key is required by the configured public tile endpoints.
+
+Map checks: `npm test`, `node --import tsx --test tests/server/land-map.test.mjs`, and
+`npx playwright test tests/e2e/land-map.spec.ts`. The browser test isolates all site mutations
+and uses deterministic tiles. Set `PLAYWRIGHT_CHANNEL=chrome` to use installed Chrome or
+`PLAYWRIGHT_BASE_URL` to exercise a running production preview. The Docker runtime includes
+the shared geometry validator as well as the built viewer.
+
 ```bash
 npm install
 npx playwright install chromium

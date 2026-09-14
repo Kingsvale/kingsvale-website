@@ -86,6 +86,7 @@ export type TrackingSite = {
   contactPriority: ContactPriority;
   summary: string;
   mapEmbedUrl: string;
+  landMap?: import("./landMap").LandMap | null;
   privateNotes: string;
   letterPresetId: string;
   letterRecipientMode: LetterRecipientMode;

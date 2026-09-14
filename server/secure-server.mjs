@@ -1,4 +1,5 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import {
@@ -77,7 +78,7 @@ const mimeTypes = {
 
 const securityHeaders = {
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com; font-src 'self'; connect-src 'self'; frame-src 'self' https://www.google.com https://earth.google.com https://*.googleusercontent.com; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com https://server.arcgisonline.com https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://api.postcodes.io; frame-src 'self' https://www.google.com https://earth.google.com https://*.googleusercontent.com; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -752,6 +753,7 @@ async function handleTrackingSitesCollection(request, response) {
 }
 
 async function handleTrackingSiteLookup(request, response) {
+  response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Method not allowed." });
     return;
@@ -776,6 +778,7 @@ async function handleTrackingSiteLookup(request, response) {
 }
 
 async function handleTrackingSiteItem(request, response, url) {
+  response.setHeader("Cache-Control", "no-store");
   const [, , , idOrToken, action] = url.pathname.split("/");
   const decodedIdOrToken = decodePathComponent(idOrToken ?? "");
 
@@ -1726,6 +1729,8 @@ function validateTrackingSite(site) {
   validateOptionalText(errors, "reference", site.reference, "Reference", 64);
   validateOptionalText(errors, "region", site.region, "Region", 80);
   validateOptionalText(errors, "mapEmbedUrl", site.mapEmbedUrl, "Google My Maps embed URL", 1200);
+  const landMapError = validateLandMap(site.landMap);
+  if (landMapError) errors.push({ path: "landMap", message: landMapError });
   if (site.mapEmbedUrl && !isSafeMapEmbedUrl(site.mapEmbedUrl)) {
     errors.push({ path: "mapEmbedUrl", message: "Google My Maps embed must be a safe Google map URL." });
   }
@@ -2041,6 +2046,7 @@ function normalizeTrackingSite(site) {
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
+    landMap: cleanLandMap(site.landMap) ?? site.landMap ?? null,
     privateNotes: site.privateNotes ?? "",
     letterPresetId: site.letterPresetId ?? "",
     letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),
@@ -2160,7 +2166,7 @@ function publicTrackingSite(site) {
   void remailReminderDate;
   void mailingNotes;
   void mailingLastUpdatedAt;
-  return publicSite;
+  return { ...publicSite, landMap: publicLandMap(site.landMap) };
 }
 
 function normalizeMapEmbedInput(value) {

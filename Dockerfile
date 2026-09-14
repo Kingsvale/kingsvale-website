@@ -23,6 +23,7 @@ RUN npm ci --omit=dev --include=optional --no-audit --no-fund \
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/lib/trackingQrSvg.js ./src/lib/trackingQrSvg.js
+COPY --from=build /app/src/lib/landMap.js ./src/lib/landMap.js
 COPY server ./server
 COPY public ./public
 

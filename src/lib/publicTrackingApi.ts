@@ -8,6 +8,7 @@ import type { TrackingSite } from "./trackingTypes";
 export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
   try {
     const response = await fetch(`/api/tracking-sites/${encodeURIComponent(token)}`, {
+      cache: "no-store",
       credentials: "same-origin",
       headers: { Accept: "application/json" }
     });

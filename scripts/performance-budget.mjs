@@ -9,32 +9,54 @@ const budgets = {
   largestJavaScriptGzip: 72_000,
   totalPublicJavaScriptGzip: 101_000,
   totalCssGzip: 24_000,
+  deferredMapJavaScriptGzip: 55_000,
+  mapEditorJavaScriptGzip: 80_000,
+  mapCssGzip: 16_000,
   prerenderedRoutes: 22
 };
 
 const assetFiles = await listFiles(assetsDir);
 const jsFiles = assetFiles.filter((file) => file.endsWith(".js"));
-const publicJsFiles = jsFiles.filter((file) => !isPrivateJavaScriptChunk(file));
+// Mapping is loaded only on land-map pages; retain the existing marketing-site budgets.
+const isMapViewer = (file) => /^land-map-(engine|view)-/.test(basename(file));
+const isMapEditor = (file) => /^studio-map-tools-/.test(basename(file));
+const isMapCss = (file) => isMapViewer(file) || isMapEditor(file) || /^land-map-/.test(basename(file));
+const publicJsFiles = jsFiles.filter((file) => !isPrivateJavaScriptChunk(file) && !isMapViewer(file));
 const cssFiles = assetFiles.filter((file) => file.endsWith(".css"));
 
 const jsSizes = await Promise.all(jsFiles.map((file) => gzipSize(file)));
 const publicJsSizes = await Promise.all(publicJsFiles.map((file) => gzipSize(file)));
 const cssSizes = await Promise.all(cssFiles.map((file) => gzipSize(file)));
+const coreCssSizes = await Promise.all(cssFiles.filter((file) => !isMapCss(file)).map(gzipSize));
+const coreJsSizes = await Promise.all(jsFiles.filter((file) => !isMapEditor(file)).map(gzipSize));
+const mapViewerSizes = await Promise.all(jsFiles.filter(isMapViewer).map(gzipSize));
+const mapEditorSizes = await Promise.all(jsFiles.filter(isMapEditor).map(gzipSize));
+const mapCssSizes = await Promise.all(cssFiles.filter(isMapCss).map(gzipSize));
 const routeHtmlCount = (await listFiles(distDir)).filter((file) => file.endsWith("index.html")).length;
 const indexHtml = await readFile(join(distDir, "index.html"), "utf8");
 const publicChunkStudioImports = await findPublicStudioChunkImports(jsFiles);
 
 const report = {
-  largestJavaScriptGzip: Math.max(0, ...jsSizes),
+  largestJavaScriptGzip: Math.max(0, ...coreJsSizes),
   totalPublicJavaScriptGzip: sum(publicJsSizes),
   totalJavaScriptGzip: sum(jsSizes),
-  totalCssGzip: sum(cssSizes),
+  totalCssGzip: sum(coreCssSizes),
+  allCssGzip: sum(cssSizes),
+  deferredMapJavaScriptGzip: sum(mapViewerSizes),
+  mapEditorJavaScriptGzip: sum(mapEditorSizes),
+  mapCssGzip: sum(mapCssSizes),
   prerenderedRoutes: routeHtmlCount,
   studioChunkPubliclyPreloaded: /\/assets\/studio-[^"]+\.js/.test(indexHtml),
   publicChunkStudioImports: publicChunkStudioImports.length > 0 ? publicChunkStudioImports.join(", ") : "none"
 };
 
 const failures = [];
+for (const key of ["deferredMapJavaScriptGzip", "mapEditorJavaScriptGzip", "mapCssGzip"]) {
+  if (report[key] > budgets[key]) failures.push(`${key} ${report[key]} exceeds ${budgets[key]} bytes.`);
+}
+if (/\/assets\/(land-map-(?:engine|view)|studio-map)-/.test(indexHtml)) {
+  failures.push("The homepage must not preload the optional land-map viewer or editing tools.");
+}
 if (report.largestJavaScriptGzip > budgets.largestJavaScriptGzip) {
   failures.push(`Largest JS gzip ${report.largestJavaScriptGzip} exceeds ${budgets.largestJavaScriptGzip} bytes.`);
 }

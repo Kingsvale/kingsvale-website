@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <!-- Synthetic test geometry. No customer plot, title or address data. -->
+    <Placemark>
+      <Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+      <ExtendedData><SchemaData>
+        <SimpleData name="title_number">TEST-PLOT-001</SimpleData>
+        <SimpleData name="address">Synthetic test plot, not a real property</SimpleData>
+      </SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>0.1,51.5 0.101,51.5 0.101,51.501 0.1,51.501 0.1,51.5</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Document>
+</kml>

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
+import LandMapEditor from "./LandMapEditor";
 import {
   AdminColorInput,
   AdminRangeInput,
@@ -89,6 +90,7 @@ export function AdminSitesPanel() {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mapBusy, setMapBusy] = useState(false);
   const [status, setStatus] = useState("Create QR-ready land interest map pages.");
   const [storageStatus, setStorageStatus] = useState(() => getTrackingStorageStatus());
   const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
@@ -186,7 +188,7 @@ export function AdminSitesPanel() {
       const { site, googleSheetSync } = await saveTrackingSiteWithResult(siteDraft);
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-      setStatus(`Map page created with reference ${site.reference}. Add the plot map link, then save.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
+      setStatus(`Map page created with reference ${site.reference}. Upload a KML or draw the land map, then save.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
     } catch {
       setStatus("Map page could not be created.");
     } finally {
@@ -195,7 +197,7 @@ export function AdminSitesPanel() {
   }
 
   async function handleSave() {
-    if (!draft) {
+    if (!draft || mapBusy) {
       return;
     }
 
@@ -215,7 +217,7 @@ export function AdminSitesPanel() {
       const { site: saved, googleSheetSync } = await saveTrackingSiteWithResult(draft);
       setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
       setDraft(saved);
-      setStatus(`Map page saved.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
+      setStatus(`Map page saved. The existing QR link now shows the saved map.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
     } catch {
       setStatus("Map page could not be saved.");
     } finally {
@@ -749,6 +751,9 @@ export function AdminSitesPanel() {
                   error={errorsByPath.statusNote}
                   onChange={(value) => updateDraft((site) => { site.statusNote = value; })}
                 />
+                <details>
+                <summary>Existing Google My Maps (optional)</summary>
+                <p className="admin-panel__note">An uploaded or drawn land map takes priority on the QR page. This link is used when no land map is saved.</p>
                 <TrackingTextarea
                   id="google-my-maps-embed-url-or-iframe"
                   label="Google My Maps embed URL or iframe"
@@ -759,7 +764,20 @@ export function AdminSitesPanel() {
                     updateDraft((site) => { site.mapEmbedUrl = normalizeMapEmbedInput(value); })
                   }
                 />
+                </details>
               </section>
+
+              <LandMapEditor
+                key={draft.id}
+                value={draft.landMap ?? null}
+                postcode={draft.siteAddressParts.postcode}
+                disabled={busy || draft.archived}
+                onChange={(landMap) => updateDraft((site) => { site.landMap = landMap; })}
+                onBusyChange={setMapBusy}
+                onSave={() => void handleSave()}
+                canSave={validation.valid && !mapBusy}
+                savedAt={draft.updatedAt}
+              />
 
               <section className="admin-panel" aria-labelledby="site-private-title">
                 <div className="admin-section-heading">
@@ -876,7 +894,7 @@ export function AdminSitesPanel() {
                   type="button"
                   className="admin-save"
                   onClick={handleSave}
-                  disabled={!validation.valid || busy || draft.archived}
+                  disabled={!validation.valid || busy || mapBusy || draft.archived}
                 >
                   <Save aria-hidden="true" />
                   {busy ? "Working" : "Save site"}

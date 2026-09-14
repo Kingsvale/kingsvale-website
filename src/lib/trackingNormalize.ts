@@ -1,5 +1,6 @@
 import type { ContactPriority, LetterRecipientMode, MailingStatus, TrackingQrStyle, TrackingSite } from "./trackingTypes";
 import { boundedPercent, presetRoundness } from "./qrStyle";
+import { cleanLandMap } from "./landMap";
 
 type LegacyQrStyle = Partial<TrackingQrStyle> & {
   dotStyle?: string;
@@ -25,6 +26,7 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
     ownerContactName: site.ownerContactName ?? "",
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
+    landMap: cleanLandMap(site.landMap) ?? site.landMap ?? null,
     privateNotes: site.privateNotes ?? "",
     letterPresetId: site.letterPresetId ?? "",
     letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),

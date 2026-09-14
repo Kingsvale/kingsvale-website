@@ -1,4 +1,5 @@
 import type { TrackingAddressParts, TrackingSite } from "./trackingTypes";
+import { publicLandMap } from "./landMap";
 
 const trackingStorageKey = "kingsvale-tracking-sites-v1";
 
@@ -38,6 +39,7 @@ export function normalizePublicTrackingSite(site: Partial<TrackingSite>): Tracki
     reference: stringValue(site.reference),
     summary: stringValue(site.summary, "View the plot information Kingsvale has shared."),
     mapEmbedUrl: stringValue(site.mapEmbedUrl),
+    landMap: publicLandMap(site.landMap),
     statusNote: stringValue(site.statusNote, "Kingsvale is reviewing this land interest opportunity."),
     currentStatus: site.currentStatus ?? "planning",
     milestones: Array.isArray(site.milestones) ? site.milestones : [],

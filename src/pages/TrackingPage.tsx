@@ -1,8 +1,10 @@
-import { useEffect, useState, type SVGProps } from "react";
+import { lazy, Suspense, useEffect, useState, type SVGProps } from "react";
 import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
 import { fetchTrackingSiteByToken } from "../lib/publicTrackingApi";
 import type { TrackingResource, TrackingResourceType, TrackingSite } from "../lib/trackingTypes";
+
+const LandMapCanvas = lazy(() => import("./LandMapCanvas"));
 
 const trackingResourceLabels: Record<TrackingResourceType, string> = {
   image: "Image",
@@ -110,7 +112,11 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
         <div className="section-heading">
           <p className="eyebrow">Interactive map</p>
         </div>
-        {site.mapEmbedUrl ? (
+        {site.landMap?.selection.length ? (
+          <Suspense fallback={<div className="tracking-map tracking-map--empty" role="status">Loading land map…</div>}>
+            <LandMapCanvas value={site.landMap} />
+          </Suspense>
+        ) : site.mapEmbedUrl ? (
           <iframe
             className="tracking-map"
             src={site.mapEmbedUrl}

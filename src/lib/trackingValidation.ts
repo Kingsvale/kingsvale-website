@@ -10,6 +10,8 @@ import type {
   TrackingStatus
 } from "./trackingTypes";
 
+import { validateLandMap } from "./landMap";
+
 export type TrackingValidationError = {
   path: string;
   message: string;
@@ -93,6 +95,8 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
   }
 
   addTokenError(errors, site.token);
+  const landMapError = validateLandMap(site.landMap);
+  if (landMapError) errors.push({ path: "landMap", message: landMapError });
   addRequiredTextError(errors, "title", site.title, "Site title", trackingFieldLimits.title);
   addOptionalTextError(
     errors,
