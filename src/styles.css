@@ -633,78 +633,56 @@ button:disabled {
 }
 
 .development-card__body {
-  display: grid;
-  align-content: start;
-  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: clamp(22px, 2.4vw, 32px);
+  color: var(--ink);
+  text-decoration: none;
 }
+
+.development-card__identity { min-width: 0; }
 
 .development-card h3 {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: clamp(27px, 2.5vw, 34px);
   font-weight: 500;
+  letter-spacing: -0.025em;
   line-height: 1.15;
 }
 
-.development-card p {
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
 .development-card__location {
-  margin-top: 2px !important;
-  color: var(--charcoal) !important;
-  font-size: 13px !important;
-  font-weight: 800;
-}
-
-.development-card__specs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: 20px 0 0;
-  border: 1px solid rgba(70, 59, 48, 0.12);
-  background: rgba(255, 255, 255, 0.42);
-}
-
-.development-card__specs div {
-  min-width: 0;
-  padding: 11px 10px;
-  border-right: 1px solid rgba(70, 59, 48, 0.1);
-}
-
-.development-card__specs div:last-child {
-  border-right: 0;
-}
-
-.development-card__specs dt,
-.development-card__specs dd {
-  margin: 0;
-}
-
-.development-card__specs dt {
+  margin: 12px 0 0;
   color: var(--taupe-dark);
   font-size: 10px;
-  font-weight: 900;
-  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.7;
   text-transform: uppercase;
 }
 
-.development-card__specs dd {
-  margin-top: 3px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.25;
+.development-card__arrow {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(173, 149, 118, 0.45);
+  border-radius: 50%;
+  color: var(--taupe-dark);
+  transition: color 220ms ease, background 220ms ease, border-color 220ms ease;
 }
 
-.development-card__link {
-  margin-top: 24px;
-  min-height: auto;
-  font-size: 11px;
+.development-card__arrow svg { width: 19px; height: 19px; }
+.development-card__body:hover .development-card__arrow,
+.development-card__body:focus-visible .development-card__arrow {
+  background: var(--charcoal);
+  border-color: var(--charcoal);
+  color: var(--ivory);
 }
+.development-card__body:focus-visible { outline: 2px solid var(--taupe-dark); outline-offset: -4px; }
 
 .land-wanted {
   display: grid;
