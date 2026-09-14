@@ -1,4 +1,6 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
+import { renderLetterPreview } from "./letter-preview.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -464,6 +466,22 @@ async function handleApiRequest(request, response, url) {
     }
 
     await handleLetterUpload(request, response, session);
+    return;
+  }
+
+  if (url.pathname === "/api/letters/preview") {
+    if (!requireSession(request, response)) return;
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const payload = await readJsonBody(request, 8_100_000);
+    const source = String(payload.url ?? "");
+    try {
+      const pdf = source.startsWith("/media/") && extname(source).toLowerCase() === ".pdf";
+      const buffer = pdf ? await readFile(resolveMediaPath(source)) : await readLetterTemplateSource(source);
+      sendJson(response, 200, await renderLetterPreview(buffer, pdf ? ".pdf" : ".docx"));
+    } catch (error) {
+      const known = ["PREVIEW_BUSY", "PREVIEW_LIMIT"].includes(error.code);
+      sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : 422, { error: known ? error.message : "The print preview could not be prepared. Please download the document or try again." });
+    }
     return;
   }
 
@@ -1274,6 +1292,7 @@ function normalizeLetterExtension(filename, contentType = "") {
 }
 
 async function readLetterTemplateSource(url) {
+  if (isStarterLetterTemplate(url)) return readFile(join(distDir, url.slice(1)));
   if (url.startsWith("/media/")) {
     if (extname(url).toLowerCase() !== ".docx") {
       throw new Error("Letter template must be DOCX.");
@@ -2606,7 +2625,7 @@ function validateImage(errors, path, image) {
     errors.push({ path, message: "Image is required." });
     return;
   }
-  validateText(errors, `${path}.alt`, image.alt, "Image alt text", 150);
+  validateOptionalText(errors, `${path}.alt`, image.alt, "Image description", 150);
   if (image.focalPoint !== undefined && (typeof image.focalPoint !== "string" || !/^(100|\d{1,2})% (100|\d{1,2})%$/.test(image.focalPoint))) errors.push({ path, message: "Choose a focal point between 0 and 100%." });
   if (image.variants !== undefined && (!Array.isArray(image.variants) || image.variants.length > 6 || image.variants.some(v => !v || !Number.isInteger(v.width) || v.width < 1 || v.width > 2400 || typeof v.src !== "string" || !isSafeImageSource(v.src)))) errors.push({ path, message: "Image variants are invalid." });
   if (typeof image.src !== "string" || !isSafeImageSource(image.src)) {
@@ -2675,6 +2694,7 @@ function isSafeLetterUrl(value) {
 }
 
 function isSafeLetterTemplateUrl(value) {
+  if (isStarterLetterTemplate(value)) return true;
   if (value.startsWith("/media/")) {
     try {
       resolveMediaPath(value);

@@ -1,4 +1,5 @@
 import type { ContactPriority, LetterRecipientMode } from "./trackingTypes";
+import { isStarterLetterTemplate } from "./letterTemplates.js";
 
 export type LetterPreset = {
   id: string;
@@ -122,6 +123,7 @@ function normalizeGoogleSheetSettings(value: Partial<GoogleSheetSettings> | null
 }
 
 function isSafeLetterTemplateUrl(value: string) {
+  if (isStarterLetterTemplate(value)) return true;
   if (value.startsWith("/media/")) {
     return /\.docx$/i.test(value);
   }

@@ -92,13 +92,9 @@ function addImageErrors(errors: ValidationError[], path: string, image?: ImageAs
   }
 
   addRequiredTextError(errors, `${path}.src`, image.src, "Image source", image.src?.startsWith("data:") ? 3_500_000 : 9000);
-  addRequiredTextError(
-    errors,
-    `${path}.alt`,
-    image.alt,
-    "Image alt text",
-    fieldLimits.imageAlt
-  );
+  if (image.alt && image.alt.length > fieldLimits.imageAlt) {
+    errors.push({ path: `${path}.alt`, message: `Image description must be ${fieldLimits.imageAlt} characters or fewer.` });
+  }
 
   if (image.src && !isValidImageSource(image.src)) {
     errors.push({

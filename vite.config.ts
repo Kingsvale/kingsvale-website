@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { isStarterLetterTemplate } from "./src/lib/letterTemplates.js";
 import react from "@vitejs/plugin-react";
 import { createReadStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -32,6 +33,7 @@ export default defineConfig({
             { name(id) {
           const normalizedId = id.replaceAll("\\", "/");
           if (normalizedId.includes("/src/pages/studioInlineEditing")) return "studio-inline";
+          if (/\/node_modules\/(docx-preview|jszip|pako|lie|immediate|setimmediate|readable-stream|saxes|xmlchars)\//.test(normalizedId)) return "studio-document-preview";
 
           if ((normalizedId.includes("/src/components/AdminFields") || normalizedId.includes("/src/components/TrackingQrCode"))) return "studio";
 
@@ -391,12 +393,12 @@ async function handleDevLetterGeneration(request: IncomingMessage, response: Ser
   }
 
   const templateUrl = String(payload.templateUrl ?? site.letterTemplateUrl ?? "");
-  if (!templateUrl.startsWith("/media/") || extname(templateUrl).toLowerCase() !== ".docx") {
+  if (!isStarterLetterTemplate(templateUrl) && (!templateUrl.startsWith("/media/") || extname(templateUrl).toLowerCase() !== ".docx")) {
     sendDevJson(response, 400, { error: "A server-uploaded DOCX template is required." });
     return;
   }
 
-  const template = await readFile(resolveDevMediaPath(templateUrl));
+  const template = await readFile(isStarterLetterTemplate(templateUrl) ? resolve("public", templateUrl.slice(1)) : resolveDevMediaPath(templateUrl));
   const publicLink = String(payload.publicLink ?? "");
   const qrPng = await createTrackingQrPng(publicLink, site.qrStyle, site.title || site.reference);
   const generated = generateLetterDocx(template, site, publicLink, qrPng);

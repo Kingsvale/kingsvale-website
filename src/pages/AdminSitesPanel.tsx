@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { defaultQrStyle } from "../lib/trackingNormalize";
 import LandMapEditor from "./LandMapEditor";
 import {
   AdminColorInput,
@@ -178,8 +179,10 @@ export function AdminSitesPanel() {
   );
   const errorsByPath = useMemo(() => toTrackingErrorMap(validation.errors), [validation.errors]);
   const publicLink = draft ? buildPublicLink(draft.token) : "";
+  const dirty = Boolean(draft && JSON.stringify(draft) !== JSON.stringify(sites.find((site) => site.id === draft.id)));
 
   async function handleCreate() {
+    if (dirty && !window.confirm("Discard unsaved changes and create a new site?")) return;
     setBusy(true);
     try {
       const siteDraft = createTrackingSite();
@@ -218,6 +221,7 @@ export function AdminSitesPanel() {
       setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
       setDraft(saved);
       setStatus(`Map page saved. The existing QR link now shows the saved map.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
+      return true;
     } catch {
       setStatus("Map page could not be saved.");
     } finally {
@@ -380,10 +384,11 @@ export function AdminSitesPanel() {
     setStatus("Title deed removed. Save the site to keep this change.");
   }
 
-  function openInMailing() {
+  async function openInMailing() {
     if (!draft) {
       return;
     }
+    if (dirty && !await handleSave()) return;
     window.dispatchEvent(new CustomEvent("kingsvale-open-mailing-site", { detail: { siteId: draft.id } }));
   }
 
@@ -449,6 +454,8 @@ export function AdminSitesPanel() {
                   type="button"
                   className={draft?.id === site.id ? "site-row site-row--active" : "site-row"}
                   onClick={() => {
+                    if (busy || mapBusy) return;
+                    if (dirty && !window.confirm("Discard unsaved changes and open another site?")) return;
                     setDraft(structuredClone(site));
                     setStatus(site.archived ? "Archived map page selected." : "Map page selected.");
                   }}
@@ -527,86 +534,9 @@ export function AdminSitesPanel() {
                   </button>
                 </div>
 
-                <details className="qr-designer qr-designer--folded">
-                  <summary className="qr-designer__summary">
-                    <span><Palette aria-hidden="true" /> QR Code Design</span>
-                    <small>Colours, shape and Word-ready PNG export</small>
-                  </summary>
-                  <div className="qr-designer__controls">
-                    <div className="admin-grid admin-grid--two">
-                      <ColorInput
-                        label="Foreground"
-                        value={draft.qrStyle.foreground}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.foreground = value; })
-                        }
-                      />
-                      <ColorInput
-                        label="Background"
-                        value={draft.qrStyle.background}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.background = value; })
-                        }
-                      />
-                      <ColorInput
-                        label="Accent"
-                        value={draft.qrStyle.accent}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.accent = value; })
-                        }
-                      />
-                      <RangeInput
-                        label="Dot roundness"
-                        value={draft.qrStyle.dotRoundness}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.dotRoundness = value; })
-                        }
-                      />
-                      <RangeInput
-                        label="Finder roundness"
-                        value={draft.qrStyle.finderRoundness}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.finderRoundness = value; })
-                        }
-                      />
-                      <RangeInput
-                        label="Frame roundness"
-                        value={draft.qrStyle.frameRoundness}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.frameRoundness = value; })
-                        }
-                      />
-                      <RangeInput
-                        label="Cut corners"
-                        value={draft.qrStyle.frameCut}
-                        onChange={(value) =>
-                          updateDraft((site) => { site.qrStyle.frameCut = value; })
-                        }
-                      />
-                    </div>
-                    <TrackingTextInput
-                      label="QR label"
-                      value={draft.qrStyle.frameLabel}
-                      maxLength={trackingFieldLimits.qrFrameLabel}
-                      error={errorsByPath["qrStyle.frameLabel"]}
-                      onChange={(value) =>
-                        updateDraft((site) => { site.qrStyle.frameLabel = value; })
-                      }
-                    />
-                    <label className="sites-admin__toggle">
-                      <input
-                        type="checkbox"
-                        checked={draft.qrStyle.includeLogo}
-                        onChange={(event) =>
-                          updateDraft((site) => { site.qrStyle.includeLogo = event.target.checked; })
-                        }
-                      />
-                      <span>Include Kingsvale mark</span>
-                    </label>
-                  </div>
-                  <TrackingQrCode value={publicLink} style={draft.qrStyle} title={draft.title} />
-                </details>
 
+
+                <div className="workflow-heading"><span>01</span><div><h3>Site &amp; owner</h3><p>Give the site a recognisable name. Its reference connects your letter to the public lookup page.</p></div></div>
                 <div className="admin-grid admin-grid--two">
                   <TrackingTextInput
                     label="Site title"
@@ -645,6 +575,7 @@ export function AdminSitesPanel() {
                     This reference already exists. References must be unique.
                   </p>
                 )}
+                <div className="workflow-heading"><span>02</span><div><h3>Letter address</h3><p>Enter each part on its own line. These details fill your Word templates automatically.</p></div></div>
                 <TrackingTextInput
                   label="Address line 1"
                   value={draft.siteAddressParts.line1}
@@ -668,7 +599,7 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateAddressPart("town", value)}
                   />
                   <TrackingTextInput
-                    label="Council"
+                    label="County"
                     value={draft.siteAddressParts.county}
                     maxLength={trackingFieldLimits.addressCounty}
                     error={errorsByPath["siteAddressParts.county"]}
@@ -682,6 +613,7 @@ export function AdminSitesPanel() {
                     onChange={(value) => updateAddressPart("postcode", value)}
                   />
                 </div>
+                <div className="workflow-heading"><span>03</span><div><h3>Land &amp; supporting information</h3><p>Add title details, documents and notes as they become available.</p></div></div>
                 <TrackingTextInput
                   label="Title number"
                   value={draft.titleNumber}
@@ -766,6 +698,88 @@ export function AdminSitesPanel() {
                 />
                 </details>
               </section>
+
+                <details className="qr-designer qr-designer--folded">
+                  <summary className="qr-designer__summary">
+                    <span><Palette aria-hidden="true" /> QR Code Design</span>
+                    <small>Colours, shape and Word-ready PNG export</small>
+                  </summary>
+                  <div className="qr-designer__controls">
+                    <button type="button" className="admin-small" onClick={() => updateDraft((site) => { site.qrStyle = defaultQrStyle(); })}>Use Kingsvale letter style</button>
+                    <p className="admin-note">Deep green on white, with rounded corners and a clear margin for scanning. Save the site before generating new letters.</p>
+                    <div className="admin-grid admin-grid--two">
+                      <ColorInput
+                        label="Foreground"
+                        value={draft.qrStyle.foreground}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.foreground = value; })
+                        }
+                      />
+                      <ColorInput
+                        label="Background"
+                        value={draft.qrStyle.background}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.background = value; })
+                        }
+                      />
+                      <ColorInput
+                        label="Accent"
+                        value={draft.qrStyle.accent}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.accent = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Dot roundness"
+                        value={draft.qrStyle.dotRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.dotRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Finder roundness"
+                        value={draft.qrStyle.finderRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.finderRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Frame roundness"
+                        value={draft.qrStyle.frameRoundness}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.frameRoundness = value; })
+                        }
+                      />
+                      <RangeInput
+                        label="Cut corners"
+                        value={draft.qrStyle.frameCut}
+                        onChange={(value) =>
+                          updateDraft((site) => { site.qrStyle.frameCut = value; })
+                        }
+                      />
+                    </div>
+                    <TrackingTextInput
+                      label="QR label"
+                      value={draft.qrStyle.frameLabel}
+                      maxLength={trackingFieldLimits.qrFrameLabel}
+                      error={errorsByPath["qrStyle.frameLabel"]}
+                      onChange={(value) =>
+                        updateDraft((site) => { site.qrStyle.frameLabel = value; })
+                      }
+                    />
+                    <label className="sites-admin__toggle">
+                      <input
+                        type="checkbox"
+                        checked={draft.qrStyle.includeLogo}
+                        onChange={(event) =>
+                          updateDraft((site) => { site.qrStyle.includeLogo = event.target.checked; })
+                        }
+                      />
+                      <span>Include Kingsvale mark</span>
+                    </label>
+                  </div>
+                  <TrackingQrCode value={publicLink} style={draft.qrStyle} title={draft.title} />
+                </details>
 
               <LandMapEditor
                 key={draft.id}
@@ -889,7 +903,8 @@ export function AdminSitesPanel() {
                 )}
               </section>
 
-              <div className="sites-admin__actions">
+              <div className="sites-admin__actions workflow-savebar">
+                <span>{dirty ? "Unsaved changes" : "All changes saved"}</span>
                 <button
                   type="button"
                   className="admin-save"

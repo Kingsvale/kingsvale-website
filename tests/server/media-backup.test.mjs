@@ -7,9 +7,24 @@ import { tmpdir } from "node:os";
 import { createHash, createDecipheriv } from "node:crypto";
 import sharp from "sharp";
 import { defaultContent } from "../../src/data/defaultContent.ts";
+import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
 
 const password = "test-only-kingsvale-images";
 const encryptionKey = "test-only-media-backup-encryption-key";
+
+test("starter letters generate on the backend and document previews require authentication", async (t) => {
+  const server = await startServer(t);
+  const site = { ...createTrackingSite(), reference: "KV-LETTER-TEST", letterTemplateUrl: "/templates/kingsvale-initial-letter-template.docx" };
+  const response = await server.api("/api/letters/generate", "POST", { site, templateUrl: site.letterTemplateUrl, publicLink: `${server.url}/track/${site.token}` });
+  assert.equal(response.status, 201);
+  const { file } = await response.json();
+  assert.ok(file.url.startsWith("/media/"));
+  const bytes = Buffer.from(await (await fetch(`${server.url}${file.url}`)).arrayBuffer());
+  assert.equal(bytes.subarray(0, 2).toString(), "PK");
+  const denied = await fetch(`${server.url}/api/letters/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: file.url }) });
+  assert.equal(denied.status, 401);
+  assert.equal((await server.api("/api/letters/preview", "POST", { url: "https://example.com/private.docx" })).status, 422);
+});
 
 async function startServer(t) {
   const directory = await mkdtemp(join(tmpdir(), "kingsvale-media-"));
@@ -47,6 +62,7 @@ test("uploaded photos survive export, a fresh server restore, revisions and merg
   assert.equal(image.width, 1600);
   assert.deepEqual(image.variants.map((variant) => variant.width), [480, 960, 1440, 1600]);
   const content = structuredClone(defaultContent);
+  content.hero.image.alt = "";
   content.textOverrides = { about_heading: "Homes made with care" };
   content.imageOverrides = { logo: { ...image, alt: "Custom studio logo" } };
   content.developments[0].image = { ...image, alt: "Garden at The Ridings", focalPoint: "20% 75%" };

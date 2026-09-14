@@ -113,9 +113,9 @@ describe("AdminPage", () => {
     expect(screen.getByLabelText("QR code preview")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download png/i })).toBeInTheDocument();
     expect(screen.getByText(/1155px PNG for Word letters/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Dot roundness")).toHaveValue("48");
-    expect(screen.getByLabelText("Finder roundness")).toHaveValue("24");
-    expect(screen.getByLabelText("Frame roundness")).toHaveValue("42");
+    expect(screen.getByLabelText("Dot roundness")).toHaveValue("65");
+    expect(screen.getByLabelText("Finder roundness")).toHaveValue("65");
+    expect(screen.getByLabelText("Frame roundness")).toHaveValue("0");
     fireEvent.change(screen.getByLabelText("Address line 1"), {
       target: { value: "12 Meadow Lane" }
     });
@@ -133,7 +133,7 @@ describe("AdminPage", () => {
     });
     expect(screen.getByLabelText("Finder roundness")).toHaveValue("86");
     expect(screen.getByLabelText("Cut corners")).toHaveValue("34");
-    expect(screen.getByLabelText("Accent")).toHaveValue("#008000");
+    expect(screen.getByLabelText("Accent")).toHaveValue("#083d29");
     expect(screen.getByRole("button", { name: /save site/i })).toBeEnabled();
   });
 
@@ -162,13 +162,13 @@ describe("AdminPage", () => {
     fireEvent.change(screen.getByLabelText("Town / city"), {
       target: { value: "Wokingham" }
     });
-    fireEvent.change(screen.getByLabelText("Council"), {
+    fireEvent.change(screen.getByLabelText("County"), {
       target: { value: "Royal Borough of Windsor and Maidenhead" }
     });
     fireEvent.change(screen.getByLabelText("Postcode"), {
       target: { value: "RG40 1AA" }
     });
-    expect(screen.getByLabelText("Council")).toHaveValue("Royal Borough of Windsor and Maidenhead");
+    expect(screen.getByLabelText("County")).toHaveValue("Royal Borough of Windsor and Maidenhead");
     expect(document.querySelector("#folder-region")).toHaveValue("Royal Borough of Windsor and Maidenhead");
 
     fireEvent.change(document.querySelector("#searchland-url") as HTMLInputElement, {

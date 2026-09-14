@@ -12,6 +12,10 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libreoffice-writer poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation \
+  && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 ENV PORT=4173
 
@@ -23,6 +27,7 @@ RUN npm ci --omit=dev --include=optional --no-audit --no-fund \
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/lib/trackingQrSvg.js ./src/lib/trackingQrSvg.js
+COPY --from=build /app/src/lib/letterTemplates.js ./src/lib/letterTemplates.js
 COPY --from=build /app/src/lib/landMap.js ./src/lib/landMap.js
 COPY server ./server
 COPY public ./public

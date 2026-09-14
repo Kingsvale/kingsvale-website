@@ -201,7 +201,7 @@ function readZip(buffer) {
     const data = method === 0
       ? Buffer.from(compressedData)
       : method === 8
-        ? inflateRawSync(compressedData)
+        ? inflateRawSync(compressedData, { maxOutputLength: maxDocxEntryBytes })
         : null;
 
     if (!data) {
@@ -328,6 +328,11 @@ function findQrMediaTarget(entries) {
   const documentXml = documentEntry.data.toString("utf8");
   for (const drawing of documentXml.matchAll(/<w:drawing>[\s\S]*?<\/w:drawing>/g)) {
     const snippet = drawing[0];
+    const markedEmbed = snippet.match(/r:embed="([^"]+)"/)?.[1];
+    if (/\b(?:descr|title|name)="KINGSVALE_QR"/i.test(snippet) && markedEmbed) {
+      const markedTarget = rels.get(markedEmbed);
+      if (markedTarget?.endsWith(".png")) return markedTarget;
+    }
     const extent = snippet.match(/<wp:extent cx="(\d+)" cy="(\d+)"/);
     const embed = snippet.match(/r:embed="([^"]+)"/);
     if (!extent || !embed) {

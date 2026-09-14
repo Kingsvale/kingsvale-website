@@ -8,6 +8,14 @@ import {
 } from "./contentValidation";
 
 describe("content validation", () => {
+  it("allows publishing images without descriptions and still limits supplied descriptions", () => {
+    const content = cloneContent(defaultContent);
+    content.hero.image.alt = "";
+    content.developments[0].gallery = [{ ...content.developments[0].image, alt: "" }];
+    expect(validateSiteContent(content).valid).toBe(true);
+    content.hero.image.alt = "x".repeat(151);
+    expect(validateSiteContent(content).errors.some((error) => error.path === "hero.image.alt")).toBe(true);
+  });
   it("accepts the default Kingsvale content", () => {
     expect(validateSiteContent(defaultContent).valid).toBe(true);
   });

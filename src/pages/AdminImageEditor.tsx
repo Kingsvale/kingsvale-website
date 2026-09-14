@@ -64,8 +64,11 @@ export function ImageEditor({ title, image, onChange, error }: {
         accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => { if (event.target.files) void upload(event.target.files); event.target.value = ""; }} />
     </label>
     <p className="studio-image__hint">Use a landscape photo, ideally 2,400 px wide. Check the crop on each device before publishing.</p>
-    <AdminTextInput label={`${title} alt text`} value={image.alt} onChange={(alt) => onChange({ ...image, alt })} maxLength={150}
-      helper="Describe what is in the photograph for visitors using a screen reader." />
+    <details className="studio-image__details">
+      <summary>Image description (optional)</summary>
+      <AdminTextInput label={`${title} alt text`} value={image.alt ?? ""} onChange={(alt) => onChange({ ...image, alt })} maxLength={150}
+        helper="Optional description for screen readers. Leave blank if you do not need one; it will not prevent publishing." />
+    </details>
     <details className="studio-image__details">
       <summary>Adjust crop & focal point</summary>
       <p>Move the photograph within its frame. The same focal point follows it across screen sizes.</p>

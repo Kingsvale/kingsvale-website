@@ -8,14 +8,14 @@ export function buildStyledQrSvg(value, style = {}, title = "", options = {}) {
   });
   const includeCaption = options.includeCaption ?? true;
   const moduleCount = qr.modules.size;
-  const quiet = 3;
+  const quiet = 4;
   const moduleSize = 10;
   const labelHeight = includeCaption ? 42 : 0;
   const size = (moduleCount + quiet * 2) * moduleSize;
   const totalHeight = size + labelHeight;
-  const foreground = safeColor(style.foreground, "#22211d");
-  const background = safeColor(style.background, "#fbf8f2");
-  const accent = safeColor(style.accent, "#008000");
+  const foreground = safeColor(style.foreground, "#083d29");
+  const background = safeColor(style.background, "#ffffff");
+  const accent = safeColor(style.accent, "#083d29");
   const dotRoundness = boundedPercent(style.dotRoundness, 48);
   const finderRoundness = boundedPercent(style.finderRoundness, 24);
   const frameRoundness = boundedPercent(style.frameRoundness, 42);
@@ -30,7 +30,7 @@ export function buildStyledQrSvg(value, style = {}, title = "", options = {}) {
 
   for (let y = 0; y < moduleCount; y += 1) {
     for (let x = 0; x < moduleCount; x += 1) {
-      if (!qr.modules.get(x, y) || isFinderModule(x, y, moduleCount)) {
+      if (!qr.modules.get(y, x) || isFinderModule(x, y, moduleCount)) {
         continue;
       }
 
@@ -50,7 +50,6 @@ export function buildStyledQrSvg(value, style = {}, title = "", options = {}) {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${totalHeight}" viewBox="0 0 ${size} ${totalHeight}" role="img" aria-label="${escapeAttribute(label)}" data-qr-svg="true">
   ${frameShape(0, 0, size, totalHeight, frameRoundness, frameCut, background)}
-  ${frameShape(8, 8, size - 16, size - 16, frameRoundness, frameCut, background, accent, 2)}
   ${modules.join("\n  ")}
   ${finders.join("\n  ")}
   ${style.includeLogo ? logoMark(size, moduleSize, background, foreground, accent) : ""}
@@ -66,7 +65,7 @@ function moduleShape(x, y, size, radius, color) {
     return `<circle cx="${left + size / 2}" cy="${top + size / 2}" r="${size * 0.42}" fill="${color}"/>`;
   }
 
-  return `<rect x="${left + 1}" y="${top + 1}" width="${size - 2}" height="${size - 2}" rx="${radius}" fill="${color}"/>`;
+  return `<rect x="${left}" y="${top}" width="${size}" height="${size}" rx="${radius}" fill="${color}"/>`;
 }
 
 function finderShape(x, y, size, roundness, foreground, background, accent) {

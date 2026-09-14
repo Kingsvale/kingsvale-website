@@ -310,6 +310,18 @@ export async function generateLetterFromTemplate(
   }
 }
 
+export async function previewLetterDocument(url: string): Promise<{ pages: string[]; pageCount: number }> {
+  const response = await fetch("/api/letters/preview", {
+    method: "POST", credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }),
+    signal: AbortSignal.timeout(100000), body: JSON.stringify({ url })
+  });
+  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("Preview unavailable");
+  const result = await response.json();
+  if (!Array.isArray(result.pages) || !result.pages.length || result.pages.length > 12 || !result.pages.every((page: unknown) => typeof page === "string" && /^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(page))) throw new Error("Invalid preview");
+  return result;
+}
+
 export async function fetchStudioSettings(): Promise<StudioSettings> {
   try {
     const response = await fetch("/api/studio-settings", {

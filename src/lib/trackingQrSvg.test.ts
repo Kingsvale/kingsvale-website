@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { defaultQrStyle } from "./trackingNormalize";
 import { buildStyledQrSvg, WORD_QR_EXPORT_SIZE } from "./trackingQrSvg.js";
+import jsQR from "jsqr";
+import sharp from "sharp";
 
 describe("styled tracking QR renderer", () => {
   it("renders the same branded SVG primitives used by the admin preview and letter export", () => {
@@ -12,8 +14,9 @@ describe("styled tracking QR renderer", () => {
     );
 
     expect(svg).toContain('data-qr-svg="true"');
-    expect(svg).toContain("#008000");
-    expect(svg).toContain('data-logo-mark="kingsvale"');
+    expect(svg).toContain("#083d29");
+    expect(svg).toContain("#ffffff");
+    expect(svg).not.toContain('data-logo-mark="kingsvale"');
     expect(svg).not.toContain(">K</text>");
     expect(svg).toContain('rx="');
     expect(svg).not.toContain("Scan to view the plot</text>");
@@ -35,7 +38,17 @@ describe("styled tracking QR renderer", () => {
     expect(toHex(png.slice(0, 8))).toBe("89504e470d0a1a0a");
     expect(pngView.getUint32(16, false)).toBe(WORD_QR_EXPORT_SIZE);
     expect(pngView.getUint32(20, false)).toBe(WORD_QR_EXPORT_SIZE);
-    expect(png.length).toBeGreaterThan(100_000);
+    expect(png.length).toBeGreaterThan(10_000);
+  });
+
+  it("decodes the exact tracking link at practical letter sizes", async () => {
+    const value = "https://kingsvalehomes.co.uk/track/9eZc0HaB1vU2kM3nP4qR5sT6";
+    for (const width of [160, 240, 400]) {
+      const { data, info } = await sharp(Buffer.from(buildStyledQrSvg(value, defaultQrStyle(), "", { includeCaption: false })))
+        .resize(width, width).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const result = jsQR(new Uint8ClampedArray(data), info.width, info.height);
+      expect(result?.data).toBe(value);
+    }
   });
 
   it("keeps street, town and postcode letter tokens separate", async () => {

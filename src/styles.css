@@ -3578,7 +3578,7 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
   transform: translateY(-2px);
 }
 
-.process-card span {
+.process-card > span {
   color: var(--taupe);
   font-weight: 800;
 }
@@ -4408,3 +4408,26 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
 .contact-form__feedback--success { color: #304c36; background: #eaf0e5; border: 1px solid #cfdbc7; }
 .contact-form__feedback--error { color: #743f30; background: #f7ece5; border: 1px solid #e5cbbb; }
 @media (max-width: 600px) { .contact-form__row { grid-template-columns: 1fr; gap: 22px; } }
+
+/* Editorial cards: only the step number uses the accent colour. */
+.process-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:24px}
+.process-card,.security-card{background:#fdfbf6;border:1px solid #e1dfd5;border-radius:3px;padding:32px;box-shadow:0 4px 18px #272a2004}
+.process-card{position:relative;border-top:2px solid #b39b74}
+.process-card>span{font-size:12px;letter-spacing:.14em;font-weight:500;color:#756448}
+.process-card h3{margin:26px 0 16px;color:#252e23;font-size:29px;font-weight:400;line-height:1.2}
+.process-card p{color:#5b6056;font-size:16px;line-height:1.8;font-weight:400;margin:0}
+.lookup-hero{min-height:370px}
+.lookup-panel{padding:48px max(24px,calc((100vw - 1040px)/2)) 64px;background:#f5f2eb}
+.lookup-panel__intro{max-width:620px;margin-bottom:28px}
+.lookup-panel__intro h2{font-family:var(--font-serif);font-size:42px;font-weight:400;margin:12px 0;color:#24362b}
+.lookup-panel__intro p:not(.eyebrow){font-size:16px;color:#60665b;line-height:1.7}
+.lookup-panel .plot-lookup__form{padding:28px;background:#fffdf8;border:1px solid #deded3;border-radius:10px;gap:20px;box-shadow:0 12px 36px #343d2806}
+.lookup-panel .plot-lookup__form label{color:#344234;font-size:13px;text-transform:none;font-weight:500;gap:10px}
+.lookup-panel .plot-lookup__form input{border:1px solid #cfd3c7;background:#fff;color:#252e23;border-radius:5px;min-height:54px;font-size:17px;font-weight:400}
+.lookup-panel .plot-lookup__form input:focus{border-color:#385b43;box-shadow:0 0 0 3px #385b431a;outline:0}
+.lookup-panel .plot-lookup__form button{background:#183e2b;color:white;border-radius:5px;text-transform:none;font-weight:500;min-height:54px;padding:0 28px}
+.lookup-panel .plot-lookup__form button:disabled{opacity:.65;cursor:wait}
+.lookup-panel .plot-lookup__form .lookup-message{color:#694a31;background:#f7ede0;padding:14px;border-radius:5px;font-size:14px;line-height:1.6}
+.lookup-panel__help{font-size:13px;line-height:1.7;color:#666d60;margin:24px 0 0}
+.lookup-panel__help a{color:#214d34;text-underline-offset:3px}
+@media(max-width:700px){.lookup-panel .plot-lookup__form{grid-template-columns:1fr;padding:22px}.lookup-panel{padding:32px 20px 42px}.lookup-panel__intro h2{font-size:35px}.process-card{padding:26px}.lookup-hero{min-height:320px}}

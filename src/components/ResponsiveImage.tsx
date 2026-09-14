@@ -36,7 +36,7 @@ export function ResponsiveImage({
       src={getOptimizedImageUrl(image.src, widthHint)}
       srcSet={image.variants?.map((variant) => `${variant.src} ${variant.width}w`).join(", ") || getResponsiveSrcSet(image.src)}
       sizes={sizes}
-      alt={image.alt}
+      alt={image.alt ?? ""}
       loading={loading ?? (priority ? "eager" : "lazy")}
       decoding="async"
       fetchPriority={priority ? "high" : "auto"}

@@ -72,15 +72,15 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
 
 export function defaultQrStyle(): TrackingQrStyle {
   return {
-    foreground: "#22211d",
-    background: "#fbf8f2",
-    accent: "#008000",
-    dotRoundness: 48,
-    finderRoundness: 24,
-    frameRoundness: 42,
+    foreground: "#083d29",
+    background: "#ffffff",
+    accent: "#083d29",
+    dotRoundness: 65,
+    finderRoundness: 65,
+    frameRoundness: 0,
     frameCut: 0,
     frameLabel: "Scan to view the plot",
-    includeLogo: true
+    includeLogo: false
   };
 }
 

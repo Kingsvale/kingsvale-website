@@ -1,3 +1,4 @@
+import { isStarterLetterTemplate } from "./letterTemplates.js";
 import type {
   ContactPriority,
   MailingStatus,
@@ -540,6 +541,7 @@ function isValidLetterUrl(value: string) {
 }
 
 function isValidLetterTemplateUrl(value: string) {
+  if (isStarterLetterTemplate(value)) return true;
   if (value.startsWith("/media/")) {
     return /\.docx$/i.test(value);
   }

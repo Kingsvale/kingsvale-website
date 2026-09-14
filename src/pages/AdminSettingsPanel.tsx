@@ -13,14 +13,19 @@ import {
 } from "../lib/studioSettings";
 import {
   contactPriorityLabels,
+  letterRecipientModeLabels,
+  type LetterRecipientMode,
   type ContactPriority
 } from "../lib/trackingTypes";
+import { AdminDocumentPreview } from "./AdminDocumentPreview";
+import { starterLetterTemplates } from "../lib/letterTemplates.js";
 
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 
 export function AdminSettingsPanel() {
   const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
   const [presetName, setPresetName] = useState("");
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Manage reusable Studio defaults.");
   const sortedPresets = useMemo(
@@ -62,7 +67,7 @@ export function AdminSettingsPanel() {
 
   async function handlePresetUpload(files: FileList | null) {
     const file = files?.[0];
-    const name = presetName.trim();
+    const name = presetName.trim() || files?.[0]?.name.replace(/\.docx$/i, "").replace(/[-_]/g, " ").slice(0, 80) || "Letter template";
     if (!file) {
       return;
     }
@@ -162,6 +167,12 @@ export function AdminSettingsPanel() {
           <div className="admin-section-heading">
             <h2 id="settings-letter-presets-title">Letter presets</h2>
           </div>
+          <p className="admin-note">Upload your branded Word letter once, then reuse it for any contact in Mailing. Preview checks the layout; Generate &amp; preview in Mailing fills the recipient details.</p>
+          <details className="workflow-help"><summary>How to prepare a reusable template</summary>
+            <p>Keep your letterhead, signature and formatting in Word. Use placeholders such as <code>{"{{legal_name}}"}</code>, <code>{"{{address_line_1}}"}</code>, <code>{"{{town}}"}</code>, <code>{"{{postal_code}}"}</code>, <code>{"{{reference}}"}</code> and <code>{"{{date}}"}</code> where each contact’s details should appear.</p>
+            <p>For the tracked QR code, use a PNG image and set its image description in Word to <strong>KINGSVALE_QR</strong>. The generator replaces that image while preserving its size and position.</p>
+            {starterLetterTemplates.map(([url, label]) => <div className="letter-template__links" key={url}><a href={url} download>{label}</a><button type="button" className="admin-small" onClick={() => setPreview({ url, name: `${label}.docx` })}>Preview</button></div>)}
+          </details>
           <div className="settings-preset-form">
             <TextInput
               id="letter-preset-name"
@@ -203,7 +214,12 @@ export function AdminSettingsPanel() {
                       }
                     />
                     <small>{preset.templateName}</small>
+                    <SelectField label="Default recipient" value={preset.recipientMode} options={Object.entries(letterRecipientModeLabels) as [LetterRecipientMode, string][]} onChange={(value) => updateSettings((draft) => {
+                      const target = draft.letterPresets.find((item) => item.id === preset.id);
+                      if (target) target.recipientMode = value as LetterRecipientMode;
+                    })} />
                   </div>
+                  <button type="button" className="admin-open" onClick={() => setPreview({ url: preset.templateUrl, name: preset.templateName })}>Preview</button>
                   <label className="admin-small settings-upload">
                     <Plus aria-hidden="true" />
                     Replace DOCX
@@ -330,6 +346,7 @@ export function AdminSettingsPanel() {
           ) : null}
         </section>
       </div>
+      {preview && <AdminDocumentPreview key={preview.url} file={preview} onClose={() => setPreview(null)} />}
     </section>
   );
 }

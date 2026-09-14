@@ -1,0 +1,41 @@
+.workflow-heading{display:flex;gap:16px;align-items:flex-start;margin:30px 0 20px;padding-top:24px;border-top:1px solid #ddd8ce}
+.workflow-heading>span{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#e4ece6;color:#083d29;font-size:12px;font-weight:600}
+.workflow-heading h3{margin:0 0 6px;font-size:19px;color:#22211d}
+.workflow-heading p,.workflow-help p{margin:0;color:#625f56;font-size:14px;line-height:1.65}
+.workflow-help{padding:18px;background:#f4f3ee;border-radius:10px;margin:0 0 20px}
+.workflow-help summary,.letter-template summary{cursor:pointer;font-size:14px;font-weight:600;min-height:28px}
+.workflow-help p{margin:14px 0}
+.workflow-savebar{position:sticky;bottom:12px;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px!important;background:#fffdf8;border:1px solid #d7d5cb;border-radius:12px;box-shadow:0 5px 24px #242a2014}
+.workflow-savebar>span{font-size:13px;color:#516351}
+.workflow-fields{min-width:0;border:0;margin:0;padding:0}
+.mailing-editor .admin-field__label,.site-editor .admin-field__label{font-weight:500;color:#464940;font-size:13px}
+.mailing-editor .admin-field input,.mailing-editor .admin-field select,.mailing-editor .admin-field textarea,.site-editor .admin-field input,.site-editor .admin-field select,.site-editor .admin-field textarea{background:#fffdf9;border-radius:7px;padding:12px 14px;font-weight:400;min-height:46px}
+.mailing-editor .admin-grid,.site-editor .admin-grid{gap:16px}
+.mailing-layout,.sites-admin__layout{align-items:start}
+.mailing-list{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow:auto;border-radius:12px}
+.mailing-row{border-radius:8px;transition:background .15s;overflow-wrap:anywhere}
+.mailing-row--active{box-shadow:inset 3px 0 #083d29}
+.mailing-editor,.site-editor{border-radius:12px}
+.letter-template{padding:18px;border-radius:10px}
+.letter-generator-actions,.letter-upload__actions,.letter-template__links{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.letter-generator-actions small{flex-basis:100%;font-weight:400;line-height:1.6}
+.letter-upload{border-radius:10px}
+.letter-upload strong,.mailing-site-details strong{overflow-wrap:anywhere}
+.settings-preset{flex-wrap:wrap;gap:12px;border-radius:10px}
+.settings-preset__content{min-width:200px;flex:1}
+.document-preview{width:min(1080px,96vw);max-width:96vw;height:92dvh;max-height:92dvh;border:0;border-radius:14px;padding:0;color:#242a21;background:#f8f6f0;box-shadow:0 24px 90px #0005;overflow:hidden}
+.document-preview[open]{display:flex;flex-direction:column}
+.document-preview::backdrop{background:#10231bd1}
+.document-preview__bar{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;gap:16px;border-bottom:1px solid #dedbd2}
+.document-preview__bar h2{font-family:var(--font-sans);font-size:17px;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.document-preview__bar p{font-size:12px;color:#666b60;margin:3px 0 0}
+.document-preview__actions{display:flex;gap:10px;flex-shrink:0}
+.document-preview__status{font-size:12px;line-height:1.5;padding:10px 22px;margin:0;color:#596151}
+.document-preview iframe{border:0;width:100%;flex:1;min-height:0;background:#e9e7e2}
+.document-preview__image{overflow:auto;padding:24px;text-align:center}
+.document-preview__image img{max-width:100%;height:auto}
+.document-preview__pages{overflow:auto;background:#e7e5df;padding:24px;flex:1;min-height:0}
+.document-preview__pages figure{margin:0 auto 24px;max-width:794px}
+.document-preview__pages img{display:block;width:100%;height:auto;box-shadow:0 4px 20px #0002}
+.document-preview__pages figcaption{text-align:center;padding:12px;font-size:12px;color:#62665d}
+@media(max-width:800px){.mailing-list{position:static;max-height:400px}.workflow-savebar{bottom:5px;padding:10px!important}.document-preview__bar{padding:14px;align-items:flex-start;flex-direction:column}.document-preview__actions{width:100%;justify-content:space-between}.workflow-heading{margin-top:22px}.settings-preset__content{min-width:0;flex-basis:100%}}

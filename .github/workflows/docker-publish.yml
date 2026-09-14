@@ -24,6 +24,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up Node for letter preview checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify server letter previews
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation
+          npm ci --no-audit --no-fund
+          node scripts/verify-letter-preview.mjs
+
+      - name: Save letter preview checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: letter-preview-checks
+          path: test-results/letter-previews/*.png
+          retention-days: 7
+
       - name: Sign in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
