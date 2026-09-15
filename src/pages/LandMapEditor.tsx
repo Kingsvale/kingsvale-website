@@ -24,6 +24,7 @@ async function prepareEditor() {
 export default function LandMapEditor({ value, postcode, disabled, onChange, onBusyChange, onSave, canSave, savedAt }: Props) {
   const [runtime, setRuntime] = useState<MapRuntime | null>(null);
   const [mode, setMode] = useState<"browse" | "draw" | "edit">("browse");
+  const [deletingPoints, setDeletingPoints] = useState(false);
   const [search, setSearch] = useState(postcode === "AA1 1AA" ? "" : postcode);
   const [locating, setLocating] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -67,6 +68,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
     runtime?.map.pm.disableDraw();
     runtime?.map.pm.disableGlobalEditMode();
     setMode("browse");
+    setDeletingPoints(false);
     callbacks.current.onBusyChange(false);
   }
 
@@ -110,8 +112,23 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
     }
     stopTools();
     editingSnapshot.current = structuredClone(current.current);
-    runtime?.map.pm.enableGlobalEditMode({ allowSelfIntersection: false, snappable: true, removeLayerBelowMinVertexCount: false });
+    configureCorners(false);
     setMode("edit");
+    callbacks.current.onBusyChange(true);
+  }
+
+  function configureCorners(remove: boolean) {
+    runtime?.map.pm.disableGlobalEditMode();
+    runtime?.map.pm.enableGlobalEditMode({ allowSelfIntersection: false, snappable: true, removeLayerBelowMinVertexCount: false,
+      removeVertexOn: remove ? "click" : "contextmenu", hideMiddleMarkers: remove, moveVertexValidation: () => !remove });
+    setDeletingPoints(remove);
+  }
+
+  function deletePoints() {
+    if (mode !== "edit") editingSnapshot.current = structuredClone(current.current);
+    configureCorners(!deletingPoints);
+    setMode("edit");
+    setError("");
     callbacks.current.onBusyChange(true);
   }
 
@@ -185,12 +202,13 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
       <button type="button" className="admin-ghost" disabled={!runtime || blocked || activeTool} onClick={() => startDraw("add")}><Pencil aria-hidden="true" />{value?.selection.length ? "Add another area" : "Draw area"}</button>
       {!!value?.selection.length && <button type="button" className="admin-ghost" disabled={!runtime || blocked || activeTool} onClick={() => startDraw("replace")}>Draw a replacement area</button>}
       <button type="button" className="admin-ghost" disabled={!runtime || blocked || !value?.selection.length || mode === "draw"} aria-pressed={mode === "edit"} onClick={editArea}>{mode === "edit" ? "Finish editing" : "Edit corners"}</button>
+      <button type="button" className="admin-ghost" disabled={!runtime || blocked || !value?.selection.length || mode === "draw"} aria-pressed={deletingPoints} onClick={deletePoints}>{deletingPoints ? "Move corners instead" : "Delete points"}</button>
       {activeTool && <button type="button" className="admin-ghost" onClick={cancelEditing}>Cancel {mode === "draw" ? "drawing" : "editing"}</button>}
       <button type="button" className="admin-ghost" disabled={blocked || activeTool || !history.length} onClick={() => {
         const previous = history[history.length - 1]; setHistory((items) => items.slice(0, -1)); current.current = previous; onChange(previous); setError(""); setMessage("Last map change undone. Save the site to update its QR page.");
       }}><Undo2 aria-hidden="true" />Undo</button>
     </div>
-    <p className="land-map-editor__hint">{mode === "draw" ? "Click or tap each corner, then the first corner to finish. Pan the map to move around." : mode === "edit" ? "Drag the corner handles to adjust the area. Drag a midpoint to add a corner, then choose Finish editing." : "Use + and − to zoom. Drag the map to move around. Draw a replacement to select just part of an imported plot."}</p>
+    <p className="land-map-editor__hint">{mode === "draw" ? "Click or tap each corner, then the first corner to finish. Pan the map to move around." : deletingPoints ? "Click or tap a white corner point to delete it. Each area must keep at least three corners. Choose Finish editing to apply, or Cancel editing to restore the shape." : mode === "edit" ? "Drag the corner handles to adjust the area. Drag a midpoint to add a corner. Choose Delete points to remove corners, then Finish editing." : "Use + and − to zoom. Drag the map to move around. Edit corners or Delete points to refine an imported plot."}</p>
     <LandMapCanvas value={value} editable prepareEditor={prepareEditor} onReady={ready} onFailure={() => onBusyChange(false)} onBasemapChange={(basemap) => { if (current.current && !activeTool && !blocked) commit({ ...current.current, basemap }); }} />
     {!!value?.selection.length && <div className="land-map-editor__areas">{value.selection.map((_, index) => <span key={index}>Area {index + 1}<button type="button" disabled={blocked || activeTool} aria-label={`Remove area ${index + 1}`} onClick={() => {
       const selection = value.selection.filter((__, i) => i !== index); commit(selection.length ? { ...value, selection } : null);
