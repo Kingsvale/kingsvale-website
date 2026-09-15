@@ -14,6 +14,7 @@ import {
 } from "../components/AdminFields";
 import {
   fetchStudioSettings,
+  createSavedLetterPdf,
   generateLetterFromTemplate,
   listTrackingSites,
   saveTrackingSite,
@@ -243,6 +244,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       updateDraft((site) => {
         site.letterFileName = upload.name;
         site.letterFileUrl = upload.url;
+        site.letterDocuments = site.letterDocuments?.filter((document) => document.kind !== "letter-pdf");
       });
       setStatus("Letter uploaded. Changes will save automatically.");
     } finally {
@@ -254,6 +256,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     updateDraft((site) => {
       site.letterFileName = "";
       site.letterFileUrl = "";
+      site.letterDocuments = site.letterDocuments?.filter((document) => document.kind !== "letter-pdf");
     });
     setStatus("Letter removed. Changes will save automatically.");
   }
@@ -286,9 +289,9 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     setBusy(true);
     try {
       if (!await autosave.flush()) return;
-      const generated = await generateLetterFromTemplate(generationDraft, publicLink, templateUrl);
+      const generated = await generateLetterFromTemplate(generationDraft, publicLink, templateUrl, letterStage);
       if (!generated) {
-        setStatus("Letter could not be generated. Check the preset is a server-uploaded DOCX.");
+        setStatus("The letter and print files could not be prepared. Please try again.");
         return;
       }
 
@@ -296,18 +299,39 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
         ...generationDraft,
         initialLetterGeneratedAt: generationDraft.initialLetterGeneratedAt || (letterStage === "initial" ? new Date().toISOString() : undefined),
         letterFileName: generated.name,
-        letterFileUrl: generated.url
+        letterFileUrl: generated.url,
+        letterDocuments: [
+          ...(letterStage === "follow-up" ? generationDraft.letterDocuments?.filter((document) => document.kind !== "letter-pdf") ?? [] : []),
+          ...generated.documents ?? []
+        ]
       });
       setSites((current) => sortMailingSites(current.map((site) => (site.id === saved.id ? saved : site)), sortMode));
       setDraft(saved);
       setStageChoice({ id: saved.id, stage: letterStage });
-      setPreview({ url: generated.url, name: generated.name });
-      setStatus("Letter generated and saved. Review the preview, then download when ready.");
-    } catch {
-      setStatus("Letter could not be generated.");
+      setPreview(generated.documents?.find((document) => document.kind === "letter-pdf") ?? generated);
+      setStatus(letterStage === "initial" ? "Letter and envelope saved in Word and PDF formats. Review and print below." : "Follow-up letter saved in Word and PDF formats. Review and print below.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "The letter and print files could not be prepared.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function prepareExistingPdf() {
+    if (!draft) return;
+    setBusy(true);
+    try {
+      if (!await autosave.flush()) return;
+      const pdf = await createSavedLetterPdf(draft.letterFileUrl);
+      const document = { kind: "letter-pdf" as const, name: draft.letterFileName.replace(/\.docx$/i, ".pdf"), url: pdf.url };
+      const saved = await saveTrackingSite({ ...draft, letterDocuments: [...draft.letterDocuments?.filter((item) => item.kind !== "letter-pdf") ?? [], document] });
+      setSites((current) => current.map((site) => site.id === saved.id ? saved : site));
+      setDraft(saved);
+      setPreview(document);
+      setStatus("PDF saved. Open it to print from your browser.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "The PDF could not be prepared.");
+    } finally { setBusy(false); }
   }
 
   return (
@@ -488,7 +512,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                 {templateUrl && <button type="button" className="admin-ghost" disabled={busy} onClick={() => setPreview({ url: templateUrl, name: selectedPreset?.templateName || "Letter template.docx" })}>Preview template</button>}
                 {!templateUrl && <small>Choose a template above to enable generation.</small>}
                 <small>
-                  Creates a DOCX, fills the legal/address placeholders, and inserts this site&apos;s tracked QR code.
+                  {letterStage === "initial" ? "Creates your letter and addressed C5 envelope in Word and PDF formats." : "Creates your follow-up letter in Word and PDF formats."} Your letter includes this site&apos;s QR code.
                 </small>
               </div>
 
@@ -526,6 +550,21 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                   )}
                 </div>
               </div>
+
+              {!!draft.letterDocuments?.length && <div className="mailing-print-files" aria-label="Print files">
+                <h3>Ready to print</h3>
+                <details className="mailing-print-help"><summary>Paper size &amp; printing help</summary><p className="admin-note">Open a PDF to print in your browser. Choose the matching paper size (C5 for envelopes), actual size and no added margins. The envelope has two pages: the addressed front and return-address back. Print page 1 for the front only. Borderless printing requires a compatible printer.</p></details>
+                {[...draft.letterDocuments].sort((a, b) => ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(a.kind) - ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(b.kind)).map((document) => <div className="letter-upload" key={document.kind}>
+                  <div><FileText aria-hidden="true" /><span><strong>{document.kind === "letter-pdf" ? "Letter · PDF" : document.kind === "envelope-pdf" ? "Envelope · PDF · C5" : "Envelope · Word"}</strong><small>{document.name}</small></span></div>
+                  <div className="letter-upload__actions">
+                    <button type="button" className="admin-open" onClick={() => setPreview(document)}>Preview</button>
+                    {document.kind.endsWith("pdf") && <a className="admin-save" href={document.url} target="_blank" rel="noopener noreferrer">Open PDF / Print</a>}
+                    <a className="admin-open" href={document.url} download={document.name}>Download</a>
+                  </div>
+                </div>)}
+              </div>}
+              {/\.docx$/i.test(draft.letterFileUrl) && !draft.letterDocuments?.some((document) => document.kind === "letter-pdf") && <button className="admin-open" type="button" disabled={busy} onClick={prepareExistingPdf}>Create PDF for saved letter</button>}
+              {/\.pdf$/i.test(draft.letterFileUrl) && <a className="admin-open" href={draft.letterFileUrl} target="_blank" rel="noopener noreferrer">Open PDF / Print</a>}
 
               <div className="workflow-heading"><span>03</span><div><h3>Posting &amp; follow-up</h3><p>Record when you post the letter and when to contact the owner again.</p></div></div>
               <button type="button" className="admin-small" disabled={busy} onClick={markMailedToday}>Mark posted today</button>

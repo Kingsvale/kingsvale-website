@@ -68,6 +68,30 @@ test("starter letters generate on the backend and document previews require auth
   const denied = await fetch(`${server.url}/api/letters/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: file.url }) });
   assert.equal(denied.status, 401);
   assert.equal((await server.api("/api/letters/preview", "POST", { url: "https://example.com/private.docx" })).status, 422);
+  assert.deepEqual(file.documents.map((document) => document.kind), ["letter-pdf", "envelope-docx", "envelope-pdf"]);
+  for (const document of file.documents) {
+    const data = Buffer.from(await (await fetch(`${server.url}${document.url}`)).arrayBuffer());
+    assert.equal(data.subarray(0, document.kind.endsWith("pdf") ? 5 : 2).toString(), document.kind.endsWith("pdf") ? "%PDF-" : "PK");
+  }
+  const saved = { ...site, letterFileName: file.name, letterFileUrl: file.url, letterDocuments: file.documents };
+  assert.equal((await server.api("/api/tracking-sites", "PUT", { site: saved })).status, 200);
+  const publicResponse = await fetch(`${server.url}/api/tracking-sites/${site.token}`);
+  // The public token endpoint must never include private print-file references.
+  assert.equal(publicResponse.status, 200);
+  assert.equal(Object.hasOwn((await publicResponse.json()).site, "letterDocuments"), false);
+  const { backup } = await (await server.api("/api/backup")).json();
+  const destination = await startServer(t);
+  assert.equal((await destination.api("/api/backup", "PUT", { backup, mode: "replace" })).status, 200);
+  for (const document of file.documents) assert.equal((await fetch(`${destination.url}${document.url}`)).status, 200);
+  const followUp = await server.api("/api/letters/generate", "POST", { site: saved, templateUrl: site.letterTemplateUrl, publicLink: `${server.url}/track/${site.token}`, stage: "follow-up" });
+  assert.equal(followUp.status, 201);
+  assert.deepEqual((await followUp.json()).file.documents.map((document) => document.kind), ["letter-pdf"]);
+  const deniedPdf = await fetch(`${server.url}/api/letters/pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: file.url }) });
+  assert.equal(deniedPdf.status, 401);
+  assert.equal((await server.api("/api/letters/pdf", "POST", { url: "https://example.com/letter.docx" })).status, 422);
+  const converted = await server.api("/api/letters/pdf", "POST", { url: file.url });
+  assert.equal(converted.status, 201);
+  assert.ok((await converted.json()).file.url.endsWith(".pdf"));
 });
 
 async function startServer(t) {

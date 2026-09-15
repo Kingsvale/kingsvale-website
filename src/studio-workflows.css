@@ -114,3 +114,7 @@
 .admin-area-nav .admin-root-tabs button { flex: 0 0 auto; min-width: 96px; min-height: 44px; }
 .admin-page .mailing-list { top: 86px; max-height: calc(100vh - 104px); }
 @media (max-width: 700px) { .admin-area-nav { padding: 6px 12px; } .admin-area-nav .admin-root-tabs { width: 100%; } .admin-area-nav .admin-root-tabs button { min-width: 82px; } }
+.mailing-print-files{display:grid;gap:12px;margin-block:24px}
+.mailing-print-files h3{margin:0}
+.mailing-print-help summary{cursor:pointer;font-weight:600;padding-block:6px}
+.mailing-print-help p{max-width:72ch;margin-bottom:8px}

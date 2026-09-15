@@ -10,6 +10,33 @@ const run = promisify(execFile);
 const cache = new Map();
 let rendering = false;
 
+// Preserve the source page size, vector artwork and selectable text for printing.
+export async function createLetterPdf(buffer) {
+  if (buffer.length > 12_000_000) throw new Error("Document too large");
+  if (rendering) throw Object.assign(new Error("Another document is being prepared. Please try again shortly."), { code: "PREVIEW_BUSY" });
+  rendering = true;
+  let directory;
+  try {
+    directory = await mkdtemp(join(tmpdir(), "kingsvale-pdf-"));
+    await writeFile(join(directory, "letter.docx"), buffer);
+    await convertDocx(directory);
+    const pdf = await readFile(join(directory, "letter.pdf"));
+    if (!pdf.subarray(0, 5).equals(Buffer.from("%PDF-"))) throw new Error("PDF conversion failed");
+    return pdf;
+  } finally {
+    rendering = false;
+    if (directory) await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function convertDocx(directory) {
+  await run(process.env.LIBREOFFICE_PATH || "libreoffice", [
+    `-env:UserInstallation=${pathToFileURL(join(directory, "profile")).href}`,
+    "--headless", "--nologo", "--nodefault", "--nofirststartwizard", "--convert-to", "pdf",
+    "--outdir", directory, join(directory, "letter.docx")
+  ], { timeout: 45000, maxBuffer: 1_000_000, windowsHide: true });
+}
+
 // Only one conversion at a time: each renderer uses an isolated profile and a
 // temporary directory. Generated previews are disposable, never source records.
 export async function renderLetterPreview(buffer, extension = ".docx") {
@@ -24,11 +51,7 @@ export async function renderLetterPreview(buffer, extension = ".docx") {
     await writeFile(join(directory, `letter${extension}`), buffer);
     const options = { timeout: 45000, maxBuffer: 1_000_000, windowsHide: true };
     if (extension === ".docx") {
-      await run(process.env.LIBREOFFICE_PATH || "libreoffice", [
-        `-env:UserInstallation=${pathToFileURL(join(directory, "profile")).href}`,
-        "--headless", "--nologo", "--nodefault", "--nofirststartwizard", "--convert-to", "pdf",
-        "--outdir", directory, join(directory, "letter.docx")
-      ], options);
+      await convertDocx(directory);
     }
     const pdf = join(directory, "letter.pdf");
     const info = await run("pdfinfo", [pdf], options);

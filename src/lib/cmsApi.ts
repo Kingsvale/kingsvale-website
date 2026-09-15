@@ -240,6 +240,7 @@ async function apiError(response: Response, fallback: string) {
 }
 
 export type UploadedLetterFile = {
+  documents?: TrackingSite["letterDocuments"];
   name: string;
   url: string;
   contentType: string;
@@ -271,7 +272,8 @@ export async function uploadLetterFile(file: File): Promise<UploadedLetterFile |
 export async function generateLetterFromTemplate(
   site: TrackingSite,
   publicLink: string,
-  templateUrl = site.letterTemplateUrl
+  templateUrl = site.letterTemplateUrl,
+  stage: "initial" | "follow-up" = "initial"
 ): Promise<UploadedLetterFile | null> {
   try {
     const generationSite = {
@@ -285,19 +287,31 @@ export async function generateLetterFromTemplate(
       body: JSON.stringify({
         site: generationSite,
         templateUrl,
-        publicLink
+        publicLink,
+        stage
       })
     });
 
     if (!response.ok) {
-      return null;
+      const failure = await response.json();
+      throw new Error(failure.error || "The letter and print files could not be prepared.");
     }
 
     const payload = (await response.json()) as { file: UploadedLetterFile };
     return payload.file;
-  } catch {
-    return null;
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("The letter and print files could not be prepared.");
   }
+}
+
+export async function createSavedLetterPdf(url: string): Promise<UploadedLetterFile> {
+  const response = await fetch("/api/letters/pdf", {
+    method: "POST", credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ url })
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "The PDF could not be prepared.");
+  return payload.file;
 }
 
 export async function previewLetterDocument(url: string): Promise<{ pages: string[]; pageCount: number }> {

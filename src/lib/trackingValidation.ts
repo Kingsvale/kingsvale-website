@@ -216,6 +216,9 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     });
   }
   addOptionalTextError(errors, "letterFileName", site.letterFileName, "Letter filename", trackingFieldLimits.letterFileName);
+  if (site.letterDocuments !== undefined && (!Array.isArray(site.letterDocuments) || site.letterDocuments.length > 3 || site.letterDocuments.some((document) => !document || !["letter-pdf", "envelope-docx", "envelope-pdf"].includes(document.kind) || typeof document.name !== "string" || document.name.length > 180 || typeof document.url !== "string" || !/^\/media\/[a-zA-Z0-9_-]+\.(pdf|docx)$/.test(document.url)))) {
+    errors.push({ path: "letterDocuments", message: "Print files must be saved Word or PDF documents." });
+  }
   if (site.letterFileUrl && (site.letterFileUrl.length > trackingFieldLimits.letterFileUrl || !isValidLetterUrl(site.letterFileUrl))) {
     errors.push({
       path: "letterFileUrl",

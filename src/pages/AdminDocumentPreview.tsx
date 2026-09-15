@@ -87,6 +87,7 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
     <header className="document-preview__bar">
       <div><h2 id="document-preview-title">{file.name}</h2><p>Document preview</p></div>
       <div className="document-preview__actions">
+        {safeUrl && isPdf && <a className="admin-save" href={file.url} target="_blank" rel="noopener noreferrer">Open PDF / Print</a>}
         {safeUrl && <a className="admin-open" href={file.url} download={file.name}>Download</a>}
         <button type="button" className="admin-ghost" onClick={onClose} autoFocus>Close preview</button>
       </div>

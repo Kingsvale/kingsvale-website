@@ -97,6 +97,7 @@ export type TrackingSite = {
   letterFileName: string;
   letterFileUrl: string;
   initialLetterGeneratedAt?: string;
+  letterDocuments?: Array<{ kind: "letter-pdf" | "envelope-docx" | "envelope-pdf"; name: string; url: string }>;
   searchlandUrl: string;
   currentStatus: TrackingStatus;
   statusNote: string;

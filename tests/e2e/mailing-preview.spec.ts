@@ -27,7 +27,11 @@ test("mailing preserves edits when sorting and previews a generated branded lett
     const data = route.request().postDataJSON();
     const qr = await createTrackingQrPng(data.publicLink, data.site.qrStyle, data.site.title);
     generated = generateLetterDocx(await readFile(`public${data.templateUrl}`), data.site, data.publicLink, qr);
-    await route.fulfill({ json: { file: { url: "/media/test-generated.docx", name: "Oakley letter.docx" } } });
+    expect(data.stage).toBe(site.initialLetterGeneratedAt ? "follow-up" : "initial");
+    serverPreview = true;
+    const documents = [{ kind: "letter-pdf", url: "/media/test-letter.pdf", name: "Oakley letter.pdf" },
+      ...(data.stage === "initial" ? [{ kind: "envelope-docx", url: "/media/test-envelope.docx", name: "Oakley envelope.docx" }, { kind: "envelope-pdf", url: "/media/test-envelope.pdf", name: "Oakley envelope.pdf" }] : [])];
+    await route.fulfill({ json: { file: { url: "/media/test-generated.docx", name: "Oakley letter.docx", documents } } });
   });
   await context.route("**/media/test-generated.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
   await page.goto("/studio");
@@ -48,6 +52,13 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.getByLabel("Address letter to", { exact: true }).selectOption("title-owner");
   await page.getByRole("button", { name: "Generate & preview letter", exact: true }).click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("status")).toContainText("Print layout preview");
+  await expect(dialog.getByRole("link", { name: "Open PDF / Print" })).toHaveAttribute("href", "/media/test-letter.pdf");
+  await page.keyboard.press("Escape");
+  await expect(page.locator('.mailing-print-files .letter-upload')).toHaveCount(3);
+  await expect(page.locator('.mailing-print-files').getByRole("link", { name: "Open PDF / Print" })).toHaveCount(2);
+  serverPreview = false;
+  await page.getByRole("button", { name: "Preview letter", exact: true }).click();
   await expect(dialog.getByRole("status")).toContainText("Preview ready", { timeout: 20000 });
   const document = page.frameLocator('iframe[title="Letter document"]');
   await expect(document.locator("body")).toContainText("Alex Example");
@@ -64,8 +75,10 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await expect(page.getByLabel("Letter preset", { exact: true }).locator("option")).toHaveText(["Choose a template", "Follow Up Full Details"]);
   await page.getByLabel("Letter preset", { exact: true }).selectOption("follow-up");
   await page.getByRole("button", { name: "Generate & preview letter", exact: true }).click();
-  await expect(dialog.getByRole("status")).toContainText("Preview ready", { timeout: 20000 });
+  await expect(dialog.getByRole("status")).toContainText("Print layout preview", { timeout: 20000 });
   await page.keyboard.press("Escape");
+  expect(site.letterDocuments?.map((document) => document.kind).sort()).toEqual(["envelope-docx", "envelope-pdf", "letter-pdf"]);
+  await page.locator('.mailing-print-files').screenshot({ path: testInfo.outputPath("print-files.png") });
   await page.getByRole("button", { name: "Mark posted today", exact: true }).click();
   await page.getByRole("button", { name: "Save mailing", exact: true }).click();
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();

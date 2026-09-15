@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { renderLetterPreview } from "../server/letter-preview.mjs";
-import { createTrackingQrPng, generateLetterDocx } from "../server/letter-generator.mjs";
+import { createLetterPdf, renderLetterPreview } from "../server/letter-preview.mjs";
+import { buildLetterTokens, replaceDocxText, createTrackingQrPng, generateLetterDocx } from "../server/letter-generator.mjs";
 import { starterLetterTemplates } from "../src/lib/letterTemplates.js";
 import sharp from "sharp";
 import jsQR from "jsqr";
@@ -20,7 +20,10 @@ for (const [url] of starterLetterTemplates) {
   const name = url.includes("follow-up") ? "follow-up" : "initial";
   const qr = await createTrackingQrPng(link, { foreground: "#083d29", background: "#ffffff", accent: "#083d29", dotRoundness: 65, finderRoundness: 65, includeLogo: false });
   const generated = generateLetterDocx(await readFile(`public${url}`), site, link, qr);
-  const preview = await renderLetterPreview(generated);
+  await writeFile(join(directory, `${name}.docx`), generated);
+  const pdf = await createLetterPdf(generated);
+  await writeFile(join(directory, `${name}.pdf`), pdf);
+  const preview = await renderLetterPreview(pdf, ".pdf");
   assert.ok(preview.pageCount >= 1 && preview.pageCount <= 3, "Expected a short letter");
   let decoded = false;
   for (const [index, data] of preview.pages.entries()) {
@@ -33,3 +36,12 @@ for (const [url] of starterLetterTemplates) {
   assert.ok(decoded, `${name}: QR must scan from the rendered letter page`);
   console.log(`${name}: ${preview.pageCount} preview pages rendered successfully`);
 }
+
+const envelope = replaceDocxText(await readFile("public/templates/kingsvale-envelope-template.docx"), buildLetterTokens(site, link));
+await writeFile(join(directory, "envelope.docx"), envelope);
+const envelopePdf = await createLetterPdf(envelope);
+await writeFile(join(directory, "envelope.pdf"), envelopePdf);
+const envelopePreview = await renderLetterPreview(envelopePdf, ".pdf");
+assert.equal(envelopePreview.pageCount, 2, "Envelope must retain its address front and return-address back");
+for (const [index, page] of envelopePreview.pages.entries()) await writeFile(join(directory, `envelope-${index + 1}.png`), Buffer.from(page.split(",")[1], "base64"));
+console.log("envelope: front and back rendered successfully");

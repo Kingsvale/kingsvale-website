@@ -1,7 +1,7 @@
 import { createContactMailer } from "./contact-mail.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
-import { renderLetterPreview } from "./letter-preview.mjs";
+import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -26,7 +26,7 @@ import { basename, extname, isAbsolute, join, normalize, relative, resolve } fro
 import { fileURLToPath } from "node:url";
 import { storeImage } from "./image-upload.mjs";
 import { collectMedia, mediaReferences, prepareMediaRestore } from "./media-backup.mjs";
-import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
+import { buildLetterTokens, replaceDocxText, createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
 
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distDir = resolve(rootDir, "dist");
@@ -497,6 +497,25 @@ async function handleApiRequest(request, response, url) {
     } catch (error) {
       const known = ["PREVIEW_BUSY", "PREVIEW_LIMIT"].includes(error.code);
       sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : 422, { error: known ? error.message : "The print preview could not be prepared. Please download the document or try again." });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/letters/pdf") {
+    const session = requireSession(request, response);
+    if (!session) return;
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const payload = await readJsonBody(request, 12_000);
+    try {
+      const source = String(payload.url ?? "");
+      if (!source.startsWith("/media/") || extname(source).toLowerCase() !== ".docx") throw new Error("Choose a saved Word document");
+      const pdf = await createLetterPdf(await readLetterTemplateSource(source));
+      const filename = `print-${randomBytes(16).toString("hex")}.pdf`;
+      await writeFile(join(uploadsDir, filename), pdf);
+      await writeAudit("letter_pdf_created", request, { user: session.user, source });
+      sendJson(response, 201, { file: { name: "letter.pdf", url: `/media/${filename}`, contentType: mimeTypes[".pdf"], bytes: pdf.length } });
+    } catch (error) {
+      sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : 422, { error: error.code === "PREVIEW_BUSY" ? error.message : "The PDF could not be prepared. Please try again." });
     }
     return;
   }
@@ -1243,10 +1262,24 @@ async function handleLetterGeneration(request, response, session) {
   try {
     const qrPng = await createTrackingQrPng(publicLink, site.qrStyle, site.title || site.reference);
     const generated = generateLetterDocx(templateBuffer, site, publicLink, qrPng);
+    const stage = payload.stage === "follow-up" ? "follow-up" : "initial";
+    const documents = [{ kind: "letter-pdf", extension: ".pdf", buffer: await createLetterPdf(generated) }];
+    if (stage === "initial") {
+      const envelope = replaceDocxText(await readFile(join(distDir, "templates/kingsvale-envelope-template.docx")), buildLetterTokens(site, publicLink));
+      documents.push({ kind: "envelope-docx", extension: ".docx", buffer: envelope });
+      documents.push({ kind: "envelope-pdf", extension: ".pdf", buffer: await createLetterPdf(envelope) });
+    }
     const slug = toSlug(`${site.reference || site.title || "letter"} generated letter`) || "generated-letter";
     const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}.docx`;
     await mkdir(uploadsDir, { recursive: true });
     await writeFile(join(uploadsDir, filename), generated);
+    const savedDocuments = [];
+    for (const document of documents) {
+      const name = `${site.reference || "generated"}-${document.kind.replace(/-(docx|pdf)$/, "")}${document.extension}`;
+      const storedName = `${slug}-${document.kind}-${randomBytes(16).toString("hex")}${document.extension}`;
+      await writeFile(join(uploadsDir, storedName), document.buffer);
+      savedDocuments.push({ kind: document.kind, name, url: `/media/${storedName}` });
+    }
 
     await writeAudit("letter_generated", request, {
       user: session.user,
@@ -1260,7 +1293,8 @@ async function handleLetterGeneration(request, response, session) {
         name: `${site.reference || site.title || "generated"}-letter.docx`,
         url: `/media/${filename}`,
         contentType: mimeTypes[".docx"],
-        bytes: generated.length
+        bytes: generated.length,
+        documents: savedDocuments
       }
     });
   } catch (error) {
@@ -1270,7 +1304,7 @@ async function handleLetterGeneration(request, response, session) {
     }
 
     console.error(error);
-    sendJson(response, 500, { error: "Letter could not be generated." });
+    sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : 500, { error: error.code === "PREVIEW_BUSY" ? error.message : "The letter and print files could not be prepared. Please try again." });
   }
 }
 
@@ -1831,6 +1865,9 @@ function validateTrackingSite(site) {
     errors.push({ path: "letterTemplateUrl", message: "Letter template must be a DOCX file stored on the server." });
   }
   validateOptionalText(errors, "letterFileName", site.letterFileName, "Letter filename", 160);
+  if (site.letterDocuments !== undefined && (!Array.isArray(site.letterDocuments) || site.letterDocuments.length > 3 || site.letterDocuments.some((document) => !document || !["letter-pdf", "envelope-docx", "envelope-pdf"].includes(document.kind) || typeof document.name !== "string" || document.name.length > 180 || typeof document.url !== "string" || !/^\/media\/[a-zA-Z0-9_-]+\.(pdf|docx)$/.test(document.url)))) {
+    errors.push({ path: "letterDocuments", message: "Print files must be saved Word or PDF documents." });
+  }
   if (site.letterFileUrl && (site.letterFileUrl.length > 7_000_000 || !isSafeLetterUrl(site.letterFileUrl))) {
     errors.push({ path: "letterFileUrl", message: "Letter upload must be a PDF, image or Word document under the upload limit." });
   }
@@ -2165,6 +2202,7 @@ function publicTrackingSite(site) {
     letterFileName,
     letterFileUrl,
     initialLetterGeneratedAt,
+    letterDocuments,
     searchlandUrl,
     remailReminderDays,
     remailReminderDate,
@@ -2173,6 +2211,7 @@ function publicTrackingSite(site) {
     ...publicSite
   } = site;
   void ownerContactName;
+  void letterDocuments;
   void ownerAddress;
   void titleNumber;
   void plotDescription;

@@ -51,7 +51,8 @@ jobs:
           npm ci --no-audit --no-fund
           node --test tests/server/deployment.test.mjs
           node node_modules/vitest/vitest.mjs run src/hooks/useSiteAutosave.test.tsx
-          node --import tsx --test --test-name-pattern="public health" tests/server/media-backup.test.mjs
+          npm run build:docker
+          node --import tsx --test tests/server/media-backup.test.mjs
           node --test tests/server/drive-backup.test.mjs
           node scripts/verify-letter-preview.mjs
 
