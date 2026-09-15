@@ -1,4 +1,5 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { createAddressLookup } from "./address-lookup.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { renderLetterPreview } from "./letter-preview.mjs";
@@ -35,6 +36,7 @@ const dataDir = resolve(process.env.KINGSVALE_DATA_DIR || resolve(rootDir, "data
 const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
 const contactMailer = createContactMailer(leadsDir);
+const lookupAddress = createAddressLookup();
 const uploadsDir = resolve(dataDir, "uploads");
 const trackingDir = resolve(dataDir, "tracking-sites");
 const analyticsDir = resolve(dataDir, "analytics");
@@ -183,6 +185,14 @@ function allowRequest(clientId) {
 }
 
 async function handleApiRequest(request, response, url) {
+  if (url.pathname === "/api/address-lookup") {
+    if (!requireSession(request, response)) return;
+    if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const { status, ...result } = await lookupAddress(url.searchParams.get("postcode"));
+    response.setHeader("Cache-Control", "no-store");
+    sendJson(response, status, result);
+    return;
+  }
   if (url.pathname.startsWith("/api/drive-backup")) {
     await handleDriveBackup(request, response, url);
     return;

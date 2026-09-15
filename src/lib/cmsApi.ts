@@ -403,6 +403,16 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
   }
 }
 
+export async function lookupPropertyAddresses(postcode: string, signal?: AbortSignal) {
+  const response = await fetch(`/api/address-lookup?postcode=${encodeURIComponent(postcode)}`, {
+    headers: authHeaders({ Accept: "application/json" }), credentials: "same-origin", signal
+  });
+  if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("Address search needs the server. You can still choose a saved address or enter one manually.");
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Address search is unavailable. Please try again.");
+  return result as { postcode: string; addresses: import("./trackingTypes").TrackingAddressParts[]; partial: boolean; source: string };
+}
+
 export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
   return (await saveTrackingSiteWithResult(site)).site;
 }

@@ -4,7 +4,6 @@ import {
   Copy,
   ExternalLink,
   FileText,
-  Folder,
   Link,
   Mail,
   Palette,
@@ -17,7 +16,12 @@ import {
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle } from "../lib/trackingNormalize";
+import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
+import { AdminAddressFinder } from "./AdminAddressFinder";
+import { useSiteFolders } from "../hooks/useSiteFolders";
+import { lastWorkflowSite } from "../lib/workflowNavigation";
 import LandMapEditor from "./LandMapEditor";
+import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import {
   AdminColorInput,
   AdminRangeInput,
@@ -44,7 +48,6 @@ import {
   createTrackingSite,
   buildAddressFromParts,
   detectSiteRegion,
-  mailingStatusClass,
   normalizeMapEmbedInput,
   priorityClass,
 } from "../lib/trackingStorage";
@@ -114,7 +117,7 @@ export function AdminSitesPanel() {
           ];
           return sortSites(merged);
         });
-        setDraft((current) => current ?? orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
+        setDraft((current) => current ?? orderedSites.find((site) => site.id === lastWorkflowSite()) ?? orderedSites.find((site) => !site.archived) ?? orderedSites[0] ?? null);
       } catch {
         if (active) {
           setStatus("Tracking storage API is unavailable.");
@@ -171,7 +174,7 @@ export function AdminSitesPanel() {
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
     });
   }, [query, showArchived, sites]);
-  const groupedSites = useMemo(() => groupSitesByRegion(visibleSites), [visibleSites]);
+
 
   const validation = useMemo(
     () => (draft ? validateTrackingSite(draft) : { valid: true, errors: [] }),
@@ -179,10 +182,19 @@ export function AdminSitesPanel() {
   );
   const errorsByPath = useMemo(() => toTrackingErrorMap(validation.errors), [validation.errors]);
   const publicLink = draft ? buildPublicLink(draft.token) : "";
-  const dirty = Boolean(draft && JSON.stringify(draft) !== JSON.stringify(sites.find((site) => site.id === draft.id)));
+  const autosave = useSiteAutosave({
+    draft, saved: sites.find((site) => site.id === draft?.id),
+    valid: validation.valid && !(draft && isDuplicateReference(draft, sites)), blocked: busy || mapBusy,
+    onSaved: (saved, snapshot) => {
+      setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
+      setDraft((current) => current?.id !== saved.id ? current : siteFingerprint(current) === siteFingerprint(snapshot) ? saved : { ...current, updatedAt: saved.updatedAt });
+    }
+  });
+  const dirty = autosave.dirty;
+  const moveSites = useSiteFolders({ flush: autosave.flush, setBusy, setSites, setDraft, setStatus });
 
   async function handleCreate() {
-    if (dirty && !window.confirm("Discard unsaved changes and create a new site?")) return;
+    if (busy || mapBusy || !await autosave.flush()) return;
     setBusy(true);
     try {
       const siteDraft = createTrackingSite();
@@ -215,18 +227,7 @@ export function AdminSitesPanel() {
       return;
     }
 
-    setBusy(true);
-    try {
-      const { site: saved, googleSheetSync } = await saveTrackingSiteWithResult(draft);
-      setSites((current) => sortSites([saved, ...current.filter((site) => site.id !== saved.id)]));
-      setDraft(saved);
-      setStatus(`Map page saved. The existing QR link now shows the saved map.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
-      return true;
-    } catch {
-      setStatus("Map page could not be saved.");
-    } finally {
-      setBusy(false);
-    }
+    return autosave.flush();
   }
 
   async function handleArchive() {
@@ -234,6 +235,7 @@ export function AdminSitesPanel() {
       return;
     }
 
+    if (!await autosave.flush()) return;
     setBusy(true);
     try {
       const archived = await archiveTrackingSite(draft.id);
@@ -259,6 +261,7 @@ export function AdminSitesPanel() {
       return;
     }
 
+    if (!await autosave.flush()) return;
     setBusy(true);
     try {
       const restored = await unarchiveTrackingSite(draft.id);
@@ -283,6 +286,7 @@ export function AdminSitesPanel() {
       return;
     }
 
+    if (!await autosave.flush()) return;
     const confirmed = window.confirm(
       `Delete ${draft.reference || draft.title}? This permanently removes the map page and cannot be undone.`
     );
@@ -341,8 +345,8 @@ export function AdminSitesPanel() {
       };
       site.siteAddressParts = nextParts;
       site.siteAddress = buildAddressFromParts(nextParts);
-      if (!site.region || site.region === "Uncategorised" || part === "town" || part === "county") {
-        site.region = nextParts.county.trim() || detectSiteRegion(site.siteAddress) || nextParts.town.trim() || "Uncategorised";
+      if (!site.region || site.region === "Uncategorised") {
+        site.region = nextParts.county.trim() || detectSiteRegion(site.siteAddress) || (nextParts.town.trim() !== "Town" ? nextParts.town.trim() : "") || "Uncategorised";
       }
     });
   }
@@ -370,7 +374,7 @@ export function AdminSitesPanel() {
         site.titleDeedFileName = upload.name;
         site.titleDeedFileUrl = upload.url;
       });
-      setStatus("Title deed uploaded. Save the site to keep it.");
+      setStatus("Title deed uploaded. Changes will save automatically.");
     } finally {
       setBusy(false);
     }
@@ -381,14 +385,14 @@ export function AdminSitesPanel() {
       site.titleDeedFileName = "";
       site.titleDeedFileUrl = "";
     });
-    setStatus("Title deed removed. Save the site to keep this change.");
+    setStatus("Title deed removed. Changes will save automatically.");
   }
 
   async function openInMailing() {
-    if (!draft) {
+    if (!draft || busy || mapBusy) {
       return;
     }
-    if (dirty && !await handleSave()) return;
+    if (!await autosave.flush()) return;
     window.dispatchEvent(new CustomEvent("kingsvale-open-mailing-site", { detail: { siteId: draft.id } }));
   }
 
@@ -438,46 +442,10 @@ export function AdminSitesPanel() {
             />
             <span>Show archived</span>
           </label>
-          <div className="sites-admin__rows">
-            {visibleSites.length === 0 ? (
-              <div className="sites-admin__empty">No map pages yet.</div>
-            ) : (
-              groupedSites.flatMap(([region, regionSites]) => [
-                <div className="site-group-heading" key={`${region}-heading`}>
-                  <Folder aria-hidden="true" />
-                  <span>{region}</span>
-                  <span>{regionSites.length}</span>
-                </div>,
-                ...regionSites.map((site) => (
-                <button
-                  key={site.id}
-                  type="button"
-                  className={draft?.id === site.id ? "site-row site-row--active" : "site-row"}
-                  onClick={() => {
-                    if (busy || mapBusy) return;
-                    if (dirty && !window.confirm("Discard unsaved changes and open another site?")) return;
-                    setDraft(structuredClone(site));
-                    setStatus(site.archived ? "Archived map page selected." : "Map page selected.");
-                  }}
-                >
-                  <span className="site-row__title">{site.title}</span>
-                  <span className="site-row__meta">
-                    {site.siteAddress}
-                    {site.reference ? ` · ${site.reference}` : ""}
-                  </span>
-                  <span className="site-row__badges">
-                    <span className={`priority-badge ${priorityClass(site.contactPriority)}`}>
-                      {contactPriorityLabels[site.contactPriority]}
-                    </span>
-                    <span className={`mailing-status ${mailingStatusClass(site.mailingStatus)}`}>
-                      {mailingStatusLabels[site.mailingStatus]}
-                    </span>
-                  </span>
-                </button>
-                ))
-              ])
-            )}
-          </div>
+          <AdminSiteFolders sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy || mapBusy} onMove={moveSites} onSelect={async (site) => {
+            if (busy || mapBusy || !await autosave.flush()) return;
+            if (site.id !== draft?.id) setDraft(structuredClone(site));
+          }} />
         </aside>
 
         <div className="sites-admin__detail">
@@ -576,6 +544,10 @@ export function AdminSitesPanel() {
                   </p>
                 )}
                 <div className="workflow-heading"><span>02</span><div><h3>Letter address</h3><p>Enter each part on its own line. These details fill your Word templates automatically.</p></div></div>
+                <AdminAddressFinder key={draft.id} postcode={draft.siteAddressParts.postcode} sites={sites} onApply={(address) => updateDraft((site) => {
+                  site.siteAddressParts = address; site.siteAddress = buildAddressFromParts(address);
+                  if (!site.region || site.region === "Uncategorised") site.region = address.county || address.town || "Uncategorised";
+                })} />
                 <TrackingTextInput
                   label="Address line 1"
                   value={draft.siteAddressParts.line1}
@@ -660,13 +632,7 @@ export function AdminSitesPanel() {
                   </div>
                 </div>
                 <div className="admin-grid admin-grid--two">
-                  <TrackingTextInput
-                    label="Folder / region"
-                    value={draft.region}
-                    maxLength={trackingFieldLimits.region}
-                    error={errorsByPath.region}
-                    onChange={(value) => updateDraft((site) => { site.region = value; })}
-                  />
+                  <SiteFolderField value={draft.region} sites={sites} onChange={(value) => updateDraft((site) => { site.region = value; })} />
                   <TrackingTextInput
                     label="Searchland URL"
                     type="url"
@@ -904,15 +870,15 @@ export function AdminSitesPanel() {
               </section>
 
               <div className="sites-admin__actions workflow-savebar">
-                <span>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+                <span className={autosave.error && dirty ? "workflow-save-status workflow-save-status--error" : "workflow-save-status"} role="status">{autosave.label}</span>
                 <button
                   type="button"
                   className="admin-save"
                   onClick={handleSave}
-                  disabled={!validation.valid || busy || mapBusy || draft.archived}
+                  disabled={!validation.valid || busy || mapBusy || autosave.saving}
                 >
                   <Save aria-hidden="true" />
-                  {busy ? "Working" : "Save site"}
+                  {autosave.saving ? "Saving…" : autosave.error ? "Retry save" : "Save site"}
                 </button>
                 {draft.archived ? (
                   <button
@@ -990,24 +956,6 @@ function replaceSite(sites: TrackingSite[], nextSite: TrackingSite) {
       ? sites.map((site) => (site.id === nextSite.id ? nextSite : site))
       : [nextSite, ...sites]
   );
-}
-
-function groupSitesByRegion(sites: TrackingSite[]) {
-  const groups = new Map<string, TrackingSite[]>();
-  for (const site of sites) {
-    const region = site.region?.trim() || detectSiteRegion(site.siteAddress) || "Uncategorised";
-    groups.set(region, [...(groups.get(region) ?? []), site]);
-  }
-
-  return [...groups.entries()].sort(([left], [right]) => {
-    if (left === "Uncategorised") {
-      return 1;
-    }
-    if (right === "Uncategorised") {
-      return -1;
-    }
-    return left.localeCompare(right);
-  });
 }
 
 function nextTrackingReference(sites: TrackingSite[]) {

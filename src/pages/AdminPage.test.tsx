@@ -101,7 +101,7 @@ describe("AdminPage", () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
-    fireEvent.click(screen.getByRole("button", { name: /create site/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /create site/i }));
 
     await waitFor(() => {
       const link = screen.getByTestId("generated-tracking-link") as HTMLInputElement;
@@ -169,7 +169,7 @@ describe("AdminPage", () => {
       target: { value: "RG40 1AA" }
     });
     expect(screen.getByLabelText("County")).toHaveValue("Royal Borough of Windsor and Maidenhead");
-    expect(document.querySelector("#folder-region")).toHaveValue("Royal Borough of Windsor and Maidenhead");
+    expect(screen.getByLabelText("Folder / region")).toHaveValue("Wokingham");
 
     fireEvent.change(document.querySelector("#searchland-url") as HTMLInputElement, {
       target: {

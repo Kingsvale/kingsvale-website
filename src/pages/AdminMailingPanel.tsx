@@ -1,5 +1,10 @@
 import { Clock, ExternalLink, FileText, Mail, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
+import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
+import { AdminAddressFinder } from "./AdminAddressFinder";
+import { useSiteFolders } from "../hooks/useSiteFolders";
+import { lastWorkflowSite } from "../lib/workflowNavigation";
 import { starterLetterTemplates } from "../lib/letterTemplates.js";
 import {
   AdminDateField as DateField,
@@ -19,7 +24,6 @@ import { AdminDocumentPreview } from "./AdminDocumentPreview";
 import { buildAddressFromParts } from "../lib/trackingNormalize";
 import {
   isRemailReminderOverdue,
-  mailingStatusClass,
   priorityClass,
   suggestRemailReminderDate
 } from "../lib/trackingStorage";
@@ -77,7 +81,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       if (active) {
         const ordered = sortMailingSites(loaded, "priority");
         setSites(ordered);
-        setDraft(ordered.find((site) => !site.archived) ?? ordered[0] ?? null);
+        setDraft(ordered.find((site) => site.id === (selectedSiteId || lastWorkflowSite())) ?? ordered.find((site) => !site.archived) ?? ordered[0] ?? null);
       }
       } catch { if (active) setStatus("Contacts could not be loaded. Refresh to try again."); }
     }
@@ -164,12 +168,20 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
   }, [draft, settings.letterPresets]);
   const publicLink = draft ? buildPublicLink(draft.token) : "";
   const validation = draft ? validateTrackingSite(draft) : { valid: true, errors: [] };
-  const dirty = Boolean(draft && JSON.stringify(draft) !== JSON.stringify(sites.find((site) => site.id === draft.id)));
+  const autosave = useSiteAutosave({
+    draft, saved: sites.find((site) => site.id === draft?.id), valid: validation.valid, blocked: busy,
+    onSaved: (saved, snapshot) => {
+      setSites((current) => sortMailingSites(current.map((site) => site.id === saved.id ? saved : site), sortMode));
+      setDraft((current) => current?.id !== saved.id ? current : siteFingerprint(current) === siteFingerprint(snapshot) ? saved : { ...current, updatedAt: saved.updatedAt });
+    }
+  });
+  const dirty = autosave.dirty;
+  const moveSites = useSiteFolders({ flush: autosave.flush, setBusy, setSites, setDraft, setStatus });
   const templateUrl = selectedPreset?.templateUrl || draft?.letterTemplateUrl || "";
 
-  function selectSite(site: TrackingSite) {
-    if (dirty && !window.confirm("You have unsaved mailing changes. Discard them and open another contact?")) return;
-    setDraft(structuredClone(site));
+  async function selectSite(site: TrackingSite) {
+    if (busy || !await autosave.flush()) return;
+    if (site.id !== draft?.id) setDraft(structuredClone(site));
   }
 
   function markMailedToday() {
@@ -180,7 +192,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       site.mailingStatus = "mailed";
       site.remailReminderDate = suggestRemailReminderDate(today, site.remailReminderDays || defaultReminderDays);
     });
-    setStatus("Marked as posted today. Save mailing to keep the dates and follow-up reminder.");
+    setStatus("Marked as posted today. Dates and follow-up reminder will save automatically.");
   }
 
   function updateDraft(recipe: (site: TrackingSite) => void) {
@@ -206,17 +218,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       return;
     }
 
-    setBusy(true);
-    try {
-      const saved = await saveTrackingSite(draft);
-      setSites((current) => sortMailingSites(current.map((site) => (site.id === saved.id ? saved : site)), sortMode));
-      setDraft(saved);
-      setStatus("Mailing details saved.");
-    } catch {
-      setStatus("Mailing details could not be saved.");
-    } finally {
-      setBusy(false);
-    }
+    return autosave.flush();
   }
 
 
@@ -243,7 +245,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
         site.letterFileName = upload.name;
         site.letterFileUrl = upload.url;
       });
-      setStatus("Letter uploaded to server. Save mailing to keep it.");
+      setStatus("Letter uploaded. Changes will save automatically.");
     } finally {
       setBusy(false);
     }
@@ -254,7 +256,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       site.letterFileName = "";
       site.letterFileUrl = "";
     });
-    setStatus("Letter removed. Save mailing to keep this change.");
+    setStatus("Letter removed. Changes will save automatically.");
   }
 
   async function generateLetter() {
@@ -283,6 +285,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
     setBusy(true);
     try {
+      if (!await autosave.flush()) return;
       const generated = await generateLetterFromTemplate(generationDraft, publicLink, templateUrl);
       if (!generated) {
         setStatus("Letter could not be generated. Check the preset is a server-uploaded DOCX.");
@@ -377,33 +380,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               ]}
             />
           </div>
-          <div className="mailing-rows">
-            {visibleSites.length === 0 && <p className="admin-note">No contacts match these filters. Try another search or create a site in Sites.</p>}
-            {visibleSites.map((site) => (
-              <button
-                key={site.id}
-                type="button"
-                className={draft?.id === site.id ? "mailing-row mailing-row--active" : "mailing-row"}
-                disabled={busy}
-                onClick={() => selectSite(site)}
-              >
-                <span>
-                  <strong>{site.reference || "No reference"}</strong>
-                  {site.title}
-                </span>
-                <small>{site.siteAddress}</small>
-                <span className="site-row__badges">
-                  <span className={`priority-badge ${priorityClass(site.contactPriority)}`}>
-                    {contactPriorityLabels[site.contactPriority]}
-                  </span>
-                  <span className={`mailing-status ${mailingStatusClass(site.mailingStatus)}`}>
-                    {mailingStatusLabels[site.mailingStatus]}
-                  </span>
-                </span>
-                {isRemailReminderOverdue(site) && <em>Reminder overdue</em>}
-              </button>
-            ))}
-          </div>
+          <AdminSiteFolders sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy} onMove={moveSites} onSelect={selectSite} />
         </aside>
 
         <div className="mailing-detail">
@@ -426,6 +403,10 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
               <fieldset className="workflow-fields" disabled={busy}>
               <div className="workflow-heading"><span>01</span><div><h3>Recipient &amp; address</h3><p>Check the details that will appear in your letter. Changes also update the site record.</p></div></div>
+              <AdminAddressFinder key={draft.id} postcode={draft.siteAddressParts.postcode} sites={sites} onApply={(address) => updateDraft((site) => {
+                site.siteAddressParts = address; site.siteAddress = buildAddressFromParts(address);
+                if (!site.region || site.region === "Uncategorised") site.region = address.county || address.town || "Uncategorised";
+              })} />
               <div className="admin-grid admin-grid--two">
                 <TextInput label="Recipient name" value={draft.customerName} maxLength={80} onChange={(value) => updateDraft((site) => { site.customerName = value; })} />
                 <SelectField label="Address letter to" value={draft.letterRecipientMode} options={Object.entries(letterRecipientModeLabels) as [LetterRecipientMode, string][]} onChange={(value) => updateDraft((site) => { site.letterRecipientMode = value as LetterRecipientMode; })} />
@@ -435,6 +416,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                     site.siteAddress = buildAddressFromParts(site.siteAddressParts);
                   })} />)}
               </div>
+              <SiteFolderField value={draft.region} sites={sites} onChange={(value) => updateDraft((site) => { site.region = value; })} />
               <div className="workflow-heading"><span>02</span><div><h3>Create &amp; review your letter</h3><p>Choose a template, generate your letter and review it here before downloading.</p></div></div>
               <details className="letter-template">
                 <summary>Template help &amp; starter downloads</summary>
@@ -626,12 +608,12 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
               {!validation.valid && <div className="admin-errors" role="alert"><strong>Check these details</strong><ul>{validation.errors.map((error) => <li key={error.path}>{error.message}</li>)}</ul></div>}
               <div className="sites-admin__actions workflow-savebar">
-                <span className="analytics-admin__subtle">
-                  {dirty ? "Unsaved changes" : "All changes saved"}
+                <span className={autosave.error && dirty ? "workflow-save-status workflow-save-status--error" : "workflow-save-status"} role="status">
+                  {autosave.label}
                 </span>
-                <button type="button" className="admin-save" onClick={saveDraft} disabled={busy || !validation.valid}>
+                <button type="button" className="admin-save" onClick={saveDraft} disabled={busy || autosave.saving || !validation.valid}>
                   <Save aria-hidden="true" />
-                  {busy ? "Working" : "Save mailing"}
+                  {autosave.saving ? "Saving…" : autosave.error ? "Retry save" : "Save mailing"}
                 </button>
               </div>
               </fieldset>

@@ -74,6 +74,7 @@ import { AdminBackupPanel } from "./AdminBackupPanel";
 import { AdminMailingPanel } from "./AdminMailingPanel";
 import { AdminSettingsPanel } from "./AdminSettingsPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
+import { flushWorkflowEdits } from "../lib/workflowNavigation";
 import { ImageEditor, ImageUploadContext } from "./AdminImageEditor";
 import { AdminImagesPanel } from "./AdminImagesPanel";
 import { ProjectGallery } from "./AdminProjectGallery";
@@ -411,7 +412,7 @@ export function AdminPage({
                 aria-selected={activeRootTab === tab.id}
                 aria-controls={`admin-root-panel-${tab.id}`}
                 disabled={uploadsPending > 0 || busy}
-                onClick={() => setActiveRootTab(tab.id)}
+                onClick={async () => { if (await flushWorkflowEdits()) { setSelectedMailingSiteId(""); setActiveRootTab(tab.id); } }}
               >
                 {tab.label}
               </button>

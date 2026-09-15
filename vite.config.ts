@@ -33,6 +33,7 @@ export default defineConfig({
             { name(id) {
           const normalizedId = id.replaceAll("\\", "/");
           if (normalizedId.includes("/src/pages/studioInlineEditing")) return "studio-inline";
+          if (normalizedId.includes("/src/hooks/useSiteAutosave") || normalizedId.includes("/src/hooks/useSiteFolders")) return "studio";
           if (/\/node_modules\/(docx-preview|jszip|pako|lie|immediate|setimmediate|readable-stream|saxes|xmlchars)\//.test(normalizedId)) return "studio-document-preview";
 
           if ((normalizedId.includes("/src/components/AdminFields") || normalizedId.includes("/src/components/TrackingQrCode"))) return "studio";

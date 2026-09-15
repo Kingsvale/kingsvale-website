@@ -24,6 +24,13 @@ test("public health identifies the running release without caching or exposing c
   assert.ok(!JSON.stringify(status).includes(encryptionKey));
 });
 
+test("property lookup requires authentication and rejects invalid postcodes before using an external source", async (t) => {
+  const server = await startServer(t);
+  assert.equal((await fetch(`${server.url}/api/address-lookup?postcode=SL45HS`)).status, 401);
+  assert.equal((await server.api("/api/address-lookup?postcode=invalid", "GET")).status, 400);
+  assert.equal((await server.api("/api/address-lookup", "POST", {})).status, 405);
+});
+
 test("Drive backup settings require Studio authentication and persist encrypted outside exports", async (t) => {
   const server = await startServer(t);
   const denied = await fetch(`${server.url}/api/drive-backup`);

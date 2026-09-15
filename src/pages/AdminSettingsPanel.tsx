@@ -219,6 +219,7 @@ export function AdminSettingsPanel() {
                       if (target) target.recipientMode = value as LetterRecipientMode;
                     })} />
                   </div>
+                  <div className="settings-preset__actions">
                   <button type="button" className="admin-open" onClick={() => setPreview({ url: preset.templateUrl, name: preset.templateName })}>Preview</button>
                   <label className="admin-small settings-upload">
                     <Plus aria-hidden="true" />
@@ -243,6 +244,7 @@ export function AdminSettingsPanel() {
                     <Trash2 aria-hidden="true" />
                     Delete
                   </button>
+                  </div>
                 </article>
               ))
             )}
