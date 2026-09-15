@@ -405,21 +405,7 @@ export function AdminPage({
             Edit one designed section at a time. The layout stays fixed, the
             guardrails stay active, and the preview shows exactly what will publish.
           </p>
-          <div className="admin-root-tabs" role="tablist" aria-label="Studio areas">
-            {adminRootTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={activeRootTab === tab.id}
-                aria-controls={`admin-root-panel-${tab.id}`}
-                disabled={uploadsPending > 0 || busy}
-                onClick={async () => { if (await flushWorkflowEdits()) { setSelectedMailingSiteId(""); setActiveRootTab(tab.id); } }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+
         </div>
         <div className="admin-actions">
           <div className="admin-secure-pill">
@@ -465,6 +451,21 @@ export function AdminPage({
           )}
         </div>
       </header>
+      <div className="admin-area-nav">          <div className="admin-root-tabs" role="tablist" aria-label="Studio areas">
+            {adminRootTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeRootTab === tab.id}
+                aria-controls={`admin-root-panel-${tab.id}`}
+                disabled={uploadsPending > 0 || busy}
+                onClick={async () => { if (await flushWorkflowEdits()) { setSelectedMailingSiteId(""); setActiveRootTab(tab.id); } }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div></div>
 
       {showRevisionHistory && (
         <div className="admin-modal-backdrop" role="presentation">

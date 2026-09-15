@@ -38,9 +38,14 @@ test("Sites and Mailing autosave typing and flush pending edits before changing 
   await expect.poll(() => state.sites()[0].title).toBe("Petworth Court land enquiry");
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByLabel("Legal owner / customer name", { exact: true }).fill("Alex Example");
+  await page.evaluate(() => window.scrollTo(0, 1400));
+  const navigation = page.getByRole("tablist", { name: "Studio areas" });
+  await expect(navigation).toBeInViewport();
+  expect((await navigation.boundingBox())!.y).toBeLessThan(25);
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();
   await expect(page.getByLabel("Recipient name", { exact: true })).toHaveValue("Alex Example");
   await page.getByLabel("Notes", { exact: true }).fill("Call again next month");
+  await expect(navigation).toBeInViewport();
   await expect.poll(() => state.sites()[0].mailingNotes).toBe("Call again next month");
   await page.getByLabel("Recipient name", { exact: true }).fill("Alex Changed");
   await page.getByRole("tab", { name: "Sites", exact: true }).click();

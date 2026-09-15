@@ -108,3 +108,9 @@
 .homepage-selection__option input { width: 20px; height: 20px; flex-shrink: 0; accent-color: #164a32; }
 .homepage-selection__option strong, .homepage-selection__option small { display: block; overflow-wrap: anywhere; }
 .homepage-selection__option small { margin-top: 4px; color: #625e54; }
+.admin-page .admin-topbar { position: relative; z-index: auto; }
+.admin-area-nav { position: sticky; top: 0; z-index: 15; padding: 8px 32px; background: #f7f3eb; border-bottom: 1px solid #d8d0c3; box-shadow: 0 3px 12px #242a2010; }
+.admin-area-nav .admin-root-tabs { display: flex; flex-wrap: nowrap; width: fit-content; max-width: 100%; margin: 0; overflow-x: auto; }
+.admin-area-nav .admin-root-tabs button { flex: 0 0 auto; min-width: 96px; min-height: 44px; }
+.admin-page .mailing-list { top: 86px; max-height: calc(100vh - 104px); }
+@media (max-width: 700px) { .admin-area-nav { padding: 6px 12px; } .admin-area-nav .admin-root-tabs { width: 100%; } .admin-area-nav .admin-root-tabs button { min-width: 82px; } }
