@@ -2059,6 +2059,7 @@ function normalizeLetterPreset(preset = {}) {
     templateName,
     templateUrl,
     recipientMode: normalizeLetterRecipientMode(preset.recipientMode),
+    stage: ["initial", "follow-up"].includes(preset.stage) ? preset.stage : /follow[\s-]*up/i.test(name) ? "follow-up" : "initial",
     createdAt: cleanText(preset.createdAt) || new Date().toISOString()
   };
 }
@@ -2163,6 +2164,7 @@ function publicTrackingSite(site) {
     letterTemplateUrl,
     letterFileName,
     letterFileUrl,
+    initialLetterGeneratedAt,
     searchlandUrl,
     remailReminderDays,
     remailReminderDate,
@@ -2190,6 +2192,7 @@ function publicTrackingSite(site) {
   void letterTemplateUrl;
   void letterFileName;
   void letterFileUrl;
+  void initialLetterGeneratedAt;
   void searchlandUrl;
   void remailReminderDays;
   void remailReminderDate;

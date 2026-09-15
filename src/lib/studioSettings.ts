@@ -7,6 +7,7 @@ export type LetterPreset = {
   templateName: string;
   templateUrl: string;
   recipientMode: LetterRecipientMode;
+  stage?: "initial" | "follow-up";
   createdAt: string;
 };
 
@@ -21,6 +22,10 @@ export const studioSettingsStorageKey = "kingsvale-studio-settings-v1";
 
 const allowedRecipientModes = ["legal-owner", "title-owner", "plot-land"] as const;
 const allowedPriorities = ["high", "medium", "low", "do-not-contact", "unknown"] as const;
+
+export function letterPresetStage(preset: Pick<LetterPreset, "name" | "stage">) {
+  return preset.stage ?? (/follow[\s-]*up/i.test(preset.name) ? "follow-up" : "initial");
+}
 
 export function defaultStudioSettings(): StudioSettings {
   return {
@@ -76,7 +81,7 @@ export function boundedReminderDays(value: number | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(120, Math.max(1, Math.trunc(value))) : 14;
 }
 
-function normalizeLetterPreset(value: Partial<LetterPreset> | null | undefined) {
+function normalizeLetterPreset(value: Partial<LetterPreset> | null | undefined): LetterPreset | null {
   const name = cleanText(value?.name).slice(0, 80);
   const templateName = cleanText(value?.templateName).slice(0, 160);
   const templateUrl = cleanText(value?.templateUrl);
@@ -89,6 +94,7 @@ function normalizeLetterPreset(value: Partial<LetterPreset> | null | undefined) 
     name,
     templateName,
     templateUrl,
+    stage: letterPresetStage({ name, stage: value?.stage === "initial" || value?.stage === "follow-up" ? value.stage : undefined }),
     recipientMode: allowedRecipientModes.includes(value?.recipientMode as LetterRecipientMode)
       ? value?.recipientMode as LetterRecipientMode
       : "legal-owner",

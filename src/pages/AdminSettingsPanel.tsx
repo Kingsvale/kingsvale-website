@@ -9,6 +9,7 @@ import {
   boundedReminderDays,
   createLetterPresetId,
   defaultStudioSettings,
+  letterPresetStage,
   type StudioSettings
 } from "../lib/studioSettings";
 import {
@@ -214,6 +215,10 @@ export function AdminSettingsPanel() {
                       }
                     />
                     <small>{preset.templateName}</small>
+                    <SelectField label="Letter stage" value={letterPresetStage(preset)} options={[["initial", "Initial letter"], ["follow-up", "Follow-up letter"]]} onChange={(value) => updateSettings((draft) => {
+                      const target = draft.letterPresets.find((item) => item.id === preset.id);
+                      if (target) target.stage = value as "initial" | "follow-up";
+                    })} />
                     <SelectField label="Default recipient" value={preset.recipientMode} options={Object.entries(letterRecipientModeLabels) as [LetterRecipientMode, string][]} onChange={(value) => updateSettings((draft) => {
                       const target = draft.letterPresets.find((item) => item.id === preset.id);
                       if (target) target.recipientMode = value as LetterRecipientMode;

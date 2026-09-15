@@ -19,3 +19,12 @@ report the number saved, and only successful records are updated in the editor.
 Address edits do not replace an existing folder choice.
 
 Enter letter addresses directly in the address fields in Sites or Mailing.
+
+Letter generation uses saved presets from Settings, grouped into Initial and
+Follow-up stages. Existing preset names containing “follow up” or “follow-up”
+are classified automatically; use the Letter stage setting to change this.
+New sites offer initial presets first. Successful initial generation saves its
+completion date with the site. Returning to Mailing then opens the follow-up
+stage. Earlier attached letters or a recorded first posting also qualify existing
+records. Initial letters can still be regenerated using the stage selector.
+Starter DOCX files remain in the help/download area, outside the preset dropdown.

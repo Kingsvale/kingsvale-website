@@ -5,6 +5,7 @@ import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
 import { starterLetterTemplates } from "../lib/letterTemplates.js";
+import { letterPresetStage } from "../lib/studioSettings";
 import {
   AdminDateField as DateField,
   AdminTextInput as TextInput,
@@ -159,12 +160,11 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     () => visibleSites.filter((site) => isRemailReminderOverdue(site)),
     [visibleSites]
   );
-  const selectedPreset = useMemo(() => {
-    if (!draft) {
-      return null;
-    }
-    return settings.letterPresets.find((preset) => preset.id === draft.letterPresetId) ?? null;
-  }, [draft, settings.letterPresets]);
+  const [stageChoice, setStageChoice] = useState<{ id: string; stage: "initial" | "follow-up" } | null>(null);
+  const initialDone = Boolean(draft?.initialLetterGeneratedAt || draft?.letterFileUrl || draft?.firstMailedAt);
+  const letterStage = stageChoice && stageChoice.id === draft?.id ? stageChoice.stage : initialDone ? "follow-up" : "initial";
+  const availablePresets = settings.letterPresets.filter((preset) => letterPresetStage(preset) === letterStage);
+  const selectedPreset = availablePresets.find((preset) => preset.id === draft?.letterPresetId) ?? null;
   const publicLink = draft ? buildPublicLink(draft.token) : "";
   const validation = draft ? validateTrackingSite(draft) : { valid: true, errors: [] };
   const autosave = useSiteAutosave({
@@ -176,11 +176,11 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
   });
   const dirty = autosave.dirty;
   const moveSites = useSiteFolders({ flush: autosave.flush, setBusy, setSites, setDraft, setStatus });
-  const templateUrl = selectedPreset?.templateUrl || draft?.letterTemplateUrl || "";
+  const templateUrl = selectedPreset?.templateUrl || "";
 
   async function selectSite(site: TrackingSite) {
     if (busy || !await autosave.flush()) return;
-    if (site.id !== draft?.id) setDraft(structuredClone(site));
+    if (site.id !== draft?.id) { setStageChoice(null); setDraft(structuredClone(site)); }
   }
 
   function markMailedToday() {
@@ -263,7 +263,8 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       return;
     }
 
-    const templateUrl = selectedPreset?.templateUrl || draft.letterTemplateUrl;
+    const templateUrl = selectedPreset?.templateUrl;
+    if (letterStage === "follow-up" && !initialDone) return;
     if (!templateUrl) {
       setStatus("Choose a letter template or upload one in Settings before generating.");
       return;
@@ -293,11 +294,13 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
       const saved = await saveTrackingSite({
         ...generationDraft,
+        initialLetterGeneratedAt: generationDraft.initialLetterGeneratedAt || (letterStage === "initial" ? new Date().toISOString() : undefined),
         letterFileName: generated.name,
         letterFileUrl: generated.url
       });
       setSites((current) => sortMailingSites(current.map((site) => (site.id === saved.id ? saved : site)), sortMode));
       setDraft(saved);
+      setStageChoice({ id: saved.id, stage: letterStage });
       setPreview({ url: generated.url, name: generated.name });
       setStatus("Letter generated and saved. Review the preview, then download when ready.");
     } catch {
@@ -441,25 +444,24 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               </details>
 
               <div className="admin-grid admin-grid--two">
+                <SelectField label="Letter stage" value={letterStage} options={initialDone ? [["initial", "Initial letter"], ["follow-up", "Follow-up letter"]] : [["initial", "Initial letter"]]} onChange={(value) => setStageChoice({ id: draft.id, stage: value as "initial" | "follow-up" })} />
+                <p className="admin-note">{initialDone ? "An earlier letter is saved or recorded as posted. Follow-up letters are now available. You can also regenerate the initial letter." : "Generate and save the initial letter first. Follow-up presets become available when you return to this site."}</p>
                 <SelectField
                   id="letter-preset"
                   label="Letter preset"
-                  value={selectedPreset?.id ?? draft.letterTemplateUrl}
+                  value={selectedPreset?.id ?? ""}
                   onChange={(value) =>
                     updateDraft((site) => {
-                      const preset = settings.letterPresets.find((item) => item.id === value);
-                      const starter = starterLetterTemplates.find(([url]) => url === value);
+                      const preset = availablePresets.find((item) => item.id === value);
                       site.letterPresetId = preset?.id ?? "";
-                      site.letterTemplateName = preset?.templateName ?? starter?.[1] ?? "";
-                      site.letterTemplateUrl = preset?.templateUrl ?? starter?.[0] ?? "";
+                      site.letterTemplateName = preset?.templateName ?? "";
+                      site.letterTemplateUrl = preset?.templateUrl ?? "";
                       if (preset) site.letterRecipientMode = preset.recipientMode;
                     })
                   }
                   options={[
                     ["", "Choose a template"],
-                    ...starterLetterTemplates,
-                    ...(!selectedPreset && draft.letterTemplateUrl && !starterLetterTemplates.some(([url]) => url === draft.letterTemplateUrl) ? [[draft.letterTemplateUrl, draft.letterTemplateName || "Saved template"] as const] : []),
-                    ...settings.letterPresets.map((preset) => [preset.id, preset.name] as const)
+                    ...availablePresets.map((preset) => [preset.id, preset.name] as const)
                   ]}
                 />
                 <div className="mailing-site-details">
@@ -473,6 +475,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               </div>
 
               <div className="letter-generator-actions">
+                {!availablePresets.length && <p className="admin-note">Add {letterStage === "initial" ? "an initial" : "a follow-up"} preset in Settings to generate this letter.</p>}
                 <button
                   type="button"
                   className="admin-save"

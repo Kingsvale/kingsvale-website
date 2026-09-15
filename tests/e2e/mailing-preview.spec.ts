@@ -15,7 +15,10 @@ test("mailing preserves edits when sorting and previews a generated branded lett
     : route.fulfill({ status: 404, json: { error: "Local renderer unavailable" } }));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await context.route("**/api/studio-settings", (route) => route.fulfill({ json: { settings: defaultStudioSettings() } }));
+  await context.route("**/api/studio-settings", (route) => route.fulfill({ json: { settings: { ...defaultStudioSettings(), letterPresets: [
+    { id: "initial", name: "Initial Full Details", templateName: "Initial.docx", templateUrl: "/templates/kingsvale-initial-letter-template.docx", recipientMode: "title-owner", stage: "initial", createdAt: "2026-09-15" },
+    { id: "follow-up", name: "Follow Up Full Details", templateName: "Follow Up.docx", templateUrl: "/templates/kingsvale-follow-up-letter-template.docx", recipientMode: "title-owner", stage: "follow-up", createdAt: "2026-09-15" }
+  ] } } }));
   await context.route("**/api/tracking-sites", (route) => {
     if (route.request().method() === "PUT") site = route.request().postDataJSON().site;
     return route.fulfill({ json: route.request().method() === "PUT" ? { site } : { sites: [site], storage: "dev-file" } });
@@ -38,7 +41,10 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.getByLabel("Recipient name", { exact: true }).fill("Alex Example");
   await page.getByLabel("Sort", { exact: true }).selectOption("updated");
   await expect(page.getByLabel("Recipient name", { exact: true })).toHaveValue("Alex Example");
-  await page.getByLabel("Letter preset", { exact: true }).selectOption("/templates/kingsvale-follow-up-letter-template.docx");
+  await expect(page.getByLabel("Letter stage", { exact: true })).toHaveValue("initial");
+  await expect(page.getByLabel("Letter stage", { exact: true }).locator("option")).toHaveCount(1);
+  await expect(page.getByLabel("Letter preset", { exact: true }).locator("option")).toHaveText(["Choose a template", "Initial Full Details"]);
+  await page.getByLabel("Letter preset", { exact: true }).selectOption("initial");
   await page.getByLabel("Address letter to", { exact: true }).selectOption("title-owner");
   await page.getByRole("button", { name: "Generate & preview letter", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -51,6 +57,15 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await dialog.screenshot({ path: testInfo.outputPath("letter-preview.png") });
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  expect(site.initialLetterGeneratedAt).toBeTruthy();
+  await page.getByRole("tab", { name: "Sites", exact: true }).click();
+  await page.getByRole("tab", { name: "Mailing", exact: true }).click();
+  await expect(page.getByLabel("Letter stage", { exact: true })).toHaveValue("follow-up");
+  await expect(page.getByLabel("Letter preset", { exact: true }).locator("option")).toHaveText(["Choose a template", "Follow Up Full Details"]);
+  await page.getByLabel("Letter preset", { exact: true }).selectOption("follow-up");
+  await page.getByRole("button", { name: "Generate & preview letter", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("Preview ready", { timeout: 20000 });
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Mark posted today", exact: true }).click();
   await page.getByRole("button", { name: "Save mailing", exact: true }).click();
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();

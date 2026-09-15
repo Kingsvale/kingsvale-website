@@ -96,6 +96,7 @@ export type TrackingSite = {
   letterTemplateUrl: string;
   letterFileName: string;
   letterFileUrl: string;
+  initialLetterGeneratedAt?: string;
   searchlandUrl: string;
   currentStatus: TrackingStatus;
   statusNote: string;
