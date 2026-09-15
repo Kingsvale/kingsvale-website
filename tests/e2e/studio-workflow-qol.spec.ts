@@ -23,7 +23,6 @@ async function setup(page: Page) {
     if (route.request().method() === "PUT") settings = route.request().postDataJSON().settings;
     return route.fulfill({ json: { settings } });
   });
-  await page.route("**/api/address-lookup?*", (route) => route.fulfill({ json: { postcode: "SL4 5HS", addresses: [{ line1: "8 Petworth Court", line2: "Helston Lane", town: "Windsor", county: "Berkshire", postcode: "SL4 5HS" }], partial: true, source: "OpenStreetMap" } }));
   await page.goto("/studio");
   await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
   await page.getByRole("button", { name: "Unlock studio" }).click();
@@ -53,7 +52,7 @@ test("Sites and Mailing autosave typing and flush pending edits before changing 
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
 });
 
-test("folders support bulk moves, rename, grouping, and postcode property selection", async ({ page }, testInfo) => {
+test("folders support bulk moves, rename, grouping, and manual address entry", async ({ page }, testInfo) => {
   const state = await setup(page);
   await page.getByLabel("Select all shown", { exact: true }).check();
   await page.getByLabel("Move to folder", { exact: true }).fill("Thames Valley");
@@ -72,18 +71,14 @@ test("folders support bulk moves, rename, grouping, and postcode property select
   await page.getByLabel("County", { exact: true }).fill("Berkshire updated");
   await expect.poll(() => state.sites()[0].siteAddressParts.county).toBe("Berkshire updated");
   expect(state.sites()[0].region).toBe("Western region");
-  await page.getByLabel("Postcode to search").fill("sl4 5hs");
-  await page.getByRole("button", { name: "Find addresses", exact: true }).click();
-  await expect(page.getByLabel("Choose a property address")).toContainText("8 Petworth Court");
-  await page.getByLabel("Choose a property address").selectOption({ label: "8 Petworth Court, Helston Lane, Windsor, Berkshire, SL4 5HS — mapped address" });
-  await page.getByRole("button", { name: "Use this address", exact: true }).click();
-  await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("8 Petworth Court");
+  await page.getByLabel("Address line 1", { exact: true }).fill("8 Petworth Court");
+  await expect(page.getByRole("button", { name: "Find addresses", exact: true })).toHaveCount(0);
   await expect.poll(() => state.sites()[0].siteAddressParts.line1).toBe("8 Petworth Court");
-  await page.locator(".address-finder").screenshot({ path: testInfo.outputPath("address-picker.png") });
   await page.locator(".site-library").screenshot({ path: testInfo.outputPath("site-folders.png") });
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();
   await expect(page.getByLabel("Folder / region", { exact: true })).toHaveValue("Western region");
   await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("8 Petworth Court");
+  await expect(page.getByRole("button", { name: "Find addresses", exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(2);
 });
 
@@ -100,14 +95,4 @@ test("preset actions and Delete fit their card on desktop and mobile", async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(2);
   await remove.click();
   await expect(card).toHaveCount(0);
-});
-
-test("searching another postcode does not autosave a different address before selection", async ({ page }) => {
-  const state = await setup(page);
-  await page.getByLabel("Postcode to search").fill("RG23 7DZ");
-  await expect(page.getByLabel("Choose a property address")).toContainText("72 Pardown");
-  await expect(page.getByLabel("Postcode", { exact: true })).toHaveValue("SL4 5HS");
-  await page.getByRole("tab", { name: "Mailing", exact: true }).click();
-  expect(state.saves).toHaveLength(0);
-  await expect(page.getByLabel("Postcode", { exact: true })).toHaveValue("SL4 5HS");
 });

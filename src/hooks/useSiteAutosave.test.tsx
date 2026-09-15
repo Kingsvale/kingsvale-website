@@ -21,7 +21,7 @@ function setup() {
     return { ...autosave, draft, saved, setDraft, setValid, setBlocked };
   });
 }
-beforeEach(() => { vi.useFakeTimers(); save.mockReset(); save.mockImplementation(async (site) => ({ site: { ...site, updatedAt: new Date().toISOString() }, googleSheetSync: null })); });
+beforeEach(() => { vi.useFakeTimers(); save.mockReset(); save.mockImplementation(async (site) => ({ site: { ...site, updatedAt: new Date().toISOString() } })); });
 afterEach(() => { vi.useRealTimers(); });
 
 it("debounces typing and saves the latest complete draft once", async () => {
@@ -39,7 +39,7 @@ it("debounces typing and saves the latest complete draft once", async () => {
 
 it("preserves typing during a slow save and serializes the subsequent save", async () => {
   let finish!: () => void;
-  save.mockImplementationOnce((site) => new Promise((resolve) => { finish = () => resolve({ site: { ...site, updatedAt: "later" }, googleSheetSync: null }); }));
+  save.mockImplementationOnce((site) => new Promise((resolve) => { finish = () => resolve({ site: { ...site, updatedAt: "later" } }); }));
   const { result } = setup();
   act(() => result.current.setDraft((site) => ({ ...site, title: "First edit" })));
   await act(() => vi.advanceTimersByTimeAsync(1000));

@@ -70,8 +70,8 @@ describe("AdminPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "Studio settings" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("heading", { name: "Google Sheet" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Spreadsheet ID")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Google Sheet" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Spreadsheet ID")).not.toBeInTheDocument();
   });
 
   it("previews hero edits and saves published content", async () => {

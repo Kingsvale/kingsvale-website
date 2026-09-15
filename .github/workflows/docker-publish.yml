@@ -50,7 +50,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation
           npm ci --no-audit --no-fund
           node --test tests/server/deployment.test.mjs
-          node --test tests/server/address-lookup.test.mjs
           node node_modules/vitest/vitest.mjs run src/hooks/useSiteAutosave.test.tsx
           node --import tsx --test --test-name-pattern="public health" tests/server/media-backup.test.mjs
           node --test tests/server/drive-backup.test.mjs

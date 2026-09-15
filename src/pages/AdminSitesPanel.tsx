@@ -17,7 +17,6 @@ import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle } from "../lib/trackingNormalize";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
-import { AdminAddressFinder } from "./AdminAddressFinder";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
 import LandMapEditor from "./LandMapEditor";
@@ -34,7 +33,6 @@ import {
   archiveTrackingSite,
   deleteTrackingSite,
   fetchStudioSettings,
-  type GoogleSheetSyncResult,
   getTrackingStorageStatus,
   listTrackingSites,
   saveTrackingSiteWithResult,
@@ -200,10 +198,10 @@ export function AdminSitesPanel() {
       const siteDraft = createTrackingSite();
       siteDraft.reference = nextTrackingReference(sites);
       siteDraft.contactPriority = settings.defaultContactPriority;
-      const { site, googleSheetSync } = await saveTrackingSiteWithResult(siteDraft);
+      const { site } = await saveTrackingSiteWithResult(siteDraft);
       setSites((current) => sortSites([site, ...current.filter((item) => item.id !== site.id)]));
       setDraft(site);
-      setStatus(`Map page created with reference ${site.reference}. Upload a KML or draw the land map, then save.${formatGoogleSheetSyncStatus(googleSheetSync)}`);
+      setStatus(`Map page created with reference ${site.reference}. Upload a KML or draw the land map, then save.`);
     } catch {
       setStatus("Map page could not be created.");
     } finally {
@@ -544,10 +542,6 @@ export function AdminSitesPanel() {
                   </p>
                 )}
                 <div className="workflow-heading"><span>02</span><div><h3>Letter address</h3><p>Enter each part on its own line. These details fill your Word templates automatically.</p></div></div>
-                <AdminAddressFinder key={draft.id} postcode={draft.siteAddressParts.postcode} sites={sites} onApply={(address) => updateDraft((site) => {
-                  site.siteAddressParts = address; site.siteAddress = buildAddressFromParts(address);
-                  if (!site.region || site.region === "Uncategorised") site.region = address.county || address.town || "Uncategorised";
-                })} />
                 <TrackingTextInput
                   label="Address line 1"
                   value={draft.siteAddressParts.line1}
@@ -925,24 +919,6 @@ function buildPublicLink(token: string) {
   }
 
   return `${window.location.origin}/track/${token}`;
-}
-
-function formatGoogleSheetSyncStatus(result: GoogleSheetSyncResult | null) {
-  if (!result || result.status === "disabled") {
-    return "";
-  }
-
-  if (result.status === "synced") {
-    return result.action === "updated"
-      ? " Google Sheet row updated."
-      : " Google Sheet row added.";
-  }
-
-  if (result.status === "skipped") {
-    return ` Google Sheet sync skipped: ${result.message ?? "configuration is incomplete"}`;
-  }
-
-  return ` Google Sheet sync failed: ${result.message ?? "check server credentials and sheet access"}`;
 }
 
 function sortSites(sites: TrackingSite[]) {

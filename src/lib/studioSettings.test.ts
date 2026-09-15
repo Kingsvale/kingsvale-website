@@ -2,27 +2,11 @@ import { describe, expect, it } from "vitest";
 import { defaultStudioSettings, normalizeStudioSettings } from "./studioSettings";
 
 describe("studio settings", () => {
-  it("defaults Google Sheet sync off with the letter reference tab", () => {
-    expect(defaultStudioSettings().googleSheet).toEqual({
-      enabled: false,
-      spreadsheetId: "",
-      sheetName: "Letter reference"
-    });
-  });
-
-  it("normalizes Google Sheet configuration safely", () => {
-    const settings = normalizeStudioSettings({
-      googleSheet: {
-        enabled: true,
-        spreadsheetId: "sheet_123",
-        sheetName: "Letter: Reference / 2026"
-      }
-    });
-
-    expect(settings.googleSheet).toEqual({
-      enabled: true,
-      spreadsheetId: "sheet_123",
-      sheetName: "Letter Reference 2026"
-    });
+  it("keeps mailing preferences while dropping retired integration settings", () => {
+    const legacy = { ...defaultStudioSettings(), defaultReminderDays: 21, googleSheet: { enabled: true, spreadsheetId: "old-sheet", sheetName: "Letters" } };
+    const settings = normalizeStudioSettings(legacy);
+    expect(settings.defaultReminderDays).toBe(21);
+    expect(settings.letterPresets).toEqual(legacy.letterPresets);
+    expect(settings).not.toHaveProperty("googleSheet");
   });
 });

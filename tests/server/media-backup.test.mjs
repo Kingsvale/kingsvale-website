@@ -12,6 +12,18 @@ import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
 const password = "test-only-kingsvale-images";
 const encryptionKey = "test-only-media-backup-encryption-key";
 
+test("legacy Sheet settings are discarded while mailing preferences and site saves remain functional", async (t) => {
+  const server = await startServer(t);
+  const settings = { letterPresets: [], defaultReminderDays: 21, defaultContactPriority: "high", googleSheet: { enabled: true, spreadsheetId: "retired", sheetName: "Letters" } };
+  assert.equal((await server.api("/api/studio-settings", "PUT", { settings })).status, 200);
+  const stored = (await (await server.api("/api/studio-settings")).json()).settings;
+  assert.equal(stored.defaultReminderDays, 21);
+  assert.equal(Object.hasOwn(stored, "googleSheet"), false);
+  const saved = await server.api("/api/tracking-sites", "PUT", { site: createTrackingSite() });
+  assert.equal(saved.status, 200);
+  assert.equal(Object.hasOwn(await saved.json(), "googleSheetSync"), false);
+});
+
 test("public health identifies the running release without caching or exposing credentials", async (t) => {
   const server = await startServer(t);
   const response = await fetch(`${server.url}/api/ops/health`);
@@ -22,13 +34,6 @@ test("public health identifies the running release without caching or exposing c
   assert.equal(status.revision, "a".repeat(40));
   assert.ok(!JSON.stringify(status).includes(password));
   assert.ok(!JSON.stringify(status).includes(encryptionKey));
-});
-
-test("property lookup requires authentication and rejects invalid postcodes before using an external source", async (t) => {
-  const server = await startServer(t);
-  assert.equal((await fetch(`${server.url}/api/address-lookup?postcode=SL45HS`)).status, 401);
-  assert.equal((await server.api("/api/address-lookup?postcode=invalid", "GET")).status, 400);
-  assert.equal((await server.api("/api/address-lookup", "POST", {})).status, 405);
 });
 
 test("Drive backup settings require Studio authentication and persist encrypted outside exports", async (t) => {

@@ -45,18 +45,8 @@ export type TrackingStorageStatus = {
   detail: string;
 };
 
-export type GoogleSheetSyncResult = {
-  status: "disabled" | "skipped" | "synced" | "failed";
-  message?: string;
-  action?: "appended" | "updated";
-  row?: number;
-  spreadsheetId?: string;
-  sheetName?: string;
-};
-
 export type TrackingSiteSaveResult = {
   site: TrackingSite;
-  googleSheetSync: GoogleSheetSyncResult | null;
 };
 
 const authTokenStorageKey = "kingsvale-studio-auth-token-v1";
@@ -403,16 +393,6 @@ export async function listTrackingSites(): Promise<TrackingSite[]> {
   }
 }
 
-export async function lookupPropertyAddresses(postcode: string, signal?: AbortSignal) {
-  const response = await fetch(`/api/address-lookup?postcode=${encodeURIComponent(postcode)}`, {
-    headers: authHeaders({ Accept: "application/json" }), credentials: "same-origin", signal
-  });
-  if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("Address search needs the server. You can still choose a saved address or enter one manually.");
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Address search is unavailable. Please try again.");
-  return result as { postcode: string; addresses: import("./trackingTypes").TrackingAddressParts[]; partial: boolean; source: string };
-}
-
 export async function saveTrackingSite(site: TrackingSite): Promise<TrackingSite> {
   return (await saveTrackingSiteWithResult(site)).site;
 }
@@ -432,18 +412,16 @@ export async function saveTrackingSiteWithResult(site: TrackingSite): Promise<Tr
         throw new Error("Tracking site could not be saved to the secure server.");
       }
       markTrackingStorageLocal();
-      return { site: upsertLocalTrackingSite(site), googleSheetSync: null };
+      return { site: upsertLocalTrackingSite(site) };
     }
 
     const payload = (await response.json()) as {
       site: TrackingSite;
       storage?: string;
-      googleSheetSync?: GoogleSheetSyncResult;
     };
     markTrackingStorageServer(payload.storage);
     return {
-      site: normalizeTrackingSite(payload.site),
-      googleSheetSync: payload.googleSheetSync ?? null
+      site: normalizeTrackingSite(payload.site)
     };
   } catch {
     if (!isLocalDemoRuntime()) {
@@ -451,7 +429,7 @@ export async function saveTrackingSiteWithResult(site: TrackingSite): Promise<Tr
       throw new Error("Tracking site could not be saved to the secure server.");
     }
     markTrackingStorageLocal();
-    return { site: upsertLocalTrackingSite(site), googleSheetSync: null };
+    return { site: upsertLocalTrackingSite(site) };
   }
 }
 

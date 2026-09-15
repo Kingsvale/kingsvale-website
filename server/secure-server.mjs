@@ -1,5 +1,4 @@
 import { createContactMailer } from "./contact-mail.mjs";
-import { createAddressLookup } from "./address-lookup.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { renderLetterPreview } from "./letter-preview.mjs";
@@ -27,7 +26,6 @@ import { basename, extname, isAbsolute, join, normalize, relative, resolve } fro
 import { fileURLToPath } from "node:url";
 import { storeImage } from "./image-upload.mjs";
 import { collectMedia, mediaReferences, prepareMediaRestore } from "./media-backup.mjs";
-import { syncTrackingSiteToGoogleSheet } from "./google-sheets-sync.mjs";
 import { createTrackingQrPng, generateLetterDocx } from "./letter-generator.mjs";
 
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -36,7 +34,6 @@ const dataDir = resolve(process.env.KINGSVALE_DATA_DIR || resolve(rootDir, "data
 const cmsDir = resolve(dataDir, "cms");
 const leadsDir = resolve(dataDir, "leads");
 const contactMailer = createContactMailer(leadsDir);
-const lookupAddress = createAddressLookup();
 const uploadsDir = resolve(dataDir, "uploads");
 const trackingDir = resolve(dataDir, "tracking-sites");
 const analyticsDir = resolve(dataDir, "analytics");
@@ -185,14 +182,7 @@ function allowRequest(clientId) {
 }
 
 async function handleApiRequest(request, response, url) {
-  if (url.pathname === "/api/address-lookup") {
-    if (!requireSession(request, response)) return;
-    if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
-    const { status, ...result } = await lookupAddress(url.searchParams.get("postcode"));
-    response.setHeader("Cache-Control", "no-store");
-    sendJson(response, status, result);
-    return;
-  }
+
   if (url.pathname.startsWith("/api/drive-backup")) {
     await handleDriveBackup(request, response, url);
     return;
@@ -779,17 +769,11 @@ async function handleTrackingSitesCollection(request, response) {
       : [savedSite, ...store.sites];
     store.updatedAt = now;
     await writeTrackingStore(store);
-    const googleSheetSettings = (await readStudioSettings()).googleSheet;
-    const publicLink = buildPublicTrackingLink(savedSite.token);
-    const googleSheetSync = googleSheetSettings.enabled && !publicLink
-      ? { status: "skipped", message: "PUBLIC_SITE_URL or SITE_URL is required for Google Sheet sync." }
-      : await syncTrackingSiteToGoogleSheet(savedSite, googleSheetSettings, { publicLink });
     await writeAudit("tracking_site_saved", request, {
       user: session.user,
-      siteId: savedSite.id,
-      googleSheetSync: googleSheetSync.status
+      siteId: savedSite.id
     });
-    sendJson(response, 200, { ok: true, site: savedSite, googleSheetSync });
+    sendJson(response, 200, { ok: true, site: savedSite });
     return;
   }
 
@@ -2003,15 +1987,6 @@ function validateStudioSettings(settings) {
     errors.push({ path: "defaultContactPriority", message: "Choose an approved default priority." });
   }
 
-  if (!settings.googleSheet || typeof settings.googleSheet !== "object") {
-    errors.push({ path: "googleSheet", message: "Google Sheet settings are required." });
-  } else {
-    if (settings.googleSheet.enabled && !settings.googleSheet.spreadsheetId) {
-      errors.push({ path: "googleSheet.spreadsheetId", message: "Spreadsheet ID is required when Google Sheet sync is enabled." });
-    }
-    validateOptionalText(errors, "googleSheet.spreadsheetId", settings.googleSheet.spreadsheetId, "Spreadsheet ID", 160);
-    validateText(errors, "googleSheet.sheetName", settings.googleSheet.sheetName, "Sheet tab name", 80);
-  }
 
   return { valid: errors.length === 0, errors };
 }
@@ -2054,7 +2029,6 @@ function defaultStudioSettings() {
     letterPresets: [],
     defaultReminderDays: 14,
     defaultContactPriority: "unknown",
-    googleSheet: defaultGoogleSheetSettings(),
     updatedAt: new Date().toISOString()
   };
 }
@@ -2067,26 +2041,7 @@ function normalizeStudioSettings(settings = {}) {
       : [],
     defaultReminderDays: boundedReminderDays(settings.defaultReminderDays),
     defaultContactPriority: normalizeContactPriority(settings.defaultContactPriority),
-    googleSheet: normalizeGoogleSheetSettings(settings.googleSheet),
     updatedAt: typeof settings.updatedAt === "string" && settings.updatedAt ? settings.updatedAt : fallback.updatedAt
-  };
-}
-
-function defaultGoogleSheetSettings() {
-  return {
-    enabled: false,
-    spreadsheetId: "",
-    sheetName: "Letter reference"
-  };
-}
-
-function normalizeGoogleSheetSettings(settings = {}) {
-  const values = settings && typeof settings === "object" ? settings : {};
-  const fallback = defaultGoogleSheetSettings();
-  return {
-    enabled: Boolean(values.enabled),
-    spreadsheetId: cleanText(values.spreadsheetId).slice(0, 160),
-    sheetName: cleanSheetName(values.sheetName) || fallback.sheetName
   };
 }
 
@@ -2120,9 +2075,6 @@ function mergeStudioSettings(current, imported) {
         (preset) => !importedSettings.letterPresets.some((item) => item.id === preset.id)
       )
     ],
-    googleSheet: hasOwn(imported, "googleSheet")
-      ? importedSettings.googleSheet
-      : currentSettings.googleSheet,
     updatedAt: new Date().toISOString()
   };
 }
@@ -2187,28 +2139,6 @@ function normalizeTrackingSite(site) {
     mailingNotes: site.mailingNotes ?? "",
     mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
-}
-
-function buildPublicTrackingLink(token) {
-  const configuredOrigin = cleanOrigin(process.env.PUBLIC_SITE_URL || process.env.SITE_URL);
-  return configuredOrigin ? `${configuredOrigin}/track/${encodeURIComponent(token)}` : "";
-}
-
-function cleanOrigin(value) {
-  if (!value) {
-    return "";
-  }
-
-  try {
-    const url = new URL(value);
-    return url.origin;
-  } catch {
-    return "";
-  }
-}
-
-function hasOwn(value, key) {
-  return Boolean(value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function publicTrackingSite(site) {
@@ -2450,9 +2380,6 @@ function cleanText(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
 }
 
-function cleanSheetName(value) {
-  return cleanText(value).replace(/[\][*?/\\:]/g, " ").replace(/\s+/g, " ").slice(0, 80);
-}
 
 function suggestRemailReminderDate(firstMailedAt, reminderDays = 14) {
   if (!firstMailedAt) {

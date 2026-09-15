@@ -2,7 +2,6 @@ import { Clock, ExternalLink, FileText, Mail, Save, Search } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
-import { AdminAddressFinder } from "./AdminAddressFinder";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
 import { starterLetterTemplates } from "../lib/letterTemplates.js";
@@ -403,10 +402,6 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
               <fieldset className="workflow-fields" disabled={busy}>
               <div className="workflow-heading"><span>01</span><div><h3>Recipient &amp; address</h3><p>Check the details that will appear in your letter. Changes also update the site record.</p></div></div>
-              <AdminAddressFinder key={draft.id} postcode={draft.siteAddressParts.postcode} sites={sites} onApply={(address) => updateDraft((site) => {
-                site.siteAddressParts = address; site.siteAddress = buildAddressFromParts(address);
-                if (!site.region || site.region === "Uncategorised") site.region = address.county || address.town || "Uncategorised";
-              })} />
               <div className="admin-grid admin-grid--two">
                 <TextInput label="Recipient name" value={draft.customerName} maxLength={80} onChange={(value) => updateDraft((site) => { site.customerName = value; })} />
                 <SelectField label="Address letter to" value={draft.letterRecipientMode} options={Object.entries(letterRecipientModeLabels) as [LetterRecipientMode, string][]} onChange={(value) => updateDraft((site) => { site.letterRecipientMode = value as LetterRecipientMode; })} />

@@ -18,26 +18,4 @@ existing folder. Renaming explicitly includes archived records. Partial failures
 report the number saved, and only successful records are updated in the editor.
 Address edits do not replace an existing folder choice.
 
-## Free property suggestions
-
-**Postcode to search** immediately shows matching addresses already saved in
-Studio. **Find addresses** additionally queries OpenStreetMap through an
-authenticated server endpoint. Choose a suggestion and click **Use this address**,
-then check and complete the fields. This fills the site address used in letters;
-it does not change the separately entered owner postal address or contact name.
-
-No account, paid API key or billing configuration is used. OpenStreetMap coverage
-is incomplete, and many UK postcodes have no mapped property addresses. This is
-not an exhaustive Royal Mail address lookup. In a live source check on 15 September
-2026, SL4 5HS returned no usable mapped property addresses; saved Studio records
-at that postcode remain available. Do not manufacture house numbers, infer every
-property from a range, or interpret missing results as an absence of properties.
-
-Only the postcode is sent to the external service, not owner names, notes or
-contact details. Searches are user-triggered, limited to one at a time with a
-three-second gap, and cached in memory for 24 hours (maximum 200 postcodes).
-Requests time out after 15 seconds and return at most 200 mapped elements.
-On failure, manual entry and saved-address suggestions remain available.
-
-Source: [OpenStreetMap / ODbL](https://www.openstreetmap.org/copyright), accessed
-using the [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API).
+Enter letter addresses directly in the address fields in Sites or Mailing.
