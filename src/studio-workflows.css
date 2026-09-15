@@ -110,3 +110,13 @@
 .drive-backup__history { list-style: none; padding: 0; }
 .drive-backup__history li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #ded8cc; }
 @media (max-width: 600px) { .drive-backup__metrics { grid-template-columns: 1fr; } }
+.homepage-selection { margin: 24px 0; padding: 22px; border: 1px solid #ccc5b7; border-radius: 12px; background: #faf8f3; }
+.homepage-selection legend { padding: 0 8px; font-weight: 700; }
+.homepage-selection > p { margin: 0 0 16px; color: #625e54; font-size: 14px; line-height: 1.6; }
+.homepage-selection__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; margin-bottom: 18px; }
+.homepage-selection__option { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid #ddd6ca; border-radius: 8px; background: white; cursor: pointer; }
+.homepage-selection__option:has(:checked) { background: #eaf0eb; border-color: #52725b; }
+.homepage-selection__option:has(:disabled) { opacity: .55; cursor: default; }
+.homepage-selection__option input { width: 20px; height: 20px; flex-shrink: 0; accent-color: #164a32; }
+.homepage-selection__option strong, .homepage-selection__option small { display: block; overflow-wrap: anywhere; }
+.homepage-selection__option small { margin-top: 4px; color: #625e54; }

@@ -7,7 +7,8 @@ const assetsDir = join(distDir, "assets");
 
 const budgets = {
   largestJavaScriptGzip: 72_000,
-  totalPublicJavaScriptGzip: 101_000,
+  // Includes homepage project selection and its publishing validation (+151 B gzip).
+  totalPublicJavaScriptGzip: 101_250,
   totalCssGzip: 24_000,
   deferredMapJavaScriptGzip: 55_000,
   mapEditorJavaScriptGzip: 80_000,

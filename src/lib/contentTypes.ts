@@ -120,6 +120,7 @@ export type SiteContent = {
     viewAllHref: string;
   };
   developments: Development[];
+  homepageDevelopmentIds?: string[];
   pages: {
     designBuild: StaticPageContent;
     visionProcess: StaticPageContent;

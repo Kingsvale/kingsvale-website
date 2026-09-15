@@ -8,10 +8,13 @@ import { Reveal } from "./Reveal";
 type DevelopmentsProps = {
   intro: SiteContent["developmentsIntro"];
   developments: Development[];
+  selectedIds?: string[];
 };
 
-export function Developments({ intro, developments }: DevelopmentsProps) {
-  if (!developments.length) return null;
+export function Developments({ intro, developments, selectedIds }: DevelopmentsProps) {
+  const featured = developments.map((development, index) => ({ development, index }))
+    .filter(({ development, index }) => selectedIds ? selectedIds.includes(development.id) : index < 6).slice(0, 6);
+  if (!featured.length) return null;
   return (
     <section className="developments" id="developments" aria-labelledby="developments-title">
       <div className="section-heading">
@@ -22,11 +25,11 @@ export function Developments({ intro, developments }: DevelopmentsProps) {
         </ButtonLink>
       </div>
       <div className="development-grid">
-        {developments.map((development, index) => (
+        {featured.map(({ development, index }, position) => (
           <DevelopmentCard
             development={development}
             index={index}
-            delay={(index % 6) * 90}
+            delay={position * 90}
             key={development.id}
           />
         ))}

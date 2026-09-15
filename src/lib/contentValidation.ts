@@ -267,6 +267,10 @@ export function isValidImageSource(src: string): boolean {
 
 export function validateSiteContent(content: SiteContent): ValidationResult {
   const errors: ValidationError[] = [];
+  const selected = content.homepageDevelopmentIds;
+  if (selected !== undefined && (!Array.isArray(selected) || selected.length > 6 || selected.some((id) => typeof id !== "string" || !id) || new Set(selected).size !== selected.length)) {
+    errors.push({ path: "homepageDevelopmentIds", message: "Select up to six different homepage projects." });
+  }
 
   if (content.textOverrides && (typeof content.textOverrides !== "object" || Array.isArray(content.textOverrides) || Object.keys(content.textOverrides).length > 512 || Object.entries(content.textOverrides).some(([key, value]) => (["__proto__", "constructor", "prototype"].includes(key) || !/^[a-zA-Z0-9_-]{1,160}$/.test(key)) || typeof value !== "string" || value.length > 2400))) {
     errors.push({ path: "textOverrides", message: "Page text must be plain text of 2,400 characters or fewer per field." });

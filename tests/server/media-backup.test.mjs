@@ -165,6 +165,12 @@ test("backend publishes more than six projects and supports removing the final p
   content.developments.push({ ...structuredClone(content.developments[0]), id: "seventh-project", title: "Seventh project", ctaHref: "/developments/seventh-project" });
   assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 200);
   assert.equal((await (await server.api("/api/cms/draft")).json()).published.developments.length, 7);
+  content.homepageDevelopmentIds = ["seventh-project"];
+  assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 200);
+  assert.deepEqual((await (await server.api("/api/cms/draft")).json()).published.homepageDevelopmentIds, ["seventh-project"]);
+  content.homepageDevelopmentIds = content.developments.map((project) => project.id);
+  assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 400);
+  content.homepageDevelopmentIds = [];
   content.developments = [];
   assert.equal((await server.api("/api/cms/publish", "POST", { content })).status, 200);
   assert.equal((await (await server.api("/api/cms/draft")).json()).published.developments.length, 0);

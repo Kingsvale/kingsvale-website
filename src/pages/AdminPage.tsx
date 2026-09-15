@@ -194,6 +194,8 @@ export function AdminPage({
   const [editingOverview, setEditingOverview] = useState(false);
   const [removedProject, setRemovedProject] = useState<{ project: Development; index: number } | null>(null);
   const selectedProject = draft.developments.find((project) => project.id === selectedProjectId) ?? draft.developments[0];
+  const homepageIds = (draft.homepageDevelopmentIds ?? draft.developments.slice(0, 6).map((project) => project.id))
+    .filter((id) => draft.developments.some((project) => project.id === id));
   const [serverMode, setServerMode] = useState(false);
   const [checkingStorage, setCheckingStorage] = useState(true);
   const [savedDraft, setSavedDraft] = useState(() => JSON.stringify(draft));
@@ -755,7 +757,7 @@ export function AdminPage({
                 disabled={draft.developments.length >= 100}
                 onClick={() => {
                   const project = createDevelopment();
-                  updateDraft((content) => { content.developments.push(project); });
+                  updateDraft((content) => { content.homepageDevelopmentIds = homepageIds; content.developments.push(project); });
                   setEditingOverview(false);
                   setSelectedProjectId(project.id);
                   setPreviewRoute(`/developments/${project.id}`);
@@ -768,6 +770,22 @@ export function AdminPage({
             {editingOverview && <AdminOverviewEditor content={draft} updateContent={updateDraft} onClose={() => setEditingOverview(false)} />}
             {removedProject && <div className="admin-note" role="status">{removedProject.project.title} removed from the draft. <button type="button" className="admin-small" onClick={() => { updateDraft((next) => { next.developments.splice(Math.min(removedProject.index, next.developments.length), 0, removedProject.project); }); setSelectedProjectId(removedProject.project.id); setPreviewRoute(removedProject.project.ctaHref); setRemovedProject(null); }}>Undo removal</button></div>}
             <p className="admin-note">{draft.developments.length} projects · Add, select or remove a project below. Save your draft, then publish when ready.</p>
+            <fieldset className="homepage-selection">
+              <legend>Homepage selection · {homepageIds.length} / 6</legend>
+              <p id="homepage-selection-help">Choose up to six projects for the homepage. All projects remain on the developments page. Uncheck a project to make room for another. The project order below also sets their homepage order.</p>
+              <div className="homepage-selection__grid">
+                {draft.developments.map((project) => {
+                  const checked = homepageIds.includes(project.id);
+                  return <label key={project.id} className="homepage-selection__option">
+                    <input type="checkbox" checked={checked} disabled={!checked && homepageIds.length >= 6} aria-describedby="homepage-selection-help" onChange={() => updateDraft((content) => {
+                      content.homepageDevelopmentIds = checked ? homepageIds.filter((id) => id !== project.id) : [...homepageIds, project.id].slice(0, 6);
+                    })} />
+                    <span><strong>{project.title}</strong><small>{project.location}</small></span>
+                  </label>;
+                })}
+              </div>
+              <button type="button" className="admin-small" onClick={() => { setPreviewRoute("/"); setScrollSection("developments"); }}>Preview homepage selection</button>
+            </fieldset>
             {!selectedProject && <p className="admin-note">No projects yet. Select Add project to create your first project.</p>}
             {selectedProject && <>
             <SelectField label="Project to edit" value={selectedProject.id} options={draft.developments.map((project) => [project.id, project.title] as const)} onChange={(id) => { setEditingOverview(false); setSelectedProjectId(id); setPreviewRoute(draft.developments.find((project) => project.id === id)!.ctaHref); }} />
@@ -786,12 +804,13 @@ export function AdminPage({
                   onMove={(direction) =>
                     updateDraft((content) => {
                       content.developments = moveItem(content.developments, index, direction);
+                      content.homepageDevelopmentIds = homepageIds;
                     })
                   }
                   onRemove={() => {
                     setRemovedProject({ project: development, index });
                     const nextProject = draft.developments[index + 1] ?? draft.developments[index - 1];
-                    updateDraft((content) => { content.developments.splice(index, 1); });
+                    updateDraft((content) => { content.homepageDevelopmentIds = homepageIds; content.developments.splice(index, 1); });
                     setSelectedProjectId(nextProject?.id ?? ""); setPreviewRoute(nextProject?.ctaHref ?? "/developments");
                   }}
                   onChange={(nextDevelopment) => {

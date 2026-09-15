@@ -1705,6 +1705,10 @@ function validateContact(payload) {
 
 function validateSiteContent(content) {
   const errors = [];
+  const selected = content?.homepageDevelopmentIds;
+  if (selected !== undefined && (!Array.isArray(selected) || selected.length > 6 || selected.some((id) => typeof id !== "string" || !id) || new Set(selected).size !== selected.length)) {
+    errors.push({ path: "homepageDevelopmentIds", message: "Select up to six different homepage projects." });
+  }
   if (!content || typeof content !== "object") {
     return { valid: false, errors: [{ path: "content", message: "Content is required." }] };
   }

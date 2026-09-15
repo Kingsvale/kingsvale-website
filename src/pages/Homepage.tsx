@@ -29,6 +29,7 @@ export function Homepage({ content, preview = false }: HomepageProps) {
         <Developments
           intro={content.developmentsIntro}
           developments={content.developments}
+          selectedIds={content.homepageDevelopmentIds}
         />
         <LandWanted content={content.landWanted} />
       </ContentWrapper>

@@ -21,6 +21,24 @@ const tinyPng = new File(
 );
 
 describe("AdminPage", () => {
+  it("lets editors swap homepage projects while limiting the selection to six", async () => {
+    const content = structuredClone(defaultContent);
+    content.developments = Array.from({ length: 8 }, (_, index) => ({ ...content.developments[0], id: `project-${index}`, title: `Project ${index}`, ctaHref: `/developments/project-${index}` }));
+    render(<AdminPage publishedContent={content} />);
+    const tab = screen.getByRole("tab", { name: "Our developments" });
+    await waitFor(() => expect(tab).toBeEnabled());
+    fireEvent.click(tab);
+    const first = await screen.findByRole("checkbox", { name: /Project 0/ });
+    const seventh = screen.getByRole("checkbox", { name: /Project 6/ });
+    expect(first).toBeChecked();
+    expect(seventh).toBeDisabled();
+    fireEvent.click(first);
+    expect(seventh).toBeEnabled();
+    fireEvent.click(seventh);
+    expect(seventh).toBeChecked();
+    expect(first).toBeDisabled();
+    expect(screen.getByRole("group", { name: "Homepage selection · 6 / 6" })).toBeInTheDocument();
+  });
   it("exposes Website, Sites, Mailing, Analytics, Backup and Settings studio tabs", async () => {
     render(<AdminPage publishedContent={defaultContent} />);
 
