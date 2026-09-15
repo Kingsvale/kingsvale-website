@@ -105,7 +105,7 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
             {site.reference ? <span>Quote reference {site.reference}</span> : null}
           </a>
         </div>
-        <span>Updated {new Date(site.updatedAt).toLocaleString()}</span>
+        <span>Updated {new Date(site.updatedAt).toLocaleDateString("en-GB")}</span>
       </section>
 
       <section className="tracking-map-section">
