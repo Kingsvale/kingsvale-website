@@ -1711,9 +1711,15 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
 
 .sites-admin__list {
   position: sticky;
-  top: 128px;
+  top: 86px;
   display: grid;
   gap: 12px;
+  max-height: calc(100dvh - 104px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-color: #8c927f #e6e1d7;
+  padding-inline-end: 8px;
 }
 
 .sites-admin__search {
@@ -3949,6 +3955,7 @@ html[data-reveal-motion="enabled"] [data-reveal][data-visible="true"] {
 
   .sites-admin__list {
     position: static;
+    max-height: min(480px, 60dvh);
   }
 
   .admin-preview {
