@@ -313,7 +313,9 @@ Run `npm run test:media` for a fresh-server upload/export/restore test (includin
 Use **Mailing → Ready to print → Regenerate envelopes** to refresh an older site's
 envelope files, including records with no saved envelopes. This saves any pending
 mailing edits, uses the current recipient, address and C5 envelope template, then
-saves new Word and PDF envelope files and opens the PDF preview. The saved letter,
+saves new Word and PDF envelope files and opens the PDF preview. Envelopes are C5,
+single-sided and address-only: one front page with the recipient's name and address,
+for use with envelopes whose return side has already been printed. The saved letter,
 letter PDF, posting dates and follow-up reminders are retained.
 
 For a saved Word letter, choose **Mailing → Edit letter** beside **Preview letter**.

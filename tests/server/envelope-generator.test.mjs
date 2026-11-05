@@ -54,8 +54,9 @@ test("authenticated envelope regeneration uses saved mailing details and preserv
   assert.match(text, /12 Updated Road/);
   assert.match(text, /SW2 2TB/);
   assert.doesNotMatch(text, /\{\{/);
+  assert.doesNotMatch(text, /Return Address|Kingsvale Ltd|Shelton Street|WC2H 9JQ/);
   const { stdout } = await promisify(execFile)("pdfinfo", [join(directory, "uploads", documents[1].url.slice(7))], { windowsHide: true });
-  assert.match(stdout, /Pages:\s+2/);
+  assert.match(stdout, /Pages:\s+1/);
   assert.match(stdout, /Page size:\s+649\.[\d]+ x 459\.[\d]+ pts/);
   assert.deepEqual(await readFile(join(directory, "uploads", "existing-letter.docx")), originalLetter);
   const loaded = (await (await api("/api/tracking-sites")).json()).sites[0];

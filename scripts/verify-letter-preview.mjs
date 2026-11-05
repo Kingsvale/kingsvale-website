@@ -65,6 +65,6 @@ await writeFile(join(directory, "envelope.docx"), envelope);
 const envelopePdf = await createLetterPdf(envelope);
 await writeFile(join(directory, "envelope.pdf"), envelopePdf);
 const envelopePreview = await renderLetterPreview(envelopePdf, ".pdf");
-assert.equal(envelopePreview.pageCount, 2, "Envelope must retain its address front and return-address back");
+assert.equal(envelopePreview.pageCount, 1, "Envelope must contain only the recipient address front");
 for (const [index, page] of envelopePreview.pages.entries()) await writeFile(join(directory, `envelope-${index + 1}.png`), Buffer.from(page.split(",")[1], "base64"));
-console.log("envelope: front and back rendered successfully");
+console.log("envelope: one address-only front page rendered successfully");

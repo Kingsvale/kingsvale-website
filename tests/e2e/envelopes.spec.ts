@@ -27,7 +27,7 @@ for (const legacy of [false, true]) test(`regenerate ${legacy ? "missing legacy"
       { kind: "envelope-pdf", name: "KV-ENV-1-envelope.pdf", url: "/media/new-envelope.pdf" }
     ] } });
   });
-  await context.route("**/api/letters/preview", (route) => route.fulfill({ json: { pageCount: 2, pages: Array(2).fill("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=") } }));
+  await context.route("**/api/letters/preview", (route) => route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } }));
   await page.goto("/studio");
   await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
   await page.getByRole("button", { name: "Unlock studio" }).click();
@@ -40,7 +40,7 @@ for (const legacy of [false, true]) test(`regenerate ${legacy ? "missing legacy"
   fail = false;
   await page.getByRole("button", { name: "Regenerate envelopes", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("status")).toContainText("2 pages");
+  await expect(dialog.getByRole("status")).toContainText("1 page");
   await expect(dialog.getByRole("link", { name: "Open PDF / Print", exact: true })).toHaveAttribute("href", "/media/new-envelope.pdf");
   await page.getByRole("button", { name: "Close preview", exact: true }).click();
   expect(site.letterFileName).toBe(before.letterFileName);
