@@ -81,7 +81,7 @@ const mimeTypes = {
 
 const securityHeaders = {
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.unsplash.com https://server.arcgisonline.com https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://api.postcodes.io; frame-src 'self' https://www.google.com https://earth.google.com https://*.googleusercontent.com; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
+    "default-src 'self'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://images.unsplash.com https://server.arcgisonline.com https://tile.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com blob:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.postcodes.io https://*.googleapis.com https://*.gstatic.com https://*.google.com blob:; worker-src 'self' blob:; frame-src 'self' https://www.google.com https://earth.google.com https://*.googleusercontent.com; form-action 'self'; base-uri 'none'; frame-ancestors 'self'; object-src 'none'",
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -296,6 +296,14 @@ async function handleApiRequest(request, response, url) {
 
   if (url.pathname === "/api/backup") {
     await handleBackup(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/maps/config") {
+    response.setHeader("Cache-Control", "no-store");
+    if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || (await readStudioSettings()).googleMapsApiKey || "";
+    sendJson(response, 200, { apiKey });
     return;
   }
 
@@ -2022,6 +2030,10 @@ function validateStudioSettings(settings) {
     });
   }
 
+  if (settings.googleMapsApiKey && !/^AIza[\w-]{35}$/.test(settings.googleMapsApiKey)) {
+    errors.push({ path: "googleMapsApiKey", message: "Enter a valid Google Maps browser API key, or leave it blank to use the existing map." });
+  }
+
   if (!Number.isFinite(settings.defaultReminderDays) || settings.defaultReminderDays < 1 || settings.defaultReminderDays > 120) {
     errors.push({ path: "defaultReminderDays", message: "Default reminder days must be between 1 and 120." });
   }
@@ -2072,6 +2084,7 @@ function defaultStudioSettings() {
     letterPresets: [],
     defaultReminderDays: 14,
     defaultContactPriority: "unknown",
+    googleMapsApiKey: "",
     updatedAt: new Date().toISOString()
   };
 }
@@ -2084,6 +2097,7 @@ function normalizeStudioSettings(settings = {}) {
       : [],
     defaultReminderDays: boundedReminderDays(settings.defaultReminderDays),
     defaultContactPriority: normalizeContactPriority(settings.defaultContactPriority),
+    googleMapsApiKey: typeof settings.googleMapsApiKey === "string" ? settings.googleMapsApiKey.trim() : "",
     updatedAt: typeof settings.updatedAt === "string" && settings.updatedAt ? settings.updatedAt : fallback.updatedAt
   };
 }

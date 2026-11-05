@@ -20,7 +20,7 @@ const budgets = {
 const assetFiles = await listFiles(assetsDir);
 const jsFiles = assetFiles.filter((file) => file.endsWith(".js"));
 // Mapping is loaded only on land-map pages; retain the existing marketing-site budgets.
-const isMapViewer = (file) => /^land-map-(engine|view)-/.test(basename(file));
+const isMapViewer = (file) => /^land-map-(engine|view|google|fallback)-/.test(basename(file));
 const isMapEditor = (file) => /^studio-map-tools-/.test(basename(file));
 const isMapCss = (file) => isMapViewer(file) || isMapEditor(file) || /^land-map-/.test(basename(file));
 const publicJsFiles = jsFiles.filter((file) => !isPrivateJavaScriptChunk(file) && !isMapViewer(file));
@@ -56,7 +56,7 @@ const failures = [];
 for (const key of ["deferredMapJavaScriptGzip", "mapEditorJavaScriptGzip", "mapCssGzip"]) {
   if (report[key] > budgets[key]) failures.push(`${key} ${report[key]} exceeds ${budgets[key]} bytes.`);
 }
-if (/\/assets\/(land-map-(?:engine|view)|studio-map)-/.test(indexHtml)) {
+if (/\/assets\/(land-map-(?:engine|view|google|fallback)|studio-map)-/.test(indexHtml)) {
   failures.push("The homepage must not preload the optional land-map viewer or editing tools.");
 }
 if (report.largestJavaScriptGzip > budgets.largestJavaScriptGzip) {

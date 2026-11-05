@@ -33,6 +33,11 @@ A responsive luxury real estate homepage and structured admin editor inspired by
 
 ### Land maps on customer QR pages
 
+Google Maps upgrade: see [Google Maps setup](GOOGLE-MAPS-SETUP.md). Configure a
+restricted browser key in **Studio → Settings → Google Maps** to use Google's
+Hybrid satellite imagery in both the editor and QR viewer. Existing geometry and
+QR links are reused; the current map remains the fallback until a key is connected.
+
 In **Studio → Sites**, open a site and use its **Land map** panel. Upload or drop a
 Searchland KML (up to 5 MB), or find a UK postcode and draw an area directly. Imported
 polygons receive the red outline and translucent fill automatically. **Draw a replacement

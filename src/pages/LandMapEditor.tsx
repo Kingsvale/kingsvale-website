@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Pencil, Upload, Undo2 } from "lucide-react";
-import type { Polygon } from "leaflet";
 import { parseKml, MAX_KML_BYTES } from "../lib/kmlImport";
 import { validateLandMap, type LandMap } from "../lib/landMap";
-import LandMapCanvas, { readMapPolygons, selectionStyle, type MapRuntime } from "./LandMapCanvas";
+import LandMapCanvas from "./LandMapCanvas";
+import type { MapRuntime } from "../lib/mapRuntime";
 
 type Props = {
   value: LandMap | null;
@@ -15,11 +15,6 @@ type Props = {
   canSave: boolean;
   savedAt: string;
 };
-
-async function prepareEditor() {
-  await import("@geoman-io/leaflet-geoman-free");
-  await import("@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css");
-}
 
 export default function LandMapEditor({ value, postcode, disabled, onChange, onBusyChange, onSave, canSave, savedAt }: Props) {
   const [runtime, setRuntime] = useState<MapRuntime | null>(null);
@@ -67,8 +62,8 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
   }
 
   function stopTools() {
-    runtime?.map.pm.disableDraw();
-    runtime?.map.pm.disableGlobalEditMode();
+    runtime?.stopDrawing();
+    runtime?.stopEditing();
     setMode("browse");
     setDeletingPoints(false);
     callbacks.current.onBusyChange(false);
@@ -76,13 +71,13 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
 
   function ready(instance: MapRuntime) {
     setRuntime(instance);
-    instance.map.pm.setGlobalOptions({ allowSelfIntersection: false, snappable: true, layerGroup: instance.selection, pathOptions: selectionStyle });
-    instance.map.on("pm:drawstart", () => { setMode("draw"); callbacks.current.onBusyChange(true); });
-    instance.map.on("pm:drawend", () => { setMode("browse"); callbacks.current.onBusyChange(false); });
-    instance.map.on("pm:create", (event) => {
-      const layer = event.layer as Polygon;
-      const geometry = layer.toGeoJSON(false).geometry;
-      if (geometry.type !== "Polygon") return;
+  }
+
+  function startDraw(intent: "add" | "replace") {
+    stopTools();
+    drawIntent.current = intent;
+    setError(""); setMode("draw"); callbacks.current.onBusyChange(true);
+    runtime?.startDrawing((geometry) => {
       const previous = current.current;
       const next: LandMap = {
         version: 1, basemap: previous?.basemap ?? "satellite", showBoundary: previous?.showBoundary ?? false,
@@ -90,21 +85,15 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
         selection: drawIntent.current === "replace" ? [geometry as LandMap["selection"][number]] : [...(previous?.selection ?? []), geometry as LandMap["selection"][number]]
       };
       const problem = validateLandMap(next);
-      if (problem) { instance.selection.removeLayer(layer); setError(problem); return; }
+      if (problem) { setError(problem); return false; }
       commit(next);
-    });
-  }
-
-  function startDraw(intent: "add" | "replace") {
-    stopTools();
-    drawIntent.current = intent;
-    setError("");
-    runtime?.map.pm.enableDraw("Polygon", { allowSelfIntersection: false, pathOptions: selectionStyle });
+      return true;
+    }, () => { setMode("browse"); callbacks.current.onBusyChange(false); });
   }
 
   function editArea() {
     if (mode === "edit") {
-      const polygons = runtime ? readMapPolygons(runtime.selection) : [];
+      const polygons = runtime?.readSelection() ?? [];
       const next = current.current ? { ...current.current, selection: polygons } : null;
       const problem = validateLandMap(next);
       if (problem) { setError(problem); return; }
@@ -120,9 +109,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
   }
 
   function configureCorners(remove: boolean) {
-    runtime?.map.pm.disableGlobalEditMode();
-    runtime?.map.pm.enableGlobalEditMode({ allowSelfIntersection: false, snappable: true, removeLayerBelowMinVertexCount: false,
-      removeVertexOn: remove ? "click" : "contextmenu", hideMiddleMarkers: remove, moveVertexValidation: () => !remove });
+    runtime?.edit(remove);
     setDeletingPoints(remove);
   }
 
@@ -137,10 +124,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
   function cancelEditing() {
     if (mode === "edit" && runtime) {
       stopTools();
-      runtime.selection.getLayers().forEach((layer, index) => {
-        const polygon = editingSnapshot.current?.selection[index];
-        if (polygon) (layer as Polygon).setLatLngs(polygon.coordinates.map((ring) => ring.map(([lng, lat]) => runtime.L.latLng(lat, lng))));
-      });
+      runtime.restore(editingSnapshot.current?.selection ?? []);
     } else stopTools();
   }
 
@@ -156,10 +140,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
       if (!alive.current) return;
       commit(imported.map, `Imported ${imported.map.selection.length} ${imported.map.selection.length === 1 ? "area" : "areas"}${imported.titleNumber ? ` (${imported.titleNumber})` : ""}. Red fill applied. Save the site to update its QR page.`);
       // Fit the new coordinates immediately, independently of the render cycle.
-      if (runtime) {
-        const points = imported.map.selection.flatMap((polygon) => polygon.coordinates[0].map(([lng, lat]) => runtime.L.latLng(lat, lng)));
-        runtime.map.fitBounds(runtime.L.latLngBounds(points), { padding: [35, 35], maxZoom: 19, animate: false });
-      }
+      runtime?.fit(imported.map.selection);
     } catch (cause) {
       if (alive.current) setError(cause instanceof Error ? cause.message : "The KML could not be imported.");
     } finally {
@@ -179,7 +160,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
       const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(normalized)}`, { signal: controller.signal });
       const data = await response.json();
       if (!response.ok || !Number.isFinite(data.result?.latitude) || !Number.isFinite(data.result?.longitude)) throw new Error("Postcode not found. Check it and try again.");
-      if (alive.current) runtime?.map.setView([data.result.latitude, data.result.longitude], 18);
+      if (alive.current) runtime?.locate(data.result.latitude, data.result.longitude, 18);
     } catch (cause) {
       if (alive.current) setError(cause instanceof Error && cause.name !== "AbortError" ? cause.message : "Postcode search is unavailable. Try again, or pan and zoom the map.");
     } finally { clearTimeout(timeout); if (alive.current) setLocating(false); }
@@ -211,7 +192,7 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
       }}><Undo2 aria-hidden="true" />Undo</button>
     </div>
     <p className="land-map-editor__hint">{mode === "draw" ? "Click or tap each corner, then the first corner to finish. Pan the map to move around." : deletingPoints ? "Click or tap a white corner point to delete it. Each area must keep at least three corners. Choose Finish editing to apply, or Cancel editing to restore the shape." : mode === "edit" ? "Drag the corner handles to adjust the area. Drag a midpoint to add a corner. Choose Delete points to remove corners, then Finish editing." : "Use + and − to zoom. Drag the map to move around. Edit corners or Delete points to refine an imported plot."}</p>
-    <LandMapCanvas value={value} editable prepareEditor={prepareEditor} onReady={ready} onFailure={() => onBusyChange(false)} onBasemapChange={(basemap) => { if (current.current && !activeTool && !blocked) commit({ ...current.current, basemap }); }} />
+    <LandMapCanvas value={value} editable onReady={ready} onFailure={() => { setRuntime(null); setMode("browse"); setDeletingPoints(false); onBusyChange(false); }} onBasemapChange={(basemap) => { if (current.current && !activeTool && !blocked) commit({ ...current.current, basemap }); }} />
     {!!value?.selection.length && <div className="land-map-editor__areas">{value.selection.map((_, index) => <span key={index}>Area {index + 1}<button type="button" disabled={blocked || activeTool} aria-label={`Remove area ${index + 1}`} onClick={() => {
       const selection = value.selection.filter((__, i) => i !== index); commit(selection.length ? { ...value, selection } : null);
     }}>Remove</button></span>)}</div>}

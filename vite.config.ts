@@ -31,6 +31,8 @@ export default defineConfig({
             { name: "land-map-data", test: /\/src\/lib\/landMap\.js/, priority: 900 },
             { name: "tracking-address", test: /\/src\/lib\/trackingAddress\.js/, priority: 900 },
             { name: "land-map-view", test: /\/src\/pages\/LandMapCanvas/, priority: 800 },
+            { name: "land-map-google", test: /\/src\/lib\/(googleMapRuntime|googleMapsLoader|mapRuntime)/, priority: 800 },
+            { name: "land-map-fallback", test: /\/src\/lib\/leafletMapRuntime/, priority: 800 },
             { name: "studio-map-tools", test: /\/node_modules\/@geoman-io\//, priority: 700 },
             { name(id) {
           const normalizedId = id.replaceAll("\\", "/");

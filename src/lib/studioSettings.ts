@@ -15,6 +15,7 @@ export type StudioSettings = {
   letterPresets: LetterPreset[];
   defaultReminderDays: number;
   defaultContactPriority: ContactPriority;
+  googleMapsApiKey: string;
   updatedAt: string;
 };
 
@@ -32,6 +33,7 @@ export function defaultStudioSettings(): StudioSettings {
     letterPresets: [],
     defaultReminderDays: 14,
     defaultContactPriority: "unknown",
+    googleMapsApiKey: "",
     updatedAt: new Date().toISOString()
   };
 }
@@ -44,6 +46,7 @@ export function normalizeStudioSettings(value: Partial<StudioSettings> | null | 
       ? value.letterPresets.map(normalizeLetterPreset).filter((preset): preset is LetterPreset => Boolean(preset))
       : [],
     defaultReminderDays,
+    googleMapsApiKey: typeof value?.googleMapsApiKey === "string" ? value.googleMapsApiKey.trim() : "",
     defaultContactPriority: allowedPriorities.includes(value?.defaultContactPriority as ContactPriority)
       ? value?.defaultContactPriority as ContactPriority
       : fallback.defaultContactPriority,

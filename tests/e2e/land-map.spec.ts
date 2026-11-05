@@ -46,9 +46,10 @@ test("KML import, drawing, editing, undo and the same QR page share the saved se
   const canvas = editor.getByRole("region", { name: "Land map drawing canvas" });
   await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
-  for (const [x, y] of [[.30, .32], [.66, .32], [.60, .67], [.30, .32]]) {
+  for (const [x, y] of [[.30, .32], [.66, .32], [.60, .67]]) {
     await canvas.click({ position: { x: box.width * x, y: box.height * y } });
   }
+  await canvas.locator(".marker-icon:not(.cursor-marker)").first().click();
   await expect(editor.getByRole("button", { name: "Save map to QR page" })).toBeEnabled();
   await editor.getByRole("button", { name: "Save map to QR page" }).click();
   await expect.poll(() => stored.landMap?.selection[0].coordinates[0].length).toBe(4);
@@ -61,12 +62,13 @@ test("KML import, drawing, editing, undo and the same QR page share the saved se
   await editor.getByRole("button", { name: "Edit corners", exact: true }).click();
   await expect(editor.getByRole("button", { name: "Save map to QR page" })).toBeDisabled();
   const handle = editor.locator(".marker-icon:not(.marker-icon-middle)").first();
-  await canvas.scrollIntoViewIfNeeded();
+  await handle.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
   await expect(handle).toBeVisible();
   const handleBox = (await handle.boundingBox())!;
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(handleBox.x + 30, handleBox.y + 20, { steps: 5 });
+  // Move beyond the editor's snapping distance from the imported reference corner.
+  await page.mouse.move(handleBox.x + 85, handleBox.y + 65, { steps: 12 });
   await page.mouse.up();
   await editor.getByRole("button", { name: "Finish editing" }).click();
   await editor.getByRole("button", { name: "Save map to QR page" }).click();
@@ -75,12 +77,12 @@ test("KML import, drawing, editing, undo and the same QR page share the saved se
 
   await editor.getByRole("button", { name: "Edit corners", exact: true }).click();
   const secondHandle = editor.locator(".marker-icon:not(.marker-icon-middle)").first();
-  await canvas.scrollIntoViewIfNeeded();
+  await secondHandle.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
   await expect(secondHandle).toBeVisible();
   const secondBox = (await secondHandle.boundingBox())!;
   await page.mouse.move(secondBox.x + 5, secondBox.y + 5);
   await page.mouse.down();
-  await page.mouse.move(secondBox.x + 20, secondBox.y + 15, { steps: 5 });
+  await page.mouse.move(secondBox.x + 85, secondBox.y + 65, { steps: 12 });
   await page.mouse.up();
   await editor.getByRole("button", { name: "Cancel editing" }).click();
   await editor.getByRole("button", { name: "Save map to QR page" }).click();
@@ -92,7 +94,7 @@ test("KML import, drawing, editing, undo and the same QR page share the saved se
   await expect(page.getByRole("region", { name: "Land map", exact: true }).locator("path[fill='#ef4444']")).toHaveCount(1);
   const customer = await context.newPage();
   await customer.goto(qrLink);
-  await expect(customer.getByRole("region", { name: "Area Kingsvale is interested in" })).toBeVisible();
+  await expect(customer.getByRole("region", { name: "Area Kingsvale is interested in", exact: true })).toBeVisible();
   await expect(customer.locator("path[fill='#ef4444']")).toHaveCount(1);
   await expect(customer.getByRole("button", { name: "Edit corners" })).toHaveCount(0);
   await expect(customer.locator("iframe")).toHaveCount(0);

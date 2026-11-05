@@ -10,7 +10,7 @@ test("saved land selections persist, reach the same public QR token, survive bac
   const directory = await mkdtemp(join(tmpdir(), "kingsvale-land-map-"));
   const child = spawn(process.execPath, ["server/secure-server.mjs"], {
     windowsHide: true, cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_USER: "kingsvale", STUDIO_PASSWORD: "test-only-map-password", STUDIO_AUTH_TOKEN_SECRET: "test-only-map-token", CMS_ENCRYPTION_KEY: "test-only-map-encryption", STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "" }
+    env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, STUDIO_USER: "kingsvale", STUDIO_PASSWORD: "test-only-map-password", STUDIO_AUTH_TOKEN_SECRET: "test-only-map-token", CMS_ENCRYPTION_KEY: "test-only-map-encryption", STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "", GOOGLE_MAPS_API_KEY: "" }
   });
   t.after(async () => {
     if (child.exitCode === null) { const closed = new Promise((done) => child.once("exit", done)); child.kill(); await closed; }
@@ -27,6 +27,16 @@ test("saved land selections persist, reach the same public QR token, survive bac
   assert.equal(login.status, 200);
   const { authToken } = await login.json();
   const api = (path, method = "GET", body) => fetch(`${url}${path}`, { method, headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  assert.deepEqual(await (await fetch(`${url}/api/maps/config`)).json(), { apiKey: "" });
+  assert.equal((await fetch(`${url}/api/studio-settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 401);
+  const settings = (await (await api("/api/studio-settings")).json()).settings;
+  const browserKey = `AIza${"x".repeat(35)}`;
+  assert.equal((await api("/api/studio-settings", "PUT", { settings: { ...settings, googleMapsApiKey: browserKey } })).status, 200);
+  let config = await fetch(`${url}/api/maps/config`);
+  assert.equal(config.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(await config.json(), { apiKey: browserKey });
+  assert.equal((await api("/api/studio-settings", "PUT", { settings: { ...settings, googleMapsApiKey: "invalid" } })).status, 400);
+  assert.deepEqual(await (await fetch(`${url}/api/maps/config`)).json(), { apiKey: browserKey });
   const polygon = { type: "Polygon", coordinates: [[[-0.84, 51.49], [-0.83, 51.49], [-0.83, 51.50], [-0.84, 51.49]]] };
   let site = { ...createTrackingSite(), reference: "KV-MAP-1", privateNotes: "not public", landMap: { version: 1, basemap: "satellite", boundary: [polygon], selection: [polygon], showBoundary: false } };
   assert.equal((await api("/api/tracking-sites", "PUT", { site })).status, 200);

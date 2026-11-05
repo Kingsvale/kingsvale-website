@@ -20,6 +20,7 @@ import {
 } from "../lib/trackingTypes";
 import { AdminDocumentPreview } from "./AdminDocumentPreview";
 import { starterLetterTemplates } from "../lib/letterTemplates.js";
+import { fetchGoogleMapsKey } from "../lib/googleMapsLoader";
 
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
 
@@ -28,6 +29,7 @@ export function AdminSettingsPanel() {
   const [presetName, setPresetName] = useState("");
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mapsKeyConfigured, setMapsKeyConfigured] = useState(false);
   const [status, setStatus] = useState("Manage reusable Studio defaults.");
   const sortedPresets = useMemo(
     () => [...settings.letterPresets].sort((left, right) => left.name.localeCompare(right.name)),
@@ -42,6 +44,7 @@ export function AdminSettingsPanel() {
         const loaded = await fetchStudioSettings();
         if (active) {
           setSettings(loaded);
+          setMapsKeyConfigured(Boolean(await fetchGoogleMapsKey()));
           setStatus("Studio settings loaded.");
         }
       } catch {
@@ -138,10 +141,12 @@ export function AdminSettingsPanel() {
   }
 
   async function handleSave() {
+    if (settings.googleMapsApiKey && !/^AIza[\w-]{35}$/.test(settings.googleMapsApiKey)) { setStatus("Enter a valid Google Maps browser API key, or leave the field empty."); return; }
     setBusy(true);
     try {
       const saved = await saveStudioSettings(settings);
       setSettings(saved);
+      setMapsKeyConfigured(Boolean(await fetchGoogleMapsKey()));
       setStatus("Studio settings saved.");
     } catch {
       setStatus("Studio settings could not be saved.");
@@ -164,6 +169,22 @@ export function AdminSettingsPanel() {
       </div>
 
       <div className="settings-grid">
+        <section className="admin-panel" aria-labelledby="settings-google-maps-title">
+          <div className="admin-section-heading"><h2 id="settings-google-maps-title">Google Maps</h2></div>
+          <p className="admin-note">Use Google satellite imagery with road labels in the land editor and on customer QR pages.</p>
+          <p>{mapsKeyConfigured ? "A Google Maps key is saved. Open a site to check the map loads correctly." : "Setup needed. Existing land maps remain available while you connect Google Maps."}</p>
+          <TextInput id="google-maps-api-key" label="Google Maps browser API key" value={settings.googleMapsApiKey} maxLength={100} onChange={(value) => updateSettings((draft) => { draft.googleMapsApiKey = value.trim(); })} />
+          <p className="admin-note">Use a website-restricted key. Browser map keys are visible to visitors, so restrict it to Kingsvale domains and the Maps JavaScript API.</p>
+          <details className="workflow-help"><summary>Set up Google Maps</summary>
+            <ol>
+              <li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">Google Cloud</a>, create or select the Kingsvale project, and link a billing account.</li>
+              <li>Enable the <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noreferrer">Maps JavaScript API</a>.</li>
+              <li>Create an API key. Under Application restrictions choose Websites, and add <code>https://kingsvalehomes.co.uk/*</code> and <code>https://www.kingsvalehomes.co.uk/*</code>. Under API restrictions allow only Maps JavaScript API.</li>
+              <li>Paste the key above and choose Save settings. Return to Sites and open a land map. Printed QR links stay the same.</li>
+            </ol>
+            <p>Google requires billing even within its free usage allowance. Set billing alerts and review Maps usage in Google Cloud.</p>
+          </details>
+        </section>
         <section className="admin-panel" aria-labelledby="settings-letter-presets-title">
           <div className="admin-section-heading">
             <h2 id="settings-letter-presets-title">Letter presets</h2>
