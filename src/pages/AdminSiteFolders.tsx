@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, Folder, FolderInput } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { contactPriorityLabels, mailingStatusLabels, type TrackingSite } from "../lib/trackingTypes";
 import { isRemailReminderOverdue, mailingStatusClass, priorityClass } from "../lib/trackingStorage";
+import { loadSiteGroupMode, rememberSiteGroupMode, type SiteGroupMode } from "../lib/siteListOrder";
 
 export const siteFolder = (site: TrackingSite) => site.region.trim() || "Uncategorised";
 export function folderNames(sites: TrackingSite[]) {
@@ -26,7 +27,7 @@ type Props = {
 
 export function AdminSiteFolders({ sites, allSites, selectedId, busy, onSelect, onMove }: Props) {
   const id = useId();
-  const [groupBy, setGroupBy] = useState("folder");
+  const [groupBy, setGroupBy] = useState(loadSiteGroupMode);
   const [folder, setFolder] = useState("");
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -62,7 +63,7 @@ export function AdminSiteFolders({ sites, allSites, selectedId, busy, onSelect, 
       <label className="admin-field"><span className="admin-field__label">Folder</span><select aria-label="Filter by folder" value={folder} onChange={(event) => { setFolder(event.target.value); setRenaming(false); setSelected([]); }}>
         <option value="">All folders</option>{folders.map((name) => <option key={name} value={name}>{name} ({allSites.filter((site) => siteFolder(site).toLowerCase() === name.toLowerCase()).length})</option>)}
       </select></label>
-      <label className="admin-field"><span className="admin-field__label">Group by</span><select aria-label="Group locations by" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setCollapsed([]); }}>
+      <label className="admin-field"><span className="admin-field__label">Group by</span><select aria-label="Group locations by" value={groupBy} onChange={(event) => { const mode = event.target.value as SiteGroupMode; setGroupBy(mode); rememberSiteGroupMode(mode); setCollapsed([]); }}>
         <option value="folder">Folder / region</option><option value="town">Town / city</option><option value="postcode">Postcode district</option>
       </select></label>
     </div>

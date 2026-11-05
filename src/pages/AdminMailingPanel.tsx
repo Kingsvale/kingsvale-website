@@ -4,6 +4,7 @@ import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
+import { loadMailingSortMode, rememberMailingSortMode, sortSites, type MailingSortMode } from "../lib/siteListOrder";
 import { starterLetterTemplates } from "../lib/letterTemplates.js";
 import { letterPresetStage } from "../lib/studioSettings";
 import {
@@ -62,15 +63,13 @@ const letterTokens = [
   "{{tracking_link}}"
 ];
 
-type SortMode = "priority" | "reminder" | "updated";
-
 export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: string }) {
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<ContactPriority | "all">("all");
   const [statusFilter, setStatusFilter] = useState<MailingStatus | "all">("all");
-  const [sortMode, setSortMode] = useState<SortMode>("priority");
+  const [sortMode, setSortMode] = useState(loadMailingSortMode);
   const [defaultReminderDays, setDefaultReminderDays] = useState(14);
   const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
   const [busy, setBusy] = useState(false);
@@ -86,7 +85,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       try {
       const loaded = await listTrackingSites();
       if (active) {
-        const ordered = sortMailingSites(loaded, "priority");
+        const ordered = sortMailingSites(loaded, sortMode);
         setSites(ordered);
         setDraft(ordered.find((site) => site.id === (selectedSiteId || lastWorkflowSite())) ?? ordered.find((site) => !site.archived) ?? ordered[0] ?? null);
       }
@@ -441,8 +440,13 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               id="sort"
               label="Sort"
               value={sortMode}
-              onChange={(value) => setSortMode(value as SortMode)}
+              onChange={(value) => {
+                const mode = value as MailingSortMode;
+                setSortMode(mode);
+                rememberMailingSortMode(mode);
+              }}
               options={[
+                ["sites", "Same as Sites"],
                 ["priority", "Priority"],
                 ["reminder", "Reminder date"],
                 ["updated", "Last updated"]
@@ -720,7 +724,8 @@ function Metric({ label, value, tone = "normal" }: { label: string; value: numbe
   );
 }
 
-function sortMailingSites(sites: TrackingSite[], mode: SortMode) {
+function sortMailingSites(sites: TrackingSite[], mode: MailingSortMode) {
+  if (mode === "sites") return sortSites(sites);
   const priorityWeight: Record<ContactPriority, number> = {
     high: 0,
     medium: 1,

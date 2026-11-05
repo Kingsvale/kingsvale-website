@@ -21,6 +21,7 @@ import { formatPastedAddress } from "../lib/addressCapitalisation";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
+import { sortSites } from "../lib/siteListOrder";
 import LandMapEditor from "./LandMapEditor";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import {
@@ -171,7 +172,7 @@ export function AdminSitesPanel() {
 
   const visibleSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return sites.filter((site) => {
+    return sortSites(sites.filter((site) => {
       if (!showArchived && site.archived) {
         return false;
       }
@@ -189,7 +190,7 @@ export function AdminSitesPanel() {
         contactPriorityLabels[site.contactPriority],
         mailingStatusLabels[site.mailingStatus]
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
+    }));
   }, [query, showArchived, sites]);
 
 
@@ -967,10 +968,6 @@ function buildPublicLink(token: string) {
   }
 
   return `${window.location.origin}/track/${token}`;
-}
-
-function sortSites(sites: TrackingSite[]) {
-  return [...sites].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 function replaceSite(sites: TrackingSite[], nextSite: TrackingSite) {
