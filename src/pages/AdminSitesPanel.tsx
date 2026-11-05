@@ -809,7 +809,8 @@ export function AdminSitesPanel() {
                   value={draft.privateNotes}
                   maxLength={trackingFieldLimits.privateNotes}
                   error={errorsByPath.privateNotes}
-                  onChange={(value) => updateDraft((site) => { site.privateNotes = value; })}
+                  helper="Shared with Mailing. Only visible to Studio editors."
+                  onChange={(value) => updateDraft((site) => { site.privateNotes = value; site.mailingNotes = value; })}
                 />
                 <button type="button" className="admin-ghost" onClick={openInMailing}>
                   <Mail aria-hidden="true" />

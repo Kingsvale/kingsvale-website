@@ -3,11 +3,12 @@ import { createTrackingSite } from "../../src/lib/trackingStorage";
 import { defaultStudioSettings } from "../../src/lib/studioSettings";
 import type { TrackingSite } from "../../src/lib/trackingTypes";
 
-async function setup(page: Page) {
+async function setup(page: Page, notes: Partial<Pick<TrackingSite, "privateNotes" | "mailingNotes">> = {}) {
   let sites: TrackingSite[] = [
     { ...createTrackingSite(), id: "site-a", token: "abcdefghijklmnopqrstuvwx", title: "Petworth Court", reference: "KV0101", region: "Berkshire", siteAddress: "6 Petworth Court, Helston Lane, Windsor, Berkshire, SL4 5HS", siteAddressParts: { line1: "6 Petworth Court", line2: "Helston Lane", town: "Windsor", county: "Berkshire", postcode: "SL4 5HS" } },
     { ...createTrackingSite(), id: "site-b", token: "bcdefghijklmnopqrstuvwxy", title: "Oakley House", reference: "KV0102", region: "Hampshire", siteAddress: "72 Pardown, Oakley, Hampshire, RG23 7DZ", siteAddressParts: { line1: "72 Pardown", line2: "", town: "Oakley", county: "Hampshire", postcode: "RG23 7DZ" } }
   ];
+  Object.assign(sites[0], notes);
   let settings = { ...defaultStudioSettings(), letterPresets: [{ id: "preset-a", name: "Follow Up Full Details", templateName: "Kingsvale Follow Up Title Deed.docx", templateUrl: "/templates/kingsvale-follow-up-letter-template.docx", recipientMode: "title-owner" as const, createdAt: new Date().toISOString() }] };
   const saves: TrackingSite[] = [];
   await page.route("**/api/tracking-sites", async (route) => {
@@ -55,6 +56,27 @@ test("Sites and Mailing autosave typing and flush pending edits before changing 
   await expect(page.getByRole("tab", { name: "Sites", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByLabel("Site title", { exact: true }).fill("Petworth Court");
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
+});
+
+test("Sites and Mailing share migrated notes, edits and clearing across navigation and reload", async ({ page }) => {
+  const state = await setup(page, { privateNotes: "Owner prefers email", mailingNotes: "First letter posted" });
+  const notes = page.getByLabel("Private notes", { exact: true });
+  await expect(notes).toHaveValue("Owner prefers email\n\nFirst letter posted");
+  await notes.fill("Call on Friday");
+  await page.getByRole("tab", { name: "Mailing", exact: true }).click();
+  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Call on Friday");
+  await page.getByLabel("Notes", { exact: true }).fill("Owner has replied");
+  await page.getByRole("tab", { name: "Sites", exact: true }).click();
+  await expect(notes).toHaveValue("Owner has replied");
+  expect(state.sites()[0].privateNotes).toBe("Owner has replied");
+  expect(state.sites()[0].mailingNotes).toBe("Owner has replied");
+  await notes.fill("");
+  await page.getByRole("tab", { name: "Mailing", exact: true }).click();
+  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("");
+  await page.reload();
+  await page.getByRole("tab", { name: "Sites", exact: true }).click();
+  await expect(notes).toHaveValue("");
+  expect(state.sites()[0].mailingNotes).toBe("");
 });
 
 test("folders support bulk moves, rename, grouping, and manual address entry", async ({ page }, testInfo) => {

@@ -30,6 +30,7 @@ COPY --from=build /app/src/lib/trackingQrSvg.js ./src/lib/trackingQrSvg.js
 COPY --from=build /app/src/lib/letterTemplates.js ./src/lib/letterTemplates.js
 COPY --from=build /app/src/lib/landMap.js ./src/lib/landMap.js
 COPY --from=build /app/src/lib/trackingAddress.js ./src/lib/trackingAddress.js
+COPY --from=build /app/src/lib/siteNotes.js ./src/lib/siteNotes.js
 COPY server ./server
 COPY public ./public
 

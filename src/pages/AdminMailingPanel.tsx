@@ -139,7 +139,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
           site.title,
           site.siteAddress,
           site.customerName,
-          site.mailingNotes
+          site.privateNotes
         ].some((value) => value.toLowerCase().includes(normalizedQuery));
       }),
       sortMode
@@ -638,10 +638,11 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               <Textarea
                 id="mailing-notes"
                 label="Notes"
-                value={draft.mailingNotes}
+                value={draft.privateNotes}
                 rows={5}
-                maxLength={trackingFieldLimits.mailingNotes}
-                onChange={(value) => updateDraft((site) => { site.mailingNotes = value; })}
+                maxLength={trackingFieldLimits.privateNotes}
+                helper="Shared with Sites. Only visible to Studio editors."
+                onChange={(value) => updateDraft((site) => { site.privateNotes = value; site.mailingNotes = value; })}
               />
 
               {!validation.valid && <div className="admin-errors" role="alert"><strong>Check these details</strong><ul>{validation.errors.map((error) => <li key={error.path}>{error.message}</li>)}</ul></div>}

@@ -1,6 +1,7 @@
 import type { ContactPriority, LetterRecipientMode, MailingStatus, TrackingQrStyle, TrackingSite } from "./trackingTypes";
 import { boundedPercent, presetRoundness } from "./qrStyle";
 import { cleanLandMap } from "./landMap";
+import { sharedSiteNotes } from "./siteNotes.js";
 
 type LegacyQrStyle = Partial<TrackingQrStyle> & {
   dotStyle?: string;
@@ -28,7 +29,7 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     landMap: cleanLandMap(site.landMap) ?? site.landMap ?? null,
-    privateNotes: site.privateNotes ?? "",
+    ...sharedSiteNotes(site),
     letterPresetId: site.letterPresetId ?? "",
     letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),
     titleDeedFileName: site.titleDeedFileName ?? "",
@@ -66,7 +67,6 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
     trackingLastCheckedAt: site.trackingLastCheckedAt ?? null,
     remailReminderDays,
     remailReminderDate: site.remailReminderDate || suggestRemailReminderDate(firstMailedAt, remailReminderDays),
-    mailingNotes: site.mailingNotes ?? "",
     mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
 }

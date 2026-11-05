@@ -12,6 +12,7 @@ import type {
 } from "./trackingTypes";
 
 import { validateLandMap } from "./landMap";
+import { siteNotesMaxLength } from "./siteNotes.js";
 
 export type TrackingValidationError = {
   path: string;
@@ -40,7 +41,7 @@ export const trackingFieldLimits = {
   reference: 64,
   region: 80,
   mapEmbedUrl: 1200,
-  privateNotes: 1200,
+  privateNotes: siteNotesMaxLength,
   letterPresetId: 120,
   titleDeedFileName: 160,
   titleDeedFileUrl: 7_000_000,
@@ -52,7 +53,7 @@ export const trackingFieldLimits = {
   statusNote: 320,
   royalMailTrackingNumber: 40,
   trackingStatus: 140,
-  mailingNotes: 1200,
+  mailingNotes: siteNotesMaxLength,
   councilName: 90,
   applicationReference: 80,
   apiBaseUrl: 180,
@@ -184,7 +185,11 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
       message: "Google My Maps embed must be a safe Google Maps, Google My Maps or Google Earth URL."
     });
   }
-  addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private note", trackingFieldLimits.privateNotes);
+  if (typeof site.privateNotes !== "string") {
+    errors.push({ path: "privateNotes", message: "Private notes must be text." });
+  } else {
+    addOptionalTextError(errors, "privateNotes", site.privateNotes, "Private note", trackingFieldLimits.privateNotes);
+  }
   addOptionalTextError(
     errors,
     "letterPresetId",
@@ -332,13 +337,11 @@ function addMailingErrors(errors: TrackingValidationError[], site: TrackingSite)
     "Tracking status",
     trackingFieldLimits.trackingStatus
   );
-  addOptionalTextError(
-    errors,
-    "mailingNotes",
-    site.mailingNotes,
-    "Mailing notes",
-    trackingFieldLimits.mailingNotes
-  );
+  if (typeof site.mailingNotes !== "string") {
+    errors.push({ path: "mailingNotes", message: "Mailing notes must be text." });
+  } else {
+    addOptionalTextError(errors, "mailingNotes", site.mailingNotes, "Mailing notes", trackingFieldLimits.mailingNotes);
+  }
 
   if (!Number.isFinite(site.remailReminderDays) || site.remailReminderDays < 1 || site.remailReminderDays > 120) {
     errors.push({ path: "remailReminderDays", message: "Reminder days must be between 1 and 120." });

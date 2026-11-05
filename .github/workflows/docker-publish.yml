@@ -50,8 +50,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation
           npm ci --no-audit --no-fund
           node --test tests/server/deployment.test.mjs
-          node node_modules/vitest/vitest.mjs run src/hooks/useSiteAutosave.test.tsx
+          node node_modules/vitest/vitest.mjs run src/hooks/useSiteAutosave.test.tsx src/lib/siteNotes.test.ts
           npm run build:docker
+          node --import tsx --test tests/server/site-notes.test.mjs
           node --import tsx --test tests/server/media-backup.test.mjs
           node --test tests/server/drive-backup.test.mjs
           node scripts/verify-letter-preview.mjs

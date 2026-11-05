@@ -9,6 +9,7 @@ import type {
 } from "./trackingTypes";
 import { validateTrackingSite } from "./trackingValidation";
 import { defaultQrStyle, normalizeTrackingSite } from "./trackingNormalize";
+import { sharedSiteNotes } from "./siteNotes.js";
 
 export {
   defaultQrStyle,
@@ -50,13 +51,14 @@ export function saveLocalTrackingSites(sites: TrackingSite[]) {
 }
 
 export function upsertLocalTrackingSite(site: TrackingSite): TrackingSite {
-  const validation = validateTrackingSite(site);
+  const sites = loadLocalTrackingSites();
+  const normalized = { ...site, ...sharedSiteNotes(site, sites.find((item) => item.id === site.id)) };
+  const validation = validateTrackingSite(normalized);
   if (!validation.valid) {
     throw new Error("Tracking site is invalid and cannot be saved.");
   }
 
-  const sites = loadLocalTrackingSites();
-  const nextSite = { ...site, updatedAt: new Date().toISOString() };
+  const nextSite = { ...normalized, updatedAt: new Date().toISOString() };
   const duplicateReference = nextSite.reference.trim()
     ? sites.find(
         (item) =>

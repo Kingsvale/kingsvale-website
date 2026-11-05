@@ -310,6 +310,8 @@ Run `npm run test:media` for a fresh-server upload/export/restore test (includin
 
 ### Letter previews and mailing
 
+Sites and Mailing share the same private note. Changes in either section save automatically and appear in the other. Existing separate notes are combined without losing text; notes remain visible only to Studio editors and are included in backups.
+
 Sites saves pending edits before opening the same record in Mailing. Mailing lets you check the recipient and address, choose a starter or uploaded DOCX, generate and preview the completed letter, and download it. Posting dates and follow-up reminders are entered separately from generation; Mark posted today schedules the next reminder from the latest posting date.
 
 Settings supports previewing, renaming and replacing reusable templates and choosing their default recipient mode. Use {{date}} for the generated date and the documented address tokens for variable text. To identify a QR image explicitly, set a PNG image's description in Word to KINGSVALE_QR; older templates retain the existing image-detection fallback. Sites → QR Code Design → Use Kingsvale letter style applies the new deep-green, white-background design to an existing site.

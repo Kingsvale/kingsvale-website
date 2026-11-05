@@ -2,6 +2,7 @@ import { createContactMailer } from "./contact-mail.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
+import { sharedSiteNotes, siteNotesMaxLength } from "../src/lib/siteNotes.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
@@ -758,14 +759,16 @@ async function handleTrackingSitesCollection(request, response) {
 
   if (request.method === "PUT") {
     const payload = await readJsonBody(request, 8_000_000);
-    const site = normalizeTrackingSite(payload.site ?? {});
+    const store = await readTrackingStore();
+    const incoming = payload.site ?? {};
+    const previous = store.sites.find((item) => item.id === incoming.id);
+    const site = normalizeTrackingSite({ ...incoming, ...sharedSiteNotes(incoming, previous) });
     const validation = validateTrackingSite(site);
     if (!validation.valid) {
       sendJson(response, 400, { errors: validation.errors });
       return;
     }
 
-    const store = await readTrackingStore();
     const existingTokenOwner = store.sites.find(
       (item) => item.token === site.token && item.id !== site.id
     );
@@ -1865,7 +1868,8 @@ function validateTrackingSite(site) {
   if (site.mapEmbedUrl && !isSafeMapEmbedUrl(site.mapEmbedUrl)) {
     errors.push({ path: "mapEmbedUrl", message: "Google My Maps embed must be a safe Google map URL." });
   }
-  validateOptionalText(errors, "privateNotes", site.privateNotes, "Private note", 1200);
+  if (typeof site.privateNotes !== "string") errors.push({ path: "privateNotes", message: "Private notes must be text." });
+  validateOptionalText(errors, "privateNotes", site.privateNotes, "Private note", siteNotesMaxLength);
   validateOptionalText(errors, "letterPresetId", site.letterPresetId, "Letter preset", 120);
   if (!["legal-owner", "title-owner", "plot-land"].includes(site.letterRecipientMode)) {
     errors.push({ path: "letterRecipientMode", message: "Choose an approved letter recipient mode." });
@@ -2062,7 +2066,8 @@ function validateMailing(errors, site) {
 
   validateOptionalText(errors, "royalMailTrackingNumber", site.royalMailTrackingNumber, "Royal Mail tracking number", 40);
   validateOptionalText(errors, "trackingStatus", site.trackingStatus, "Tracking status", 140);
-  validateOptionalText(errors, "mailingNotes", site.mailingNotes, "Mailing notes", 1200);
+  if (typeof site.mailingNotes !== "string") errors.push({ path: "mailingNotes", message: "Mailing notes must be text." });
+  validateOptionalText(errors, "mailingNotes", site.mailingNotes, "Mailing notes", siteNotesMaxLength);
 
   if (!Number.isFinite(site.remailReminderDays) || site.remailReminderDays < 1 || site.remailReminderDays > 120) {
     errors.push({ path: "remailReminderDays", message: "Reminder days must be between 1 and 120." });
@@ -2157,7 +2162,7 @@ function normalizeTrackingSite(site) {
     contactPriority: normalizeContactPriority(site.contactPriority),
     mapEmbedUrl: normalizeMapEmbedInput(site.mapEmbedUrl ?? ""),
     landMap: cleanLandMap(site.landMap) ?? site.landMap ?? null,
-    privateNotes: site.privateNotes ?? "",
+    ...sharedSiteNotes(site),
     letterPresetId: site.letterPresetId ?? "",
     letterRecipientMode: normalizeLetterRecipientMode(site.letterRecipientMode),
     titleDeedFileName: site.titleDeedFileName ?? "",
@@ -2195,7 +2200,6 @@ function normalizeTrackingSite(site) {
     trackingLastCheckedAt: site.trackingLastCheckedAt ?? null,
     remailReminderDays,
     remailReminderDate: site.remailReminderDate || suggestRemailReminderDate(firstMailedAt, remailReminderDays),
-    mailingNotes: site.mailingNotes ?? "",
     mailingLastUpdatedAt: site.mailingLastUpdatedAt ?? site.updatedAt ?? new Date().toISOString()
   };
 }

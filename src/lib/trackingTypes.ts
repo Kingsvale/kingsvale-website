@@ -89,6 +89,7 @@ export type TrackingSite = {
   summary: string;
   mapEmbedUrl: string;
   landMap?: import("./landMap").LandMap | null;
+  /** Shared editor-only note used by Sites and Mailing. */
   privateNotes: string;
   letterPresetId: string;
   letterRecipientMode: LetterRecipientMode;
@@ -115,6 +116,7 @@ export type TrackingSite = {
   trackingLastCheckedAt: string | null;
   remailReminderDays: number;
   remailReminderDate: string;
+  /** Compatibility alias of privateNotes for stored records and backups. */
   mailingNotes: string;
   mailingLastUpdatedAt: string;
   createdAt: string;

@@ -10,6 +10,7 @@ import { collectMedia, prepareMediaRestore } from "./server/media-backup.mjs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ViteDevServer } from "vite";
 import { normalizeTrackingSite } from "./src/lib/trackingNormalize";
+import { sharedSiteNotes } from "./src/lib/siteNotes.js";
 import type { TrackingSite } from "./src/lib/trackingTypes";
 import { validateTrackingSite } from "./src/lib/trackingValidation";
 import { publicLandMap } from "./src/lib/landMap";
@@ -192,14 +193,16 @@ async function handleDevTrackingRequest(request: IncomingMessage, response: Serv
 
     if (request.method === "PUT") {
       const payload = await readDevJsonBody(request, 8_000_000);
-      const site = normalizeTrackingSite(payload.site ?? {});
+      const store = await readDevTrackingStore();
+      const incoming = payload.site ?? {};
+      const previous = store.sites.find((item) => item.id === incoming.id);
+      const site = normalizeTrackingSite({ ...incoming, ...sharedSiteNotes(incoming, previous) });
       const validation = validateTrackingSite(site);
       if (!validation.valid) {
         sendDevJson(response, 400, { errors: validation.errors });
         return;
       }
 
-      const store = await readDevTrackingStore();
       const now = new Date().toISOString();
       const savedSite = {
         ...site,
