@@ -28,6 +28,7 @@ export const trackingFieldLimits = {
   title: 72,
   customerName: 80,
   siteAddress: 160,
+  landAddress: 220,
   addressLine1: 90,
   addressLine2: 90,
   addressTown: 70,
@@ -152,6 +153,11 @@ export function validateTrackingSite(site: TrackingSite): TrackingValidationResu
     errors.push({ path: "siteAddressParts.postcode", message: "Use a valid UK postcode." });
   }
   addOptionalTextError(errors, "reference", site.reference, "Reference", trackingFieldLimits.reference);
+  if (site.landAddress != null && typeof site.landAddress !== "string") {
+    errors.push({ path: "landAddress", message: "Site address (if different) must be text." });
+  } else {
+    addOptionalTextError(errors, "landAddress", site.landAddress ?? "", "Site address (if different)", trackingFieldLimits.landAddress);
+  }
   addOptionalTextError(errors, "region", site.region, "Region", trackingFieldLimits.region);
   addOptionalTextError(
     errors,

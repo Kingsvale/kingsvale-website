@@ -43,6 +43,8 @@ export default function LandMapEditor({ value, postcode, disabled, onChange, onB
   const blocked = disabled || importing;
   const previousSave = useRef(savedAt);
 
+  useEffect(() => { setSearch(postcode === "AA1 1AA" ? "" : postcode); }, [postcode]);
+
   useEffect(() => {
     if (previousSave.current !== savedAt) {
       previousSave.current = savedAt;

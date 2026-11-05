@@ -1,6 +1,6 @@
 import {
   findPublicLocalTrackingSiteByToken,
-  loadPublicLocalTrackingSites,
+  lookupPublicLocalTrackingSite,
   normalizePublicTrackingSite
 } from "./trackingLocalRead";
 import type { TrackingSite } from "./trackingTypes";
@@ -45,18 +45,7 @@ export async function lookupTrackingSite(reference: string, postcode: string): P
 }
 
 function lookupLocalTrackingSite(reference: string, postcode: string) {
-  const normalizedReference = reference.trim().toUpperCase();
-  const normalizedPostcode = postcode.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return loadPublicLocalTrackingSites().find((site) =>
-    !site.archived &&
-    site.reference.trim().toUpperCase() === normalizedReference &&
-    extractPostcode(site.siteAddress) === normalizedPostcode
-  ) ?? null;
-}
-
-function extractPostcode(address: string) {
-  const match = address.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
-  return match ? match[1].replace(/[^A-Z0-9]/g, "") : "";
+  return lookupPublicLocalTrackingSite(reference, postcode);
 }
 
 function isLocalDemoRuntime() {

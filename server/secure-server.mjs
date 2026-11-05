@@ -1,6 +1,7 @@
 import { createContactMailer } from "./contact-mail.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
+import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
@@ -1830,6 +1831,11 @@ function validateTrackingSite(site) {
 
   validateText(errors, "title", site.title, "Site title", 72);
   validateText(errors, "siteAddress", site.siteAddress, "Site address", 160);
+  if (site.landAddress != null && typeof site.landAddress !== "string") {
+    errors.push({ path: "landAddress", message: "Site address (if different) must be text." });
+  } else {
+    validateOptionalText(errors, "landAddress", site.landAddress ?? "", "Site address (if different)", 220);
+  }
   validateText(errors, "siteAddressParts.line1", site.siteAddressParts?.line1, "Address line 1", 90);
   validateOptionalText(errors, "siteAddressParts.line2", site.siteAddressParts?.line2 ?? "", "Address line 2", 90);
   validateText(errors, "siteAddressParts.town", site.siteAddressParts?.town, "Town or city", 70);
@@ -2128,6 +2134,7 @@ function normalizeTrackingSite(site) {
     ...site,
     siteAddress,
     siteAddressParts,
+    landAddress: typeof site.landAddress === "string" ? site.landAddress.trim() : site.landAddress ?? "",
     region: site.region || detectSiteRegion(siteAddress) || siteAddressParts.county || siteAddressParts.town || "Uncategorised",
     ownerAddress: site.ownerAddress ?? "",
     titleNumber: site.titleNumber ?? "",
@@ -2237,7 +2244,7 @@ function publicTrackingSite(site) {
   void remailReminderDate;
   void mailingNotes;
   void mailingLastUpdatedAt;
-  return { ...publicSite, landMap: publicLandMap(site.landMap) };
+  return { ...publicSite, ...publicTrackingAddress(site), landMap: publicLandMap(site.landMap) };
 }
 
 function normalizeMapEmbedInput(value) {

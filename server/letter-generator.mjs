@@ -1,6 +1,7 @@
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import sharp from "sharp";
 import { buildStyledQrSvg, safeColor, WORD_QR_EXPORT_SIZE } from "../src/lib/trackingQrSvg.js";
+import { publicTrackingAddress, parseTrackingAddress } from "../src/lib/trackingAddress.js";
 
 const textNodePattern = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
 const xmlEntryPattern = /^word\/(?!_rels\/).+\.xml$/;
@@ -70,16 +71,19 @@ export function buildLetterTokens(site, publicLink) {
   const mode = ["legal-owner", "title-owner", "plot-land"].includes(site?.letterRecipientMode)
     ? site.letterRecipientMode
     : "legal-owner";
+  const landAddress = cleanText(site?.landAddress);
   const targetAddress = mode === "plot-land"
-    ? cleanText(site?.plotDescription) || cleanText(site?.siteAddress)
+    ? landAddress || cleanText(site?.plotDescription) || cleanText(site?.siteAddress)
     : cleanText(site?.siteAddress);
-  const address = normalizeAddressParts(site?.siteAddressParts, targetAddress);
+  const address = mode === "plot-land" && landAddress
+    ? parseTrackingAddress(landAddress)
+    : normalizeAddressParts(site?.siteAddressParts, targetAddress);
   const titledOwnerName = cleanText(site?.customerName) || cleanText(site?.ownerContactName) || "The Legal Owner";
   const legalName = mode === "title-owner" ? titledOwnerName : "The Legal Owner";
   const council = cleanText(site?.siteAddressParts?.county) || cleanText(site?.council?.councilName) || cleanText(site?.region);
   const streetAddress = [address.line1, address.line2].filter(Boolean).join(", ");
   const allAddress = buildAddressFromParts(address) || targetAddress.replace(/\s*,\s*/g, ", ");
-  const siteAddress = cleanText(site?.siteAddress).replace(/\s*,\s*/g, ", ");
+  const siteAddress = cleanText(publicTrackingAddress(site ?? {}).siteAddress).replace(/\s*,\s*/g, ", ");
   const generatedDate = formatLetterDate(new Date());
 
   return new Map([

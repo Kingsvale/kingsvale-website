@@ -16,6 +16,7 @@ import {
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle } from "../lib/trackingNormalize";
+import { parseTrackingAddress, publicTrackingAddress } from "../lib/trackingAddress.js";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
@@ -65,6 +66,21 @@ import {
 
 const resourceTypes = Object.keys(trackingResourceLabels) as TrackingResourceType[];
 const contactPriorities = Object.keys(contactPriorityLabels) as ContactPriority[];
+
+function LetterAddressPaste({ onFill }: { onFill: (value: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <AdminTextarea
+      id="paste-full-letter-address"
+      label="Paste full letter address"
+      value={text}
+      maxLength={500}
+      rows={2}
+      helper="Paste a comma-separated or multiline address to fill the fields below automatically. Review the split and add any missing details."
+      onChange={(value) => { setText(value); onFill(value); }}
+    />
+  );
+}
 
 function TrackingTextInput({ id, label, ...props }: ComponentProps<typeof AdminTextInput>) {
   return <AdminTextInput {...props} id={id ?? toId(label)} label={label} />;
@@ -165,6 +181,7 @@ export function AdminSitesPanel() {
         site.title,
         site.customerName,
         site.siteAddress,
+        site.landAddress ?? "",
         site.region,
         site.reference,
         contactPriorityLabels[site.contactPriority],
@@ -345,6 +362,18 @@ export function AdminSitesPanel() {
       site.siteAddress = buildAddressFromParts(nextParts);
       if (!site.region || site.region === "Uncategorised") {
         site.region = nextParts.county.trim() || detectSiteRegion(site.siteAddress) || (nextParts.town.trim() !== "Town" ? nextParts.town.trim() : "") || "Uncategorised";
+      }
+    });
+  }
+
+  function fillLetterAddress(value: string) {
+    if (!value.trim()) return;
+    const parts = parseTrackingAddress(value);
+    updateDraft((site) => {
+      site.siteAddressParts = parts;
+      site.siteAddress = buildAddressFromParts(parts);
+      if (!site.region || site.region === "Uncategorised") {
+        site.region = parts.county || detectSiteRegion(site.siteAddress) || parts.town || "Uncategorised";
       }
     });
   }
@@ -541,7 +570,17 @@ export function AdminSitesPanel() {
                     This reference already exists. References must be unique.
                   </p>
                 )}
-                <div className="workflow-heading"><span>02</span><div><h3>Letter address</h3><p>Enter each part on its own line. These details fill your Word templates automatically.</p></div></div>
+                <TrackingTextarea
+                  label="Site address (if different)"
+                  value={draft.landAddress ?? ""}
+                  maxLength={trackingFieldLimits.landAddress}
+                  error={errorsByPath.landAddress}
+                  helper="Leave blank to use the letter address. If the owner lives elsewhere, enter the land address here for the QR page."
+                  onChange={(value) => updateDraft((site) => { site.landAddress = value; })}
+                />
+                <p className="admin-panel__note"><strong>QR page site address:</strong> {publicTrackingAddress(draft).siteAddress}</p>
+                <div className="workflow-heading"><span>02</span><div><h3>Letter address</h3><p>The correspondence address used for letters and envelopes. Also used on the QR page unless a different site address is entered above.</p></div></div>
+                <LetterAddressPaste key={draft.id} onFill={fillLetterAddress} />
                 <TrackingTextInput
                   label="Address line 1"
                   value={draft.siteAddressParts.line1}
@@ -744,7 +783,7 @@ export function AdminSitesPanel() {
               <LandMapEditor
                 key={draft.id}
                 value={draft.landMap ?? null}
-                postcode={draft.siteAddressParts.postcode}
+                postcode={publicTrackingAddress(draft).siteAddressParts?.postcode ?? ""}
                 disabled={busy || draft.archived}
                 onChange={(landMap) => updateDraft((site) => { site.landMap = landMap; })}
                 onBusyChange={setMapBusy}

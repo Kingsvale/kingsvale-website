@@ -18,7 +18,19 @@ existing folder. Renaming explicitly includes archived records. Partial failures
 report the number saved, and only successful records are updated in the editor.
 Address edits do not replace an existing folder choice.
 
-Enter letter addresses directly in the address fields in Sites or Mailing.
+Enter letter addresses directly in the address fields in Sites or Mailing. In
+Sites, **Paste full letter address** splits a comma-separated or multiline address
+into address lines, town, a supplied county and a formatted postcode. Review the
+split and edit any field as needed; missing details are not looked up or invented.
+
+The QR page uses the letter address by default. When the owner lives elsewhere,
+enter the land address in **Site & owner > Site address (if different)**. That
+address appears on the QR page and supplies the map editor's postcode; clearing
+it restores the letter-address default. Letters and envelopes keep their letter
+address, and public reference lookup still uses the postcode printed on the
+letter. The `{{site_address}}` letter token uses the land address when supplied;
+an explicitly selected **Plot of land** recipient also uses that land address.
+Both addresses are saved with the site and included in backups.
 
 Letter generation uses saved presets from Settings, grouped into Initial and
 Follow-up stages. Existing preset names containing “follow up” or “follow-up”

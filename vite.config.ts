@@ -13,6 +13,7 @@ import { normalizeTrackingSite } from "./src/lib/trackingNormalize";
 import type { TrackingSite } from "./src/lib/trackingTypes";
 import { validateTrackingSite } from "./src/lib/trackingValidation";
 import { publicLandMap } from "./src/lib/landMap";
+import { publicTrackingAddress } from "./src/lib/trackingAddress.js";
 // @ts-expect-error server helper is intentionally authored as runtime ESM for production Node.
 import { createTrackingQrPng, generateLetterDocx } from "./server/letter-generator.mjs";
 
@@ -28,6 +29,7 @@ export default defineConfig({
             { name: "react-vendor", test: /\/node_modules\/(react|react-dom|scheduler)\//, priority: 1000 },
             { name: "land-map-engine", test: /\/node_modules\/leaflet\//, priority: 900 },
             { name: "land-map-data", test: /\/src\/lib\/landMap\.js/, priority: 900 },
+            { name: "tracking-address", test: /\/src\/lib\/trackingAddress\.js/, priority: 900 },
             { name: "land-map-view", test: /\/src\/pages\/LandMapCanvas/, priority: 800 },
             { name: "studio-map-tools", test: /\/node_modules\/@geoman-io\//, priority: 700 },
             { name(id) {
@@ -602,7 +604,7 @@ function publicDevTrackingSite(site: TrackingSite) {
   void remailReminderDate;
   void mailingNotes;
   void mailingLastUpdatedAt;
-  return { ...publicSite, landMap: publicLandMap(site.landMap) };
+  return { ...publicSite, ...publicTrackingAddress(site), landMap: publicLandMap(site.landMap) };
 }
 
 function normalizeLookupText(value: unknown) {

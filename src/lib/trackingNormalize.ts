@@ -19,6 +19,7 @@ export function normalizeTrackingSite(site: TrackingSite): TrackingSite {
     ...site,
     siteAddress,
     siteAddressParts,
+    landAddress: typeof site.landAddress === "string" ? site.landAddress.trim() : site.landAddress ?? "",
     region: site.region || detectSiteRegion(siteAddress) || siteAddressParts.county || siteAddressParts.town || "Uncategorised",
     ownerAddress: site.ownerAddress ?? "",
     titleNumber: site.titleNumber ?? "",

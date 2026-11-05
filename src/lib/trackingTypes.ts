@@ -77,6 +77,8 @@ export type TrackingSite = {
   customerName: string;
   siteAddress: string;
   siteAddressParts: TrackingAddressParts;
+  /** Optional land address. Legacy siteAddress fields remain the letter address. */
+  landAddress?: string;
   ownerAddress: string;
   titleNumber: string;
   plotDescription: string;

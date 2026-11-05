@@ -129,6 +129,7 @@ export function createTrackingSite(): TrackingSite {
       postcode: "AA1 1AA"
     },
     ownerAddress: "",
+    landAddress: "",
     titleNumber: "",
     plotDescription: "",
     reference: "",
