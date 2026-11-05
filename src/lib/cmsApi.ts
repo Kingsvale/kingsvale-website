@@ -314,6 +314,25 @@ export async function createSavedLetterPdf(url: string): Promise<UploadedLetterF
   return payload.file;
 }
 
+export type LetterTextContent = { version: string; paragraphs: Array<{ id: number; text: string }> };
+
+export async function loadLetterText(url: string): Promise<LetterTextContent> {
+  return letterEditorRequest("content", { url });
+}
+
+export async function saveLetterText(url: string, name: string, version: string, changes: LetterTextContent["paragraphs"]): Promise<UploadedLetterFile> {
+  return (await letterEditorRequest("edit", { url, name, version, changes })).file;
+}
+
+async function letterEditorRequest(action: "content" | "edit", body: unknown) {
+  const response = await fetch(`/api/letters/${action}`, { method: "POST", credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }), body: JSON.stringify(body) });
+  if (!isJsonResponse(response)) throw new Error("The letter editor could not be loaded. Please try again.");
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "The letter could not be prepared. Please try again.");
+  return payload;
+}
+
 export async function previewLetterDocument(url: string): Promise<{ pages: string[]; pageCount: number }> {
   const response = await fetch("/api/letters/preview", {
     method: "POST", credentials: "same-origin",

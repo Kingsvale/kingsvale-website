@@ -310,6 +310,15 @@ Run `npm run test:media` for a fresh-server upload/export/restore test (includin
 
 ### Letter previews and mailing
 
+For a saved Word letter, choose **Mailing → Edit letter** beside **Preview letter**.
+Edit the greeting, paragraphs or sign-off, or use **Use recipient name in greeting**.
+**Save changes & preview** saves new Word and PDF files and opens the print preview.
+Changes apply to that individual letter; reusable templates remain unchanged.
+The editor preserves the letterhead, QR artwork and existing document formatting.
+Cancel offers to discard unsaved changes. Generating from a template again replaces
+individual wording edits. PDF-only or image uploads can be replaced with a Word
+letter to use the text editor.
+
 Sites and Mailing share the same private note. Changes in either section save automatically and appear in the other. Existing separate notes are combined without losing text; notes remain visible only to Studio editors and are included in backups.
 
 Sites saves pending edits before opening the same record in Mailing. Mailing lets you check the recipient and address, choose a starter or uploaded DOCX, generate and preview the completed letter, and download it. Posting dates and follow-up reminders are entered separately from generation; Mark posted today schedules the next reminder from the latest posting date.

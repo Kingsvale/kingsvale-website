@@ -3,13 +3,17 @@ import { readFile } from "node:fs/promises";
 import { createTrackingSite } from "../../src/lib/trackingStorage";
 import { defaultStudioSettings } from "../../src/lib/studioSettings";
 // @ts-expect-error Production document generator is runtime ESM.
-import { createTrackingQrPng, generateLetterDocx } from "../../server/letter-generator.mjs";
+import { createTrackingQrPng, generateLetterDocx, editLetterParagraphs, extractLetterParagraphs } from "../../server/letter-generator.mjs";
+// @ts-expect-error Production document editor is runtime ESM.
+import { letterContent } from "../../server/letter-editor.mjs";
 
 test("mailing preserves edits when sorting and previews a generated branded letter", async ({ page, context }, testInfo) => {
   let site = { ...createTrackingSite(), title: "Oakley letter test", reference: "KV-TEST-042", customerName: "Test Owner",
     siteAddress: "72 Pardown, Oakley, Hampshire, RG23 7DZ", siteAddressParts: { line1: "72 Pardown", line2: "", town: "Oakley", county: "Hampshire", postcode: "RG23 7DZ" } };
   let generated: Buffer;
   let serverPreview = false;
+  let failEdit = false;
+  let failLoad = false;
   await context.route("**/api/letters/preview", (route) => serverPreview
     ? route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } })
     : route.fulfill({ status: 404, json: { error: "Local renderer unavailable" } }));
@@ -34,6 +38,17 @@ test("mailing preserves edits when sorting and previews a generated branded lett
     await route.fulfill({ json: { file: { url: "/media/test-generated.docx", name: "Oakley letter.docx", documents } } });
   });
   await context.route("**/media/test-generated.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  await context.route("**/api/letters/content", (route) => failLoad
+    ? route.fulfill({ status: 422, json: { error: "Letter text could not be loaded." } })
+    : route.fulfill({ json: letterContent(generated) }));
+  await context.route("**/api/letters/edit", (route) => {
+    if (failEdit) return route.fulfill({ status: 422, json: { error: "The PDF could not be prepared. Please try again." } });
+    const data = route.request().postDataJSON();
+    expect(data.url).toBe(site.letterFileUrl);
+    expect(data.version).toBe(letterContent(generated).version);
+    generated = editLetterParagraphs(generated, data.changes);
+    return route.fulfill({ status: 201, json: { file: { url: "/media/test-edited.docx", name: "Oakley letter.docx", documents: [{ kind: "letter-pdf", url: "/media/test-edited.pdf", name: "Oakley letter.pdf" }] } } });
+  });
   await page.goto("/studio");
   await page.getByLabel("Studio passphrase").fill("KV-3D0pKUxlx2yC");
   await page.getByRole("button", { name: "Unlock studio" }).click();
@@ -68,6 +83,49 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await dialog.screenshot({ path: testInfo.outputPath("letter-preview.png") });
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  const envelopes = site.letterDocuments?.filter((item) => item.kind !== "letter-pdf");
+  failLoad = true;
+  await page.getByRole("button", { name: "Edit letter", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("could not be loaded");
+  failLoad = false;
+  await dialog.getByRole("button", { name: "Try loading again" }).click();
+  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Sir/Madam,");
+  await dialog.getByRole("button", { name: "Use recipient name in greeting" }).click();
+  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  // Locate by the saved value rather than relying on a template's paragraph order.
+  const body = dialog.locator("textarea").filter({ hasText: /^I am writing/ });
+  await body.fill("A personal note about your land.\nPlease contact us when convenient.");
+  await page.keyboard.press("Escape");
+  await expect(dialog.getByText("Discard your unsaved changes?", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Keep editing" }).click();
+  failEdit = true;
+  await dialog.getByRole("button", { name: "Save changes & preview" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("PDF could not be prepared");
+  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  expect(site.letterFileUrl).toBe("/media/test-generated.docx");
+  await dialog.screenshot({ path: testInfo.outputPath("letter-editor.png") });
+  failEdit = false;
+  serverPreview = true;
+  await dialog.getByRole("button", { name: "Save changes & preview" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Print layout preview");
+  await expect(dialog.getByRole("link", { name: "Open PDF / Print" })).toHaveAttribute("href", "/media/test-edited.pdf");
+  await page.keyboard.press("Escape");
+  expect(site.letterFileUrl).toBe("/media/test-edited.docx");
+  expect(site.letterDocuments?.filter((item) => item.kind !== "letter-pdf")).toEqual(envelopes);
+  expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "Dear Alex Example,")).toBe(true);
+  expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "A personal note about your land.\nPlease contact us when convenient.")).toBe(true);
+  await page.getByRole("button", { name: "Edit letter", exact: true }).click();
+  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  await dialog.getByLabel("Greeting", { exact: true }).fill("Do not save this");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialog.getByRole("button", { name: "Discard changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "Do not save this")).toBe(false);
+  await page.reload();
+  await page.getByRole("tab", { name: "Mailing", exact: true }).click();
+  await page.getByRole("button", { name: "Edit letter", exact: true }).click();
+  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(site.initialLetterGeneratedAt).toBeTruthy();
   await page.getByRole("tab", { name: "Sites", exact: true }).click();
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();

@@ -67,6 +67,88 @@ export function replaceDocxText(templateBuffer, replacements) {
   return writeZip(entries);
 }
 
+// Edit the saved document itself, so uploaded letterheads, QR images, page setup
+// and unchanged Word runs survive a small wording change.
+export function extractLetterParagraphs(buffer) {
+  const document = readZip(buffer).find((entry) => entry.name === "word/document.xml");
+  if (!document) throw new Error("DOCX document is missing.");
+  return letterParagraphRanges(document.data.toString("utf8")).map((paragraph, id) => ({
+    id, text: wordTextTokens(paragraph.xml).map((token) => token.text).join("")
+  })).filter((paragraph) => paragraph.text.trim());
+}
+
+export function editLetterParagraphs(buffer, changes) {
+  const entries = readZip(buffer);
+  const document = entries.find((entry) => entry.name === "word/document.xml");
+  if (!document) throw new Error("DOCX document is missing.");
+  const xml = document.data.toString("utf8");
+  const paragraphs = letterParagraphRanges(xml);
+  let next = xml;
+  for (const change of [...changes].sort((a, b) => b.id - a.id)) {
+    const paragraph = paragraphs[change.id];
+    if (!paragraph) throw new Error("DOCX paragraph is missing.");
+    const edited = editWordParagraph(paragraph.xml, change.text);
+    next = next.slice(0, paragraph.start) + edited + next.slice(paragraph.end);
+  }
+  document.data = Buffer.from(next);
+  return writeZip(entries);
+}
+
+function letterParagraphRanges(xml) {
+  const stack = [];
+  const paragraphs = [];
+  // Text boxes can contain paragraphs inside a drawing's outer paragraph.
+  // Only leaf paragraphs own editable text; never rewrite the drawing wrapper.
+  for (const match of xml.matchAll(/<\/?w:p\b[^>]*>/g)) {
+    if (match[0].startsWith("</")) {
+      const paragraph = stack.pop();
+      if (paragraph && !paragraph.nested) {
+        const end = match.index + match[0].length;
+        paragraphs.push({ start: paragraph.start, end, xml: xml.slice(paragraph.start, end) });
+      }
+    } else if (!match[0].endsWith("/>")) {
+      if (stack.length) stack.at(-1).nested = true;
+      stack.push({ start: match.index, nested: false });
+    }
+  }
+  return paragraphs.sort((a, b) => a.start - b.start);
+}
+
+function wordTextTokens(xml) {
+  return [...xml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:(?:tab|br|cr)\b[^>]*\/>/g)]
+    .filter((match) => !/<w:br\b[^>]*w:type="(?:page|column)"/.test(match[0]))
+    .map((match) => ({ start: match.index, end: match.index + match[0].length,
+      text: match[1] !== undefined ? decodeXml(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n" }));
+}
+
+function editWordParagraph(xml, text) {
+  const tokens = wordTextTokens(xml);
+  const original = tokens.map((token) => token.text).join("");
+  if (original === text) return xml;
+  let start = 0;
+  while (start < original.length && start < text.length && original[start] === text[start]) start++;
+  let suffix = 0;
+  while (suffix < original.length - start && suffix < text.length - start && original.at(-1 - suffix) === text.at(-1 - suffix)) suffix++;
+  const end = original.length - suffix;
+  const inserted = text.slice(start, text.length - suffix);
+  let offset = 0;
+  let insertedAt = false;
+  const replacements = tokens.map((token) => {
+    const tokenStart = offset;
+    offset += token.text.length;
+    if (offset < start || tokenStart > end) return token;
+    const before = token.text.slice(0, Math.max(0, start - tokenStart));
+    const after = token.text.slice(Math.min(token.text.length, Math.max(0, end - tokenStart)));
+    const value = before + (insertedAt ? "" : inserted) + after;
+    insertedAt = true;
+    return { ...token, replacement: value.split(/(\n|\t)/).map((part) => part === "\n" ? "<w:br/>" : part === "\t" ? "<w:tab/>" : `<w:t xml:space="preserve">${encodeXml(part)}</w:t>`).join("") };
+  });
+  for (const token of replacements.reverse()) {
+    if (token.replacement !== undefined) xml = xml.slice(0, token.start) + token.replacement + xml.slice(token.end);
+  }
+  return xml;
+}
+
 export function buildLetterTokens(site, publicLink) {
   const mode = ["legal-owner", "title-owner", "plot-land"].includes(site?.letterRecipientMode)
     ? site.letterRecipientMode

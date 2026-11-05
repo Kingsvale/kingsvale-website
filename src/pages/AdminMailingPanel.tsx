@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, FileText, Mail, Save, Search } from "lucide-react";
+import { Clock, ExternalLink, FileText, Mail, Pencil, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
@@ -18,10 +18,13 @@ import {
   generateLetterFromTemplate,
   listTrackingSites,
   saveTrackingSite,
+  saveLetterText,
+  type LetterTextContent,
   uploadLetterFile
 } from "../lib/cmsApi";
 import { defaultStudioSettings, type StudioSettings } from "../lib/studioSettings";
 import { AdminDocumentPreview } from "./AdminDocumentPreview";
+import { AdminLetterEditor } from "./AdminLetterEditor";
 import { buildAddressFromParts } from "../lib/trackingNormalize";
 import { formatPastedAddress } from "../lib/addressCapitalisation";
 import {
@@ -71,6 +74,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
   const [settings, setSettings] = useState<StudioSettings>(() => defaultStudioSettings());
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
+  const [editingLetter, setEditingLetter] = useState<{ url: string; name: string } | null>(null);
   const openedSiteId = useRef("");
   const [status, setStatus] = useState("Manage postal contact and re-mailing reminders.");
 
@@ -335,6 +339,26 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     } finally { setBusy(false); }
   }
 
+  async function openLetterEditor() {
+    if (!draft || !await autosave.flush()) return;
+    setEditingLetter({ url: draft.letterFileUrl, name: draft.letterFileName });
+  }
+
+  async function saveLetterChanges(version: string, changes: LetterTextContent["paragraphs"]) {
+    if (!draft || !editingLetter) return;
+    setBusy(true);
+    try {
+      const generated = await saveLetterText(editingLetter.url, editingLetter.name, version, changes);
+      const saved = await saveTrackingSite({ ...draft, letterFileName: generated.name, letterFileUrl: generated.url,
+        letterDocuments: [...draft.letterDocuments?.filter((item) => item.kind !== "letter-pdf") ?? [], ...generated.documents ?? []] });
+      setSites((current) => current.map((site) => site.id === saved.id ? saved : site));
+      setDraft(saved);
+      setEditingLetter(null);
+      setPreview(generated.documents?.find((item) => item.kind === "letter-pdf") ?? generated);
+      setStatus("Letter changes saved in Word and PDF formats. Review the updated letter before printing.");
+    } finally { setBusy(false); }
+  }
+
   return (
     <section className="mailing-admin" aria-label="Postal contact workflow">
       <div className="sites-admin__toolbar">
@@ -526,6 +550,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                   </span>
                 </div>
                 <div className="letter-upload__actions">
+                  {/^\/media\/[^/]+\.docx$/i.test(draft.letterFileUrl) && <button type="button" className="admin-open" onClick={openLetterEditor}><Pencil aria-hidden="true" />Edit letter</button>}
                   {draft.letterFileUrl && (
                     <button type="button" className="admin-open" onClick={() => setPreview({ url: draft.letterFileUrl, name: draft.letterFileName })}>Preview letter</button>
                   )}
@@ -551,6 +576,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                   )}
                 </div>
               </div>
+              {draft.letterFileUrl && <p className="admin-note">Edit a saved Word letter to personalise its wording. Generating from a template again replaces those edits.</p>}
 
               {!!draft.letterDocuments?.length && <div className="mailing-print-files" aria-label="Print files">
                 <h3>Ready to print</h3>
@@ -660,6 +686,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
           )}
         </div>
       </div>
+      {editingLetter && <AdminLetterEditor key={editingLetter.url} file={editingLetter} recipient={draft?.customerName || draft?.ownerContactName || ""} onClose={() => setEditingLetter(null)} onSave={saveLetterChanges} />}
       {preview && <AdminDocumentPreview key={preview.url} file={preview} onClose={() => setPreview(null)} />}
     </section>
   );

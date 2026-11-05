@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createLetterPdf, renderLetterPreview } from "../server/letter-preview.mjs";
-import { buildLetterTokens, replaceDocxText, createTrackingQrPng, generateLetterDocx } from "../server/letter-generator.mjs";
+import { buildLetterTokens, replaceDocxText, createTrackingQrPng, generateLetterDocx, extractLetterParagraphs, editLetterParagraphs } from "../server/letter-generator.mjs";
 import { starterLetterTemplates } from "../src/lib/letterTemplates.js";
 import sharp from "sharp";
 import jsQR from "jsqr";
@@ -36,6 +36,23 @@ for (const [url] of starterLetterTemplates) {
   assert.ok(decoded, `${name}: QR must scan from the rendered letter page`);
   console.log(`${name}: ${preview.pageCount} preview pages rendered successfully`);
 }
+
+const initial = await readFile(join(directory, "initial.docx"));
+const greeting = extractLetterParagraphs(initial).find((item) => item.text.startsWith("Dear "));
+const edited = editLetterParagraphs(initial, [{ id: greeting.id, text: "Dear Alex Example," }]);
+await writeFile(join(directory, "initial-edited.docx"), edited);
+const editedPdf = await createLetterPdf(edited);
+await writeFile(join(directory, "initial-edited.pdf"), editedPdf);
+const editedPreview = await renderLetterPreview(editedPdf, ".pdf");
+let editedQrDecoded = false;
+for (const [index, page] of editedPreview.pages.entries()) {
+  const bytes = Buffer.from(page.split(",")[1], "base64");
+  await writeFile(join(directory, `initial-edited-${index + 1}.png`), bytes);
+  const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  editedQrDecoded ||= jsQR(new Uint8ClampedArray(data), info.width, info.height)?.data === link;
+}
+assert.ok(editedQrDecoded, "Edited letter QR must retain its original tracking link");
+console.log(`edited initial: ${editedPreview.pageCount} preview pages rendered; QR preserved`);
 
 const envelope = replaceDocxText(await readFile("public/templates/kingsvale-envelope-template.docx"), buildLetterTokens(site, link));
 await writeFile(join(directory, "envelope.docx"), envelope);

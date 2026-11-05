@@ -4,6 +4,7 @@ import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
 import { sharedSiteNotes, siteNotesMaxLength } from "../src/lib/siteNotes.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
+import { letterContent, saveEditedLetter } from "./letter-editor.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -526,6 +527,28 @@ async function handleApiRequest(request, response, url) {
       sendJson(response, 201, { file: { name: "letter.pdf", url: `/media/${filename}`, contentType: mimeTypes[".pdf"], bytes: pdf.length } });
     } catch (error) {
       sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : 422, { error: error.code === "PREVIEW_BUSY" ? error.message : "The PDF could not be prepared. Please try again." });
+    }
+    return;
+  }
+
+  if (["/api/letters/content", "/api/letters/edit"].includes(url.pathname)) {
+    const session = requireSession(request, response);
+    if (!session) return;
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const payload = await readJsonBody(request, 1_000_000);
+    try {
+      const source = String(payload.url ?? "");
+      if (!/^\/media\/[a-zA-Z0-9._-]+\.docx$/i.test(source)) throw Object.assign(new Error("Choose a saved Word letter to edit."), { code: "LETTER_EDIT_INVALID" });
+      const buffer = await readLetterTemplateSource(source);
+      if (url.pathname.endsWith("/content")) sendJson(response, 200, letterContent(buffer));
+      else {
+        const file = await saveEditedLetter(buffer, payload, uploadsDir);
+        await writeAudit("letter_edited", request, { user: session.user, source, generated: file.url });
+        sendJson(response, 201, { file });
+      }
+    } catch (error) {
+      sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : error.code === "LETTER_EDIT_INVALID" ? 400 : 422,
+        { error: ["PREVIEW_BUSY", "LETTER_EDIT_INVALID"].includes(error.code) ? error.message : "The letter could not be prepared. Your saved letter is unchanged. Please try again." });
     }
     return;
   }
