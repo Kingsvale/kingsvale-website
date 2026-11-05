@@ -311,10 +311,17 @@ Run `npm run test:media` for a fresh-server upload/export/restore test (includin
 ### Letter previews and mailing
 
 For a saved Word letter, choose **Mailing → Edit letter** beside **Preview letter**.
-Edit the greeting, paragraphs or sign-off, or use **Use recipient name in greeting**.
+The graphical editor shows your letter on a page: click text to change it and select
+words to apply bold, italic, underline or a font size. Alignment, undo/redo, keyboard
+shortcuts and page/width/percentage zoom controls are available above the letter.
+Use **Use recipient name in greeting** to personalise the salutation.
+**Preview print layout** renders the current edits without saving and checks the final
+page breaks. **Back to editing** retains your edits and undo history. The editing view
+uses browser layout; the print preview shows the server-rendered Word/PDF pagination.
 **Save changes & preview** saves new Word and PDF files and opens the print preview.
 Changes apply to that individual letter; reusable templates remain unchanged.
-The editor preserves the letterhead, QR artwork and existing document formatting.
+The editor preserves the letterhead and QR artwork. Plain wording changes retain the
+original Word formatting; explicit formatting changes are saved as Word text runs.
 Cancel offers to discard unsaved changes. Generating from a template again replaces
 individual wording edits. PDF-only or image uploads can be replaced with a Word
 letter to use the text editor.

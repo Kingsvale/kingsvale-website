@@ -314,7 +314,9 @@ export async function createSavedLetterPdf(url: string): Promise<UploadedLetterF
   return payload.file;
 }
 
-export type LetterTextContent = { version: string; paragraphs: Array<{ id: number; text: string }> };
+export type LetterTextRun = { text: string; bold: boolean; italic: boolean; underline: boolean; fontSize: number; fontFamily: string; color: string };
+export type LetterParagraph = { id: number; text: string; runs?: LetterTextRun[]; alignment?: "left" | "center" | "right" | "both" };
+export type LetterTextContent = { version: string; paragraphs: LetterParagraph[]; editorDocument?: string; decoration?: { headerFill?: { color: string; heightPt: number } } };
 
 export async function loadLetterText(url: string): Promise<LetterTextContent> {
   return letterEditorRequest("content", { url });
@@ -324,7 +326,11 @@ export async function saveLetterText(url: string, name: string, version: string,
   return (await letterEditorRequest("edit", { url, name, version, changes })).file;
 }
 
-async function letterEditorRequest(action: "content" | "edit", body: unknown) {
+export async function previewLetterChanges(url: string, version: string, changes: LetterParagraph[]): Promise<{ pages: string[]; pageCount: number }> {
+  return letterEditorRequest("draft-preview", { url, version, changes });
+}
+
+async function letterEditorRequest(action: "content" | "edit" | "draft-preview", body: unknown) {
   const response = await fetch(`/api/letters/${action}`, { method: "POST", credentials: "same-origin",
     headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }), body: JSON.stringify(body) });
   if (!isJsonResponse(response)) throw new Error("The letter editor could not be loaded. Please try again.");

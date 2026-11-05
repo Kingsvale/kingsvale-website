@@ -18,7 +18,9 @@ import { publicTrackingAddress } from "./src/lib/trackingAddress.js";
 // @ts-expect-error server helper is intentionally authored as runtime ESM for production Node.
 import { createTrackingQrPng, generateLetterDocx } from "./server/letter-generator.mjs";
 // @ts-expect-error Shared runtime ESM used by both servers.
-import { letterContent, saveEditedLetter } from "./server/letter-editor.mjs";
+import { applyLetterChanges, letterContent, saveEditedLetter } from "./server/letter-editor.mjs";
+// @ts-expect-error Shared runtime ESM used by both servers.
+import { renderLetterPreview } from "./server/letter-preview.mjs";
 
 export default defineConfig({
   plugins: [devTrackingApi(), react()],
@@ -158,7 +160,7 @@ function devTrackingApi(): Plugin {
           return;
         }
 
-        if (["/api/letters/content", "/api/letters/edit"].includes(url.pathname)) {
+        if (["/api/letters/content", "/api/letters/edit", "/api/letters/draft-preview"].includes(url.pathname)) {
           if (request.method !== "POST") { sendDevJson(response, 405, { error: "Method not allowed." }); return; }
           try {
             const payload = await readDevJsonBody(request, 1_000_000);
@@ -166,6 +168,7 @@ function devTrackingApi(): Plugin {
             if (!/^\/media\/[a-zA-Z0-9._-]+\.docx$/i.test(source)) throw new Error("Choose a saved Word letter to edit.");
             const buffer = await readFile(resolveDevMediaPath(source));
             if (url.pathname.endsWith("/content")) sendDevJson(response, 200, letterContent(buffer));
+            else if (url.pathname.endsWith("/draft-preview")) sendDevJson(response, 200, await renderLetterPreview(applyLetterChanges(buffer, payload, true)));
             else sendDevJson(response, 201, { file: await saveEditedLetter(buffer, payload, devUploadsDir) });
           } catch (error) {
             sendDevJson(response, 422, { error: error instanceof Error ? error.message : "The letter could not be prepared. Please try again." });

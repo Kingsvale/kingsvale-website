@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { inflateRawSync } from "node:zlib";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { editLetterParagraphs, extractLetterParagraphs, generateLetterDocx, createTrackingQrPng } from "../../server/letter-generator.mjs";
-import { letterContent, saveEditedLetter } from "../../server/letter-editor.mjs";
+import { applyLetterChanges, letterContent, saveEditedLetter } from "../../server/letter-editor.mjs";
 import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
 
 test("saved letter edits round-trip text while preserving artwork, relationships and Word styles", async () => {
@@ -49,6 +49,31 @@ test("editor validates changes before invoking conversion", async () => {
   ]) await assert.rejects(saveEditedLetter(buffer, payload, "unused"), { code: "LETTER_EDIT_INVALID" });
 });
 
+test("graphical formatting writes Word runs and alignment while preserving document artwork", async () => {
+  const buffer = await readFile("public/templates/kingsvale-initial-letter-template.docx");
+  const content = letterContent(buffer);
+  const greeting = content.paragraphs.find((item) => item.text.startsWith("Dear "));
+  const marked = unzip(Buffer.from(content.editorDocument, "base64"));
+  assert.equal(content.decoration.headerFill.color, "#063C22");
+  assert.ok(marked.get("word/document.xml").toString().includes(`w:name="KV_EDIT_${greeting.id}"`));
+  const run = { text: greeting.text, bold: true, italic: true, underline: true, fontFamily: "Calibri", fontSize: 14, color: "#083d29" };
+  const payload = { version: content.version, changes: [{ ...greeting, runs: [run], alignment: "center" }] };
+  const edited = applyLetterChanges(buffer, payload);
+  assert.deepEqual(extractLetterParagraphs(edited), content.paragraphs);
+  const files = unzip(edited);
+  const xml = files.get("word/document.xml").toString();
+  assert.match(xml, /<w:b w:val="1"\/><w:i w:val="1"\/><w:u w:val="single"\/><w:sz w:val="28"\/>/);
+  assert.match(xml, /<w:jc w:val="center"\/>/);
+  assert.ok(!xml.includes("KV_EDIT_"), "Canvas markers must not enter the saved Word document");
+  for (const [name, bytes] of unzip(buffer)) if (name !== "word/document.xml") assert.deepEqual(files.get(name), bytes, name);
+  for (const change of [
+    { ...greeting, runs: [{ ...run, text: "mismatched text" }] },
+    { ...greeting, runs: [{ ...run, fontSize: 10000 }] },
+    { ...greeting, runs: [{ ...run, color: "javascript:invalid" }] },
+    { ...greeting, alignment: "invalid" }
+  ]) assert.throws(() => applyLetterChanges(buffer, { version: content.version, changes: [change] }), { code: "LETTER_EDIT_INVALID" });
+});
+
 test("letter editor API requires authentication and saves matching Word/PDF without changing the source", { timeout: 90000 }, async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "kingsvale-letter-edit-"));
   await mkdir(join(directory, "uploads"));
@@ -67,7 +92,7 @@ test("letter editor API requires authentication and saves matching Word/PDF with
     child.once("exit", (code) => { clearTimeout(timer); reject(new Error(`Server exited ${code}`)); });
     child.stdout.on("data", (data) => { const match = data.toString().match(/http:\/\/127\.0\.0\.1:\d+/); if (match) { clearTimeout(timer); done(match[0]); } });
   });
-  for (const endpoint of ["content", "edit"]) assert.equal((await fetch(`${url}/api/letters/${endpoint}`, { method: "POST" })).status, 401);
+  for (const endpoint of ["content", "edit", "draft-preview"]) assert.equal((await fetch(`${url}/api/letters/${endpoint}`, { method: "POST" })).status, 401);
   const { authToken } = await (await fetch(`${url}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "kingsvale", password: "test-editor-password" }) })).json();
   const api = (action, body) => fetch(`${url}/api/letters/${action}`, { method: "POST", headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   for (const source of ["https://example.com/x.docx", "/media/../secret.docx", "/media/original.pdf"]) assert.equal((await api("content", { url: source })).status, 400);
@@ -78,7 +103,15 @@ test("letter editor API requires authentication and saves matching Word/PDF with
   const bodyId = content.paragraphs.find((item) => item.text.startsWith("I am writing")).id;
   assert.equal((await api("edit", { url: "/media/original.docx", version: "old", changes: [{ id, text: "Dear Amy Example," }] })).status, 400);
   if (process.platform === "win32" && !process.env.LIBREOFFICE_PATH) { t.diagnostic("PDF conversion requires LIBREOFFICE_PATH on Windows; production CI exercises conversion."); return; }
-  const saved = await api("edit", { url: "/media/original.docx", name: "test-letter.docx", version: content.version, changes: [{ id, text: "Dear Amy Example," }, { id: bodyId, text: "A personal note about your property.\nPlease contact us when convenient." }] });
+  const changes = [{ id, text: "Dear Amy Example,", alignment: "left", runs: [{ text: "Dear Amy Example,", bold: true, italic: true, underline: true, fontSize: 14, fontFamily: "Calibri", color: "#083d29" }] }, { id: bodyId, text: "A personal note about your property.\nPlease contact us when convenient." }];
+  const beforePreview = await readdir(join(directory, "uploads"));
+  const preview = await api("draft-preview", { url: "/media/original.docx", version: content.version, changes });
+  assert.equal(preview.status, 200, await preview.clone().text());
+  const previewData = await preview.json();
+  assert.ok(previewData.pages.length > 0);
+  assert.ok(previewData.pages[0].startsWith("data:image/png;base64,"));
+  assert.deepEqual(await readdir(join(directory, "uploads")), beforePreview, "An unsaved preview must not write letter files");
+  const saved = await api("edit", { url: "/media/original.docx", name: "test-letter.docx", version: content.version, changes });
   assert.equal(saved.status, 201, await saved.clone().text());
   const { file } = await saved.json();
   assert.equal(file.name, "test-letter.docx");

@@ -4,7 +4,7 @@ import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
 import { sharedSiteNotes, siteNotesMaxLength } from "../src/lib/siteNotes.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
-import { letterContent, saveEditedLetter } from "./letter-editor.mjs";
+import { applyLetterChanges, letterContent, saveEditedLetter } from "./letter-editor.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -531,7 +531,7 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
-  if (["/api/letters/content", "/api/letters/edit"].includes(url.pathname)) {
+  if (["/api/letters/content", "/api/letters/edit", "/api/letters/draft-preview"].includes(url.pathname)) {
     const session = requireSession(request, response);
     if (!session) return;
     if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
@@ -541,6 +541,7 @@ async function handleApiRequest(request, response, url) {
       if (!/^\/media\/[a-zA-Z0-9._-]+\.docx$/i.test(source)) throw Object.assign(new Error("Choose a saved Word letter to edit."), { code: "LETTER_EDIT_INVALID" });
       const buffer = await readLetterTemplateSource(source);
       if (url.pathname.endsWith("/content")) sendJson(response, 200, letterContent(buffer));
+      else if (url.pathname.endsWith("/draft-preview")) sendJson(response, 200, await renderLetterPreview(applyLetterChanges(buffer, payload, true)));
       else {
         const file = await saveEditedLetter(buffer, payload, uploadsDir);
         await writeAudit("letter_edited", request, { user: session.user, source, generated: file.url });

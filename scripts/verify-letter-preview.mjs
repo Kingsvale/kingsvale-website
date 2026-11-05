@@ -39,7 +39,9 @@ for (const [url] of starterLetterTemplates) {
 
 const initial = await readFile(join(directory, "initial.docx"));
 const greeting = extractLetterParagraphs(initial).find((item) => item.text.startsWith("Dear "));
-const edited = editLetterParagraphs(initial, [{ id: greeting.id, text: "Dear Alex Example," }]);
+const edited = editLetterParagraphs(initial, [{ id: greeting.id, text: "Dear Alex Example,", alignment: "left", runs: [
+  { text: "Dear Alex Example,", bold: true, italic: false, underline: false, fontSize: 14, fontFamily: "Calibri", color: "#083d29" }
+] }]);
 await writeFile(join(directory, "initial-edited.docx"), edited);
 const editedPdf = await createLetterPdf(edited);
 await writeFile(join(directory, "initial-edited.pdf"), editedPdf);

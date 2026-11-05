@@ -14,6 +14,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   let serverPreview = false;
   let failEdit = false;
   let failLoad = false;
+  let savedChanges: Array<{ id: number; text: string; runs?: Array<{ bold: boolean; italic: boolean; underline: boolean; fontSize: number }>; alignment?: string }> = [];
   await context.route("**/api/letters/preview", (route) => serverPreview
     ? route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } })
     : route.fulfill({ status: 404, json: { error: "Local renderer unavailable" } }));
@@ -38,6 +39,12 @@ test("mailing preserves edits when sorting and previews a generated branded lett
     await route.fulfill({ json: { file: { url: "/media/test-generated.docx", name: "Oakley letter.docx", documents } } });
   });
   await context.route("**/media/test-generated.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  await context.route("**/media/test-edited.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  await context.route("**/api/letters/draft-preview", (route) => {
+    const data = route.request().postDataJSON();
+    expect(data.changes.some((item: { text: string }) => item.text === "Dear Alex Example,")).toBe(true);
+    return route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } });
+  });
   await context.route("**/api/letters/content", (route) => failLoad
     ? route.fulfill({ status: 422, json: { error: "Letter text could not be loaded." } })
     : route.fulfill({ json: letterContent(generated) }));
@@ -46,6 +53,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
     const data = route.request().postDataJSON();
     expect(data.url).toBe(site.letterFileUrl);
     expect(data.version).toBe(letterContent(generated).version);
+    savedChanges = data.changes;
     generated = editLetterParagraphs(generated, data.changes);
     return route.fulfill({ status: 201, json: { file: { url: "/media/test-edited.docx", name: "Oakley letter.docx", documents: [{ kind: "letter-pdf", url: "/media/test-edited.pdf", name: "Oakley letter.pdf" }] } } });
   });
@@ -67,6 +75,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.getByLabel("Address letter to", { exact: true }).selectOption("title-owner");
   await page.getByRole("button", { name: "Generate & preview letter", exact: true }).click();
   const dialog = page.getByRole("dialog");
+  const canvasPage = page.frameLocator('iframe[title="Letter editor page"]');
   await expect(dialog.getByRole("status")).toContainText("Print layout preview");
   await expect(dialog.getByRole("link", { name: "Open PDF / Print" })).toHaveAttribute("href", "/media/test-letter.pdf");
   await page.keyboard.press("Escape");
@@ -89,19 +98,43 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await expect(dialog.getByRole("alert")).toContainText("could not be loaded");
   failLoad = false;
   await dialog.getByRole("button", { name: "Try loading again" }).click();
-  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Sir/Madam,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Sir/Madam,");
+  await expect(canvasPage.locator("section.docx")).toBeVisible();
+  await expect(canvasPage.locator("img").first()).toBeVisible();
+  await dialog.screenshot({ path: testInfo.outputPath("graphical-letter-full-page.png") });
   await dialog.getByRole("button", { name: "Use recipient name in greeting" }).click();
-  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
   // Locate by the saved value rather than relying on a template's paragraph order.
-  const body = dialog.locator("textarea").filter({ hasText: /^I am writing/ });
+  const bodyName = await canvasPage.getByRole("textbox").filter({ hasText: /^I am writing/ }).getAttribute("aria-label");
+  const body = canvasPage.getByRole("textbox", { name: bodyName!, exact: true });
   await body.fill("A personal note about your land.\nPlease contact us when convenient.");
+  await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(body).toContainText("I am writing");
+  await dialog.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(body).toHaveJSProperty("innerText", "A personal note about your land.\nPlease contact us when convenient.");
+  await canvasPage.getByLabel("Greeting", { exact: true }).click();
+  await canvasPage.getByLabel("Greeting", { exact: true }).press("Control+a");
+  await dialog.getByRole("button", { name: "Bold", exact: true }).click();
+  await dialog.getByRole("button", { name: "Italic", exact: true }).click();
+  await dialog.getByRole("button", { name: "Underline", exact: true }).click();
+  await dialog.getByLabel("Font size", { exact: true }).selectOption("14");
+  await dialog.getByRole("button", { name: "Align centre", exact: true }).click();
+  await dialog.getByLabel("Zoom", { exact: true }).selectOption("100");
+  await dialog.getByLabel("Zoom", { exact: true }).selectOption("fit");
+  await dialog.screenshot({ path: testInfo.outputPath("graphical-letter-editor.png") });
+  const beforePreviewUrl = site.letterFileUrl;
+  await dialog.getByRole("button", { name: "Preview print layout", exact: true }).click();
+  await expect(dialog.getByRole("img", { name: "Edited letter page 1", exact: true })).toBeVisible();
+  expect(site.letterFileUrl).toBe(beforePreviewUrl);
+  await dialog.getByRole("button", { name: "Back to editing", exact: true }).click();
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
   await page.keyboard.press("Escape");
   await expect(dialog.getByText("Discard your unsaved changes?", { exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Keep editing" }).click();
   failEdit = true;
   await dialog.getByRole("button", { name: "Save changes & preview" }).click();
   await expect(dialog.getByRole("alert")).toContainText("PDF could not be prepared");
-  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
   expect(site.letterFileUrl).toBe("/media/test-generated.docx");
   await dialog.screenshot({ path: testInfo.outputPath("letter-editor.png") });
   failEdit = false;
@@ -111,12 +144,16 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await expect(dialog.getByRole("link", { name: "Open PDF / Print" })).toHaveAttribute("href", "/media/test-edited.pdf");
   await page.keyboard.press("Escape");
   expect(site.letterFileUrl).toBe("/media/test-edited.docx");
+  const savedGreeting = savedChanges.find((item) => item.text === "Dear Alex Example,");
+  expect(savedGreeting?.alignment).toBe("center");
+  expect(savedGreeting?.runs?.some((run) => run.bold && run.italic && run.underline && run.fontSize === 14)).toBe(true);
+  expect(savedChanges.find((item) => item.text.startsWith("A personal note"))?.runs).toBeUndefined();
   expect(site.letterDocuments?.filter((item) => item.kind !== "letter-pdf")).toEqual(envelopes);
   expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "Dear Alex Example,")).toBe(true);
   expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "A personal note about your land.\nPlease contact us when convenient.")).toBe(true);
   await page.getByRole("button", { name: "Edit letter", exact: true }).click();
-  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
-  await dialog.getByLabel("Greeting", { exact: true }).fill("Do not save this");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
+  await canvasPage.getByLabel("Greeting", { exact: true }).fill("Do not save this");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await dialog.getByRole("button", { name: "Discard changes", exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -124,7 +161,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.reload();
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();
   await page.getByRole("button", { name: "Edit letter", exact: true }).click();
-  await expect(dialog.getByLabel("Greeting", { exact: true })).toHaveValue("Dear Alex Example,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(site.initialLetterGeneratedAt).toBeTruthy();
   await page.getByRole("tab", { name: "Sites", exact: true }).click();

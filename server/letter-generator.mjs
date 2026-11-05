@@ -77,6 +77,42 @@ export function extractLetterParagraphs(buffer) {
   })).filter((paragraph) => paragraph.text.trim());
 }
 
+export function createEditableLetterDocx(buffer) {
+  const entries = readZip(buffer);
+  const document = entries.find((entry) => entry.name === "word/document.xml");
+  if (!document) throw new Error("DOCX document is missing.");
+  let xml = document.data.toString("utf8");
+  const paragraphs = letterParagraphRanges(xml);
+  for (let id = paragraphs.length - 1; id >= 0; id--) {
+    const paragraph = paragraphs[id];
+    if (!wordTextTokens(paragraph.xml).some((token) => token.text.trim())) continue;
+    const properties = paragraph.xml.match(/^<w:p\b[^>]*>\s*(?:<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>)/);
+    const offset = properties?.[0].length ?? paragraph.xml.indexOf(">") + 1;
+    const marked = paragraph.xml.slice(0, offset) + `<w:bookmarkStart w:id="${100000000 + id}" w:name="KV_EDIT_${id}"/>` + paragraph.xml.slice(offset);
+    xml = xml.slice(0, paragraph.start) + marked + xml.slice(paragraph.end);
+  }
+  document.data = Buffer.from(xml);
+  return writeZip(entries);
+}
+
+export function letterCanvasDecoration(buffer) {
+  const document = readZip(buffer).find((entry) => entry.name === "word/document.xml");
+  const xml = document?.data.toString("utf8") ?? "";
+  const pageWidth = Number(xml.match(/<w:pgSz\b[^>]*w:w="(\d+)"/)?.[1] || 11906) / 20;
+  // Word's full-width rectangles aren't handled by the browser renderer. Carry
+  // their simple fill into the canvas without changing the actual DOCX artwork.
+  for (const match of xml.matchAll(/<wp:anchor\b[^>]*behindDoc="1"[\s\S]*?<\/wp:anchor>/g)) {
+    const shape = match[0];
+    const extent = shape.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+    const color = shape.match(/<a:solidFill>\s*<a:srgbClr\s+val="([0-9a-f]{6})"/i)?.[1];
+    const top = shape.match(/<wp:positionV\b[^>]*>\s*<wp:posOffset>(-?\d+)<\/wp:posOffset>/)?.[1];
+    if (extent && color && Number(top) < 0 && Number(extent[1]) / 12700 > pageWidth * 0.85 && Number(extent[2]) / 12700 < 220 && /<a:prstGeom\b[^>]*prst="rect"/.test(shape)) {
+      return { headerFill: { color: `#${color}`, heightPt: Number(extent[2]) / 12700 } };
+    }
+  }
+  return {};
+}
+
 export function editLetterParagraphs(buffer, changes) {
   const entries = readZip(buffer);
   const document = entries.find((entry) => entry.name === "word/document.xml");
@@ -87,11 +123,34 @@ export function editLetterParagraphs(buffer, changes) {
   for (const change of [...changes].sort((a, b) => b.id - a.id)) {
     const paragraph = paragraphs[change.id];
     if (!paragraph) throw new Error("DOCX paragraph is missing.");
-    const edited = editWordParagraph(paragraph.xml, change.text);
+    let edited = change.runs ? formatWordParagraph(paragraph.xml, change.runs) : editWordParagraph(paragraph.xml, change.text);
+    if (change.alignment) {
+      const alignment = `<w:jc w:val="${change.alignment}"/>`;
+      const properties = edited.match(/<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>/)?.[0];
+      if (properties) edited = edited.replace(properties, properties.replace(/<w:jc\b[^>]*\/>/g, "").replace("</w:pPr>", alignment + "</w:pPr>"));
+      else if (/<w:pPr\s*\/>/.test(edited)) edited = edited.replace(/<w:pPr\s*\/>/, `<w:pPr>${alignment}</w:pPr>`);
+      else edited = edited.replace(/^(<w:p\b[^>]*>)/, `$1<w:pPr>${alignment}</w:pPr>`);
+    }
     next = next.slice(0, paragraph.start) + edited + next.slice(paragraph.end);
   }
   document.data = Buffer.from(next);
   return writeZip(entries);
+}
+
+function formatWordParagraph(xml, runs) {
+  const firstProperties = xml.match(/<w:rPr\b[^>]*>[\s\S]*?<\/w:rPr>/)?.[0] ?? "<w:rPr></w:rPr>";
+  const cleanProperties = firstProperties.replace(/<w:(b|bCs|i|iCs|u|sz|szCs|rFonts|color)\b[^>]*(?:\/>|>[\s\S]*?<\/w:\1>)/g, "");
+  const formatted = runs.map((run) => {
+    const font = encodeXml(run.fontFamily || "Calibri").replaceAll('"', "&quot;");
+    const size = Math.round((run.fontSize || 11) * 2);
+    const properties = `<w:b w:val="${run.bold ? 1 : 0}"/><w:i w:val="${run.italic ? 1 : 0}"/><w:u w:val="${run.underline ? "single" : "none"}"/><w:sz w:val="${size}"/><w:szCs w:val="${size}"/><w:rFonts w:ascii="${font}" w:hAnsi="${font}"/>${run.color ? `<w:color w:val="${run.color.slice(1)}"/>` : ""}`;
+    const text = run.text.split(/(\n|\t)/).map((part) => part === "\n" ? "<w:br/>" : part === "\t" ? "<w:tab/>" : `<w:t xml:space="preserve">${encodeXml(part)}</w:t>`).join("");
+    return `<w:r>${cleanProperties.replace("</w:rPr>", properties + "</w:rPr>")}${text}</w:r>`;
+  }).join("");
+  for (const token of wordTextTokens(xml).reverse()) xml = xml.slice(0, token.start) + xml.slice(token.end);
+  const properties = xml.match(/^<w:p\b[^>]*>\s*(?:<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>)/);
+  const offset = properties?.[0].length ?? xml.indexOf(">") + 1;
+  return xml.slice(0, offset) + formatted + xml.slice(offset);
 }
 
 function letterParagraphRanges(xml) {
