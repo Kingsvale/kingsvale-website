@@ -23,6 +23,8 @@ import { applyLetterChanges, letterContent, saveEditedLetter } from "./server/le
 import { renderLetterPreview } from "./server/letter-preview.mjs";
 // @ts-expect-error Shared runtime ESM used by both servers.
 import { renderLetterCanvas } from "./server/letter-layout.mjs";
+// @ts-expect-error Shared runtime ESM used by both servers.
+import { regenerateEnvelopeDocuments } from "./server/envelope-generator.mjs";
 
 export default defineConfig({
   plugins: [devTrackingApi(), react()],
@@ -181,6 +183,20 @@ function devTrackingApi(): Plugin {
             else sendDevJson(response, 201, { file: await saveEditedLetter(buffer, payload, devUploadsDir) });
           } catch (error) {
             sendDevJson(response, 422, { error: error instanceof Error ? error.message : "The letter could not be prepared. Please try again." });
+          }
+          return;
+        }
+
+        if (url.pathname === "/api/letters/envelopes") {
+          if (request.method !== "POST") { sendDevJson(response, 405, { error: "Method not allowed." }); return; }
+          try {
+            const payload = await readDevJsonBody(request, 12000);
+            const site = (await readDevTrackingStore()).sites.find((item) => item.id === payload.siteId);
+            if (!site) { sendDevJson(response, 404, { error: "Save this site's mailing details before regenerating envelopes." }); return; }
+            const documents = await regenerateEnvelopeDocuments(await readFile(resolve("public/templates/kingsvale-envelope-template.docx")), site, devUploadsDir);
+            sendDevJson(response, 201, { documents });
+          } catch (error) {
+            sendDevJson(response, 422, { error: error instanceof Error ? error.message : "The envelope files could not be prepared. Please try again." });
           }
           return;
         }

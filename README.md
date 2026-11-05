@@ -310,6 +310,12 @@ Run `npm run test:media` for a fresh-server upload/export/restore test (includin
 
 ### Letter previews and mailing
 
+Use **Mailing → Ready to print → Regenerate envelopes** to refresh an older site's
+envelope files, including records with no saved envelopes. This saves any pending
+mailing edits, uses the current recipient, address and C5 envelope template, then
+saves new Word and PDF envelope files and opens the PDF preview. The saved letter,
+letter PDF, posting dates and follow-up reminders are retained.
+
 For a saved Word letter, choose **Mailing → Edit letter** beside **Preview letter**.
 The graphical editor shows your letter on a page: click text to change it and select
 words to apply bold, italic, underline or a font size. Alignment, undo/redo, keyboard

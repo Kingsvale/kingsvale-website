@@ -6,6 +6,7 @@ import { sharedSiteNotes, siteNotesMaxLength } from "../src/lib/siteNotes.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
 import { applyLetterChanges, letterContent, saveEditedLetter } from "./letter-editor.mjs";
 import { renderLetterCanvas } from "./letter-layout.mjs";
+import { regenerateEnvelopeDocuments } from "./envelope-generator.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -558,6 +559,24 @@ async function handleApiRequest(request, response, url) {
     } catch (error) {
       sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : error.code === "LETTER_EDIT_INVALID" ? 400 : 422,
         { error: ["PREVIEW_BUSY", "LETTER_EDIT_INVALID"].includes(error.code) ? error.message : "The letter could not be prepared. Your saved letter is unchanged. Please try again." });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/letters/envelopes") {
+    const session = requireSession(request, response);
+    if (!session) return;
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    const payload = await readJsonBody(request, 12000);
+    const site = (await readTrackingStore()).sites.find((item) => item.id === payload.siteId);
+    if (!site) { sendJson(response, 404, { error: "Save this site's mailing details before regenerating envelopes." }); return; }
+    try {
+      const documents = await regenerateEnvelopeDocuments(await readFile(join(distDir, "templates/kingsvale-envelope-template.docx")), site, uploadsDir);
+      await writeAudit("envelopes_regenerated", request, { user: session.user, siteId: site.id });
+      sendJson(response, 201, { documents });
+    } catch (error) {
+      sendJson(response, error.code === "PREVIEW_BUSY" ? 429 : error.code === "ENVELOPE_ADDRESS" ? 400 : 422,
+        { error: ["PREVIEW_BUSY", "ENVELOPE_ADDRESS"].includes(error.code) ? error.message : "The envelope files could not be prepared. Please try again." });
     }
     return;
   }

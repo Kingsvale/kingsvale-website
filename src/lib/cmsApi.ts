@@ -314,6 +314,15 @@ export async function createSavedLetterPdf(url: string): Promise<UploadedLetterF
   return payload.file;
 }
 
+export async function regenerateEnvelopes(siteId: string): Promise<NonNullable<TrackingSite["letterDocuments"]>> {
+  const response = await fetch("/api/letters/envelopes", { method: "POST", credentials: "same-origin",
+    headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }), body: JSON.stringify({ siteId }) });
+  if (!isJsonResponse(response)) throw new Error("Envelope generation requires the website server. Please try again.");
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "The envelope files could not be prepared. Please try again.");
+  return payload.documents;
+}
+
 export type LetterTextRun = { text: string; bold: boolean; italic: boolean; underline: boolean; fontSize: number; fontFamily: string; color: string };
 export type LetterParagraph = { id: number; text: string; runs?: LetterTextRun[]; alignment?: "left" | "center" | "right" | "both" };
 export type LetterLayoutRect = { page: number; x: number; y: number; width: number; height: number };

@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, FileText, Mail, Pencil, Save, Search } from "lucide-react";
+import { Clock, ExternalLink, FileText, Mail, Pencil, RefreshCw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
@@ -16,6 +16,7 @@ import {
   fetchStudioSettings,
   createSavedLetterPdf,
   generateLetterFromTemplate,
+  regenerateEnvelopes,
   listTrackingSites,
   saveTrackingSite,
   saveLetterText,
@@ -339,6 +340,23 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     } finally { setBusy(false); }
   }
 
+  async function regenerateEnvelopeFiles() {
+    if (!draft || busy || !validation.valid) return;
+    setBusy(true);
+    try {
+      if (!await autosave.flush()) return;
+      const documents = await regenerateEnvelopes(draft.id);
+      const saved = await saveTrackingSite({ ...draft,
+        letterDocuments: [...draft.letterDocuments?.filter((item) => item.kind === "letter-pdf") ?? [], ...documents] });
+      setSites((current) => current.map((site) => site.id === saved.id ? saved : site));
+      setDraft(saved);
+      setPreview(documents.find((item) => item.kind === "envelope-pdf") ?? null);
+      setStatus("Envelopes regenerated from the current recipient and address. Word and C5 PDF files are ready to print.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "The envelope files could not be prepared. Please try again.");
+    } finally { setBusy(false); }
+  }
+
   async function openLetterEditor() {
     if (!draft || !await autosave.flush()) return;
     setEditingLetter({ url: draft.letterFileUrl, name: draft.letterFileName });
@@ -578,10 +596,11 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               </div>
               {draft.letterFileUrl && <p className="admin-note">Edit a saved Word letter to personalise its wording. Generating from a template again replaces those edits.</p>}
 
-              {!!draft.letterDocuments?.length && <div className="mailing-print-files" aria-label="Print files">
-                <h3>Ready to print</h3>
+              <div className="mailing-print-files" aria-label="Print files">
+                <div className="admin-section-heading"><h3>Ready to print</h3><button type="button" className="admin-open" disabled={busy || !validation.valid} onClick={regenerateEnvelopeFiles}><RefreshCw aria-hidden="true" />Regenerate envelopes</button></div>
+                <p className="admin-note">Refresh the envelope Word and C5 PDF files using the current recipient, address and envelope design.</p>
                 <details className="mailing-print-help"><summary>Paper size &amp; printing help</summary><p className="admin-note">Open a PDF to print in your browser. Choose the matching paper size (C5 for envelopes), actual size and no added margins. The envelope has two pages: the addressed front and return-address back. Print page 1 for the front only. Borderless printing requires a compatible printer.</p></details>
-                {[...draft.letterDocuments].sort((a, b) => ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(a.kind) - ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(b.kind)).map((document) => <div className="letter-upload" key={document.kind}>
+                {[...draft.letterDocuments ?? []].sort((a, b) => ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(a.kind) - ["letter-pdf", "envelope-pdf", "envelope-docx"].indexOf(b.kind)).map((document) => <div className="letter-upload" key={document.kind}>
                   <div><FileText aria-hidden="true" /><span><strong>{document.kind === "letter-pdf" ? "Letter · PDF" : document.kind === "envelope-pdf" ? "Envelope · PDF · C5" : "Envelope · Word"}</strong><small>{document.name}</small></span></div>
                   <div className="letter-upload__actions">
                     <button type="button" className="admin-open" onClick={() => setPreview(document)}>Preview</button>
@@ -589,7 +608,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                     <a className="admin-open" href={document.url} download={document.name}>Download</a>
                   </div>
                 </div>)}
-              </div>}
+              </div>
               {/\.docx$/i.test(draft.letterFileUrl) && !draft.letterDocuments?.some((document) => document.kind === "letter-pdf") && <button className="admin-open" type="button" disabled={busy} onClick={prepareExistingPdf}>Create PDF for saved letter</button>}
               {/\.pdf$/i.test(draft.letterFileUrl) && <a className="admin-open" href={draft.letterFileUrl} target="_blank" rel="noopener noreferrer">Open PDF / Print</a>}
 
