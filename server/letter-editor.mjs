@@ -1,16 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createEditableLetterDocx, editLetterParagraphs, extractLetterParagraphs, letterCanvasDecoration } from "./letter-generator.mjs";
+import { editLetterParagraphs, extractLetterParagraphs } from "./letter-generator.mjs";
 import { createLetterPdf } from "./letter-preview.mjs";
 
-export function letterContent(buffer, includeCanvas = true) {
+export function letterContent(buffer) {
   const paragraphs = extractLetterParagraphs(buffer);
   if (!paragraphs.length || paragraphs.length > 200 || paragraphs.reduce((total, item) => total + item.text.length, 0) > 100_000) {
     throw invalid("This document has too much text for the letter editor. Download it to edit in Word.");
   }
-  return { version: createHash("sha256").update(buffer).digest("hex"), paragraphs,
-    ...(includeCanvas ? { editorDocument: createEditableLetterDocx(buffer).toString("base64"), decoration: letterCanvasDecoration(buffer) } : {}) };
+  return { version: createHash("sha256").update(buffer).digest("hex"), paragraphs };
 }
 
 export function applyLetterChanges(buffer, payload, allowEmpty = false) {

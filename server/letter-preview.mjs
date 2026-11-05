@@ -39,10 +39,13 @@ async function convertDocx(directory) {
 
 // Only one conversion at a time: each renderer uses an isolated profile and a
 // temporary directory. Generated previews are disposable, never source records.
-export async function renderLetterPreview(buffer, extension = ".docx") {
+export async function renderLetterPreview(buffer, extension = ".docx", includeLayout = false) {
   if (![".docx", ".pdf"].includes(extension) || buffer.length > 12_000_000) throw new Error("Unsupported preview file");
   const key = createHash("sha256").update(buffer).digest("hex");
-  if (cache.has(key)) return cache.get(key);
+  if (cache.has(key) && (!includeLayout || cache.get(key).layoutXml)) {
+    const saved = cache.get(key);
+    return includeLayout ? saved : { pages: saved.pages, pageCount: saved.pageCount };
+  }
   if (rendering) throw Object.assign(new Error("Another preview is being prepared. Please try again shortly."), { code: "PREVIEW_BUSY" });
   rendering = true;
   let directory;
@@ -61,7 +64,13 @@ export async function renderLetterPreview(buffer, extension = ".docx") {
     const files = (await readdir(directory)).filter((name) => /^page-\d+\.png$/.test(name)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     if (files.length !== pageCount) throw new Error("Preview pages missing");
     const pages = await Promise.all(files.map(async (name) => `data:image/png;base64,${(await readFile(join(directory, name))).toString("base64")}`));
-    const result = { pages, pageCount };
+    let layoutXml;
+    if (includeLayout) {
+      await run(process.env.PDFTOHTML_PATH || "pdftohtml", ["-xml", "-hidden", "-i", "-zoom", "1", "-noroundcoord", "-fontfullname", "-enc", "UTF-8", pdf, join(directory, "layout")], options);
+      layoutXml = await readFile(join(directory, "layout.xml"), "utf8");
+      if (layoutXml.length > 4_000_000) throw new Error("Document layout is too large");
+    }
+    const result = { pages, pageCount, ...(layoutXml ? { layoutXml } : {}) };
     if (cache.size >= 4) cache.delete(cache.keys().next().value);
     cache.set(key, result);
     return result;

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createLetterPdf, renderLetterPreview } from "../server/letter-preview.mjs";
 import { buildLetterTokens, replaceDocxText, createTrackingQrPng, generateLetterDocx, extractLetterParagraphs, editLetterParagraphs } from "../server/letter-generator.mjs";
 import { starterLetterTemplates } from "../src/lib/letterTemplates.js";
+import { renderLetterCanvas } from "../server/letter-layout.mjs";
 import sharp from "sharp";
 import jsQR from "jsqr";
 
@@ -34,6 +35,9 @@ for (const [url] of starterLetterTemplates) {
     await writeFile(join(directory, `${name}-${index + 1}.png`), bytes);
   }
   assert.ok(decoded, `${name}: QR must scan from the rendered letter page`);
+  const layout = await renderLetterCanvas(generated, extractLetterParagraphs(generated));
+  assert.deepEqual(layout.pages.map((page) => page.image), preview.pages, `${name}: editor must use the exact print-preview pages`);
+  assert.ok(layout.blocks.some((block) => block.runs.map((run) => run.text).join("").startsWith("Dear ")), `${name}: greeting must be editable on the printed page`);
   console.log(`${name}: ${preview.pageCount} preview pages rendered successfully`);
 }
 

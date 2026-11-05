@@ -316,8 +316,10 @@ words to apply bold, italic, underline or a font size. Alignment, undo/redo, key
 shortcuts and page/width/percentage zoom controls are available above the letter.
 Use **Use recipient name in greeting** to personalise the salutation.
 **Preview print layout** renders the current edits without saving and checks the final
-page breaks. **Back to editing** retains your edits and undo history. The editing view
-uses browser layout; the print preview shows the server-rendered Word/PDF pagination.
+page breaks. **Back to editing** retains your edits and undo history. The editor and
+preview share the same server-rendered page images, preserving the printed fonts,
+spacing, floating artwork and page size. Editable text sits over its rendered
+position; after a short pause, the page layout updates without saving the letter.
 **Save changes & preview** saves new Word and PDF files and opens the print preview.
 Changes apply to that individual letter; reusable templates remain unchanged.
 The editor preserves the letterhead and QR artwork. Plain wording changes retain the

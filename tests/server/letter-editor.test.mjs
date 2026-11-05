@@ -53,9 +53,6 @@ test("graphical formatting writes Word runs and alignment while preserving docum
   const buffer = await readFile("public/templates/kingsvale-initial-letter-template.docx");
   const content = letterContent(buffer);
   const greeting = content.paragraphs.find((item) => item.text.startsWith("Dear "));
-  const marked = unzip(Buffer.from(content.editorDocument, "base64"));
-  assert.equal(content.decoration.headerFill.color, "#063C22");
-  assert.ok(marked.get("word/document.xml").toString().includes(`w:name="KV_EDIT_${greeting.id}"`));
   const run = { text: greeting.text, bold: true, italic: true, underline: true, fontFamily: "Calibri", fontSize: 14, color: "#083d29" };
   const payload = { version: content.version, changes: [{ ...greeting, runs: [run], alignment: "center" }] };
   const edited = applyLetterChanges(buffer, payload);
@@ -92,13 +89,15 @@ test("letter editor API requires authentication and saves matching Word/PDF with
     child.once("exit", (code) => { clearTimeout(timer); reject(new Error(`Server exited ${code}`)); });
     child.stdout.on("data", (data) => { const match = data.toString().match(/http:\/\/127\.0\.0\.1:\d+/); if (match) { clearTimeout(timer); done(match[0]); } });
   });
-  for (const endpoint of ["content", "edit", "draft-preview"]) assert.equal((await fetch(`${url}/api/letters/${endpoint}`, { method: "POST" })).status, 401);
+  for (const endpoint of ["content", "edit", "draft-preview", "layout"]) assert.equal((await fetch(`${url}/api/letters/${endpoint}`, { method: "POST" })).status, 401);
   const { authToken } = await (await fetch(`${url}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "kingsvale", password: "test-editor-password" }) })).json();
   const api = (action, body) => fetch(`${url}/api/letters/${action}`, { method: "POST", headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   for (const source of ["https://example.com/x.docx", "/media/../secret.docx", "/media/original.pdf"]) assert.equal((await api("content", { url: source })).status, 400);
   const response = await api("content", { url: "/media/original.docx" });
   assert.equal(response.status, 200);
   const content = await response.json();
+  assert.ok(content.layout.pages.length > 0);
+  assert.ok(content.layout.blocks.some((block) => block.id === content.paragraphs.find((item) => item.text.startsWith("Dear ")).id));
   const id = content.paragraphs.find((item) => item.text.startsWith("Dear ")).id;
   const bodyId = content.paragraphs.find((item) => item.text.startsWith("I am writing")).id;
   assert.equal((await api("edit", { url: "/media/original.docx", version: "old", changes: [{ id, text: "Dear Amy Example," }] })).status, 400);
@@ -110,6 +109,11 @@ test("letter editor API requires authentication and saves matching Word/PDF with
   const previewData = await preview.json();
   assert.ok(previewData.pages.length > 0);
   assert.ok(previewData.pages[0].startsWith("data:image/png;base64,"));
+  const layoutResponse = await api("layout", { url: "/media/original.docx", version: content.version, changes });
+  assert.equal(layoutResponse.status, 200, await layoutResponse.clone().text());
+  const layout = await layoutResponse.json();
+  assert.deepEqual(layout.pages.map((page) => page.image), previewData.pages, "Editing pages must exactly match print preview pixels");
+  assert.ok(layout.blocks.some((block) => block.id === id));
   assert.deepEqual(await readdir(join(directory, "uploads")), beforePreview, "An unsaved preview must not write letter files");
   const saved = await api("edit", { url: "/media/original.docx", name: "test-letter.docx", version: content.version, changes });
   assert.equal(saved.status, 201, await saved.clone().text());

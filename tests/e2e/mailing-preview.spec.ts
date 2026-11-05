@@ -6,14 +6,23 @@ import { defaultStudioSettings } from "../../src/lib/studioSettings";
 import { createTrackingQrPng, generateLetterDocx, editLetterParagraphs, extractLetterParagraphs } from "../../server/letter-generator.mjs";
 // @ts-expect-error Production document editor is runtime ESM.
 import { letterContent } from "../../server/letter-editor.mjs";
+// @ts-expect-error Production layout renderer is runtime ESM.
+import { renderLetterCanvas } from "../../server/letter-layout.mjs";
+// @ts-expect-error Production document preview is runtime ESM.
+import { renderLetterPreview } from "../../server/letter-preview.mjs";
+// @ts-expect-error Production document editor is runtime ESM.
+import { applyLetterChanges } from "../../server/letter-editor.mjs";
 
 test("mailing preserves edits when sorting and previews a generated branded letter", async ({ page, context }, testInfo) => {
+  test.setTimeout(120000);
   let site = { ...createTrackingSite(), title: "Oakley letter test", reference: "KV-TEST-042", customerName: "Test Owner",
     siteAddress: "72 Pardown, Oakley, Hampshire, RG23 7DZ", siteAddressParts: { line1: "72 Pardown", line2: "", town: "Oakley", county: "Hampshire", postcode: "RG23 7DZ" } };
   let generated: Buffer;
   let serverPreview = false;
   let failEdit = false;
   let failLoad = false;
+  let canvasImage = "";
+  let layoutRequests = 0;
   let savedChanges: Array<{ id: number; text: string; runs?: Array<{ bold: boolean; italic: boolean; underline: boolean; fontSize: number }>; alignment?: string }> = [];
   await context.route("**/api/letters/preview", (route) => serverPreview
     ? route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } })
@@ -40,14 +49,27 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   });
   await context.route("**/media/test-generated.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
   await context.route("**/media/test-edited.docx", (route) => route.fulfill({ body: generated, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-  await context.route("**/api/letters/draft-preview", (route) => {
+  await context.route("**/api/letters/draft-preview", async (route) => {
     const data = route.request().postDataJSON();
     expect(data.changes.some((item: { text: string }) => item.text === "Dear Alex Example,")).toBe(true);
-    return route.fulfill({ json: { pageCount: 1, pages: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="] } });
+    const preview = await renderLetterPreview(applyLetterChanges(generated, data, true));
+    expect(preview.pages[0]).toBe(canvasImage);
+    return route.fulfill({ json: preview });
   });
-  await context.route("**/api/letters/content", (route) => failLoad
-    ? route.fulfill({ status: 422, json: { error: "Letter text could not be loaded." } })
-    : route.fulfill({ json: letterContent(generated) }));
+  await context.route("**/api/letters/content", async (route) => {
+    if (failLoad) return route.fulfill({ status: 422, json: { error: "Letter text could not be loaded." } });
+    const content = letterContent(generated, false);
+    const layout = await renderLetterCanvas(generated, content.paragraphs);
+    canvasImage = layout.pages[0].image;
+    return route.fulfill({ json: { ...content, layout } });
+  });
+  await context.route("**/api/letters/layout", async (route) => {
+    layoutRequests++;
+    const edited = applyLetterChanges(generated, route.request().postDataJSON(), true);
+    const layout = await renderLetterCanvas(edited, letterContent(edited, false).paragraphs);
+    canvasImage = layout.pages[0].image;
+    return route.fulfill({ json: layout });
+  });
   await context.route("**/api/letters/edit", (route) => {
     if (failEdit) return route.fulfill({ status: 422, json: { error: "The PDF could not be prepared. Please try again." } });
     const data = route.request().postDataJSON();
@@ -97,10 +119,12 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.getByRole("button", { name: "Edit letter", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("could not be loaded");
   failLoad = false;
+  if (testInfo.project.name === "desktop") await page.setViewportSize({ width: 1920, height: 1400 });
   await dialog.getByRole("button", { name: "Try loading again" }).click();
-  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Sir/Madam,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Sir/Madam,", { timeout: 30000 });
   await expect(canvasPage.locator("section.docx")).toBeVisible();
   await expect(canvasPage.locator("img").first()).toBeVisible();
+  await expect(canvasPage.locator(".letter-page-image").first()).toHaveAttribute("src", canvasImage);
   await dialog.screenshot({ path: testInfo.outputPath("graphical-letter-full-page.png") });
   await dialog.getByRole("button", { name: "Use recipient name in greeting" }).click();
   await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
@@ -121,13 +145,25 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await dialog.getByRole("button", { name: "Align centre", exact: true }).click();
   await dialog.getByLabel("Zoom", { exact: true }).selectOption("100");
   await dialog.getByLabel("Zoom", { exact: true }).selectOption("fit");
+  await expect.poll(() => layoutRequests, { timeout: 10000 }).toBeGreaterThan(0);
+  await expect(dialog.getByRole("status")).toContainText("Unsaved letter changes", { timeout: 30000 });
+  await canvasPage.locator("body").click({ position: { x: 2, y: 2 } });
   await dialog.screenshot({ path: testInfo.outputPath("graphical-letter-editor.png") });
   const beforePreviewUrl = site.letterFileUrl;
   await dialog.getByRole("button", { name: "Preview print layout", exact: true }).click();
-  await expect(dialog.getByRole("img", { name: "Edited letter page 1", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Edited letter page 1", exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(dialog.getByRole("img", { name: "Edited letter page 1", exact: true })).toHaveAttribute("src", canvasImage);
+  await dialog.screenshot({ path: testInfo.outputPath("matching-letter-preview.png") });
   expect(site.letterFileUrl).toBe(beforePreviewUrl);
   await dialog.getByRole("button", { name: "Back to editing", exact: true }).click();
   await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
+  await body.fill(Array.from({ length: 36 }, () => "Additional information about the site and planning opportunity.").join("\n"));
+  await expect.poll(() => canvasPage.locator(".letter-page-image").count(), { timeout: 30000 }).toBeGreaterThan(1);
+  await expect(dialog.getByRole("status")).toContainText("Unsaved letter changes", { timeout: 30000 });
+  await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(body).toHaveJSProperty("innerText", "A personal note about your land.\nPlease contact us when convenient.");
+  await expect(canvasPage.locator(".letter-page-image")).toHaveCount(1, { timeout: 30000 });
+  await expect(dialog.getByRole("status")).toContainText("Unsaved letter changes", { timeout: 30000 });
   await page.keyboard.press("Escape");
   await expect(dialog.getByText("Discard your unsaved changes?", { exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Keep editing" }).click();
@@ -152,7 +188,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "Dear Alex Example,")).toBe(true);
   expect(extractLetterParagraphs(generated).some((item: { text: string }) => item.text === "A personal note about your land.\nPlease contact us when convenient.")).toBe(true);
   await page.getByRole("button", { name: "Edit letter", exact: true }).click();
-  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,", { timeout: 30000 });
   await canvasPage.getByLabel("Greeting", { exact: true }).fill("Do not save this");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await dialog.getByRole("button", { name: "Discard changes", exact: true }).click();
@@ -161,7 +197,7 @@ test("mailing preserves edits when sorting and previews a generated branded lett
   await page.reload();
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();
   await page.getByRole("button", { name: "Edit letter", exact: true }).click();
-  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,");
+  await expect(canvasPage.getByLabel("Greeting", { exact: true })).toHaveText("Dear Alex Example,", { timeout: 30000 });
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(site.initialLetterGeneratedAt).toBeTruthy();
   await page.getByRole("tab", { name: "Sites", exact: true }).click();

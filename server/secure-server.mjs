@@ -5,6 +5,7 @@ import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
 import { sharedSiteNotes, siteNotesMaxLength } from "../src/lib/siteNotes.js";
 import { createLetterPdf, renderLetterPreview } from "./letter-preview.mjs";
 import { applyLetterChanges, letterContent, saveEditedLetter } from "./letter-editor.mjs";
+import { renderLetterCanvas } from "./letter-layout.mjs";
 import { cleanLandMap, publicLandMap, validateLandMap } from "../src/lib/landMap.js";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -531,7 +532,7 @@ async function handleApiRequest(request, response, url) {
     return;
   }
 
-  if (["/api/letters/content", "/api/letters/edit", "/api/letters/draft-preview"].includes(url.pathname)) {
+  if (["/api/letters/content", "/api/letters/edit", "/api/letters/draft-preview", "/api/letters/layout"].includes(url.pathname)) {
     const session = requireSession(request, response);
     if (!session) return;
     if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
@@ -540,7 +541,14 @@ async function handleApiRequest(request, response, url) {
       const source = String(payload.url ?? "");
       if (!/^\/media\/[a-zA-Z0-9._-]+\.docx$/i.test(source)) throw Object.assign(new Error("Choose a saved Word letter to edit."), { code: "LETTER_EDIT_INVALID" });
       const buffer = await readLetterTemplateSource(source);
-      if (url.pathname.endsWith("/content")) sendJson(response, 200, letterContent(buffer));
+      if (url.pathname.endsWith("/content")) {
+        const content = letterContent(buffer, false);
+        sendJson(response, 200, { ...content, layout: await renderLetterCanvas(buffer, content.paragraphs) });
+      }
+      else if (url.pathname.endsWith("/layout")) {
+        const generated = applyLetterChanges(buffer, payload, true);
+        sendJson(response, 200, await renderLetterCanvas(generated, letterContent(generated, false).paragraphs));
+      }
       else if (url.pathname.endsWith("/draft-preview")) sendJson(response, 200, await renderLetterPreview(applyLetterChanges(buffer, payload, true)));
       else {
         const file = await saveEditedLetter(buffer, payload, uploadsDir);

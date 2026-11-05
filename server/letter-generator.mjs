@@ -77,42 +77,6 @@ export function extractLetterParagraphs(buffer) {
   })).filter((paragraph) => paragraph.text.trim());
 }
 
-export function createEditableLetterDocx(buffer) {
-  const entries = readZip(buffer);
-  const document = entries.find((entry) => entry.name === "word/document.xml");
-  if (!document) throw new Error("DOCX document is missing.");
-  let xml = document.data.toString("utf8");
-  const paragraphs = letterParagraphRanges(xml);
-  for (let id = paragraphs.length - 1; id >= 0; id--) {
-    const paragraph = paragraphs[id];
-    if (!wordTextTokens(paragraph.xml).some((token) => token.text.trim())) continue;
-    const properties = paragraph.xml.match(/^<w:p\b[^>]*>\s*(?:<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>)/);
-    const offset = properties?.[0].length ?? paragraph.xml.indexOf(">") + 1;
-    const marked = paragraph.xml.slice(0, offset) + `<w:bookmarkStart w:id="${100000000 + id}" w:name="KV_EDIT_${id}"/>` + paragraph.xml.slice(offset);
-    xml = xml.slice(0, paragraph.start) + marked + xml.slice(paragraph.end);
-  }
-  document.data = Buffer.from(xml);
-  return writeZip(entries);
-}
-
-export function letterCanvasDecoration(buffer) {
-  const document = readZip(buffer).find((entry) => entry.name === "word/document.xml");
-  const xml = document?.data.toString("utf8") ?? "";
-  const pageWidth = Number(xml.match(/<w:pgSz\b[^>]*w:w="(\d+)"/)?.[1] || 11906) / 20;
-  // Word's full-width rectangles aren't handled by the browser renderer. Carry
-  // their simple fill into the canvas without changing the actual DOCX artwork.
-  for (const match of xml.matchAll(/<wp:anchor\b[^>]*behindDoc="1"[\s\S]*?<\/wp:anchor>/g)) {
-    const shape = match[0];
-    const extent = shape.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
-    const color = shape.match(/<a:solidFill>\s*<a:srgbClr\s+val="([0-9a-f]{6})"/i)?.[1];
-    const top = shape.match(/<wp:positionV\b[^>]*>\s*<wp:posOffset>(-?\d+)<\/wp:posOffset>/)?.[1];
-    if (extent && color && Number(top) < 0 && Number(extent[1]) / 12700 > pageWidth * 0.85 && Number(extent[2]) / 12700 < 220 && /<a:prstGeom\b[^>]*prst="rect"/.test(shape)) {
-      return { headerFill: { color: `#${color}`, heightPt: Number(extent[2]) / 12700 } };
-    }
-  }
-  return {};
-}
-
 export function editLetterParagraphs(buffer, changes) {
   const entries = readZip(buffer);
   const document = entries.find((entry) => entry.name === "word/document.xml");

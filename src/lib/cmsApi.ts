@@ -316,10 +316,17 @@ export async function createSavedLetterPdf(url: string): Promise<UploadedLetterF
 
 export type LetterTextRun = { text: string; bold: boolean; italic: boolean; underline: boolean; fontSize: number; fontFamily: string; color: string };
 export type LetterParagraph = { id: number; text: string; runs?: LetterTextRun[]; alignment?: "left" | "center" | "right" | "both" };
-export type LetterTextContent = { version: string; paragraphs: LetterParagraph[]; editorDocument?: string; decoration?: { headerFill?: { color: string; heightPt: number } } };
+export type LetterLayoutRect = { page: number; x: number; y: number; width: number; height: number };
+export type LetterPrintLayout = { pages: Array<{ width: number; height: number; image: string }>; blocks: Array<LetterLayoutRect & { id: number; fragments: LetterLayoutRect[]; prefix: string; suffix: string; runs: LetterTextRun[]; lineHeight: number }> };
+export type LetterTextContent = { version: string; paragraphs: LetterParagraph[]; layout: LetterPrintLayout };
+const pendingLetterLoads = new Map<string, Promise<LetterTextContent>>();
 
 export async function loadLetterText(url: string): Promise<LetterTextContent> {
-  return letterEditorRequest("content", { url });
+  const pending = pendingLetterLoads.get(url);
+  if (pending) return pending;
+  const request = letterEditorRequest("content", { url }).finally(() => pendingLetterLoads.delete(url));
+  pendingLetterLoads.set(url, request);
+  return request;
 }
 
 export async function saveLetterText(url: string, name: string, version: string, changes: LetterTextContent["paragraphs"]): Promise<UploadedLetterFile> {
@@ -330,7 +337,11 @@ export async function previewLetterChanges(url: string, version: string, changes
   return letterEditorRequest("draft-preview", { url, version, changes });
 }
 
-async function letterEditorRequest(action: "content" | "edit" | "draft-preview", body: unknown) {
+export async function refreshLetterLayout(url: string, version: string, changes: LetterParagraph[]): Promise<LetterPrintLayout> {
+  return letterEditorRequest("layout", { url, version, changes });
+}
+
+async function letterEditorRequest(action: "content" | "edit" | "draft-preview" | "layout", body: unknown) {
   const response = await fetch(`/api/letters/${action}`, { method: "POST", credentials: "same-origin",
     headers: authHeaders({ "Content-Type": "application/json", Accept: "application/json" }), body: JSON.stringify(body) });
   if (!isJsonResponse(response)) throw new Error("The letter editor could not be loaded. Please try again.");

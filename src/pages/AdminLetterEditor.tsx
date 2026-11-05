@@ -1,6 +1,6 @@
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eye, Italic, Redo2, Undo2, Underline } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { loadLetterText, previewLetterChanges, type LetterTextContent } from "../lib/cmsApi";
+import { loadLetterText, previewLetterChanges, refreshLetterLayout, type LetterTextContent } from "../lib/cmsApi";
 import { LetterCanvas, letterCanvasShell, type CanvasState } from "../lib/letterCanvas";
 
 type LetterFile = { url: string; name: string };
@@ -16,6 +16,7 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
   const dialog = useRef<HTMLDialogElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const canvas = useRef<LetterCanvas | null>(null);
+  const closeRef = useRef<() => void>(() => {});
   const zoomRef = useRef("fit");
   const [original, setOriginal] = useState<LetterTextContent | null>(null);
   const [state, setState] = useState<CanvasState>(emptyCanvas);
@@ -27,9 +28,19 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
   const [attempt, setAttempt] = useState(0);
   const [zoom, setZoom] = useState("fit");
   const [previewing, setPreviewing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [renderedKey, setRenderedKey] = useState("[]");
+  const [layoutTick, setLayoutTick] = useState(0);
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  const failedLayout = useRef("");
+  const changesKey = JSON.stringify(state.changes);
+  const latestKey = useRef(changesKey);
+  latestKey.current = changesKey;
   const [printed, setPrinted] = useState<{ pages: string[]; pageCount: number } | null>(null);
   const greeting = original?.paragraphs.find((item) => /^Dear\s/i.test(item.text.trim()));
   const busy = saving || previewing;
+  closeRef.current = close;
   zoomRef.current = zoom;
 
   useEffect(() => {
@@ -41,9 +52,10 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
   }, [state.changes.length, busy]);
 
   useEffect(() => {
+    mounted.current = true;
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
-    return () => { previous?.focus(); };
+    return () => { mounted.current = false; previous?.focus(); };
   }, []);
 
   useEffect(() => {
@@ -51,6 +63,9 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
     setError("");
     setOriginal(null);
     setCanvasReady(false);
+    setState(emptyCanvas);
+    setRenderedKey("[]");
+    failedLayout.current = "";
     void loadLetterText(file.url).then((content) => {
       if (active) setOriginal(content);
     }).catch((failure) => { if (active) setError(failure instanceof Error ? failure.message : "The letter could not be loaded."); });
@@ -61,19 +76,14 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
     if (!original || !frameReady) return;
     let active = true;
     let resize: ResizeObserver | undefined;
-    async function render() {
+    function render() {
       try {
-        if (!original?.editorDocument) throw new Error("The page editor could not load this letter. Please refresh and try again.");
-        const { renderAsync } = await import("docx-preview");
+        if (!original?.layout) throw new Error("The print layout could not load this letter. Please refresh and try again.");
         const doc = frame.current?.contentDocument;
         const pages = doc?.getElementById("pages");
-        const styles = doc?.getElementById("styles");
-        if (!active || !doc || !pages || !styles) return;
-        const bytes = Uint8Array.from(atob(original.editorDocument), (character) => character.charCodeAt(0));
-        await renderAsync(bytes, pages, styles, { useBase64URL: true, ignoreFonts: false, renderAltChunks: false,
-          renderHeaders: true, renderFooters: true, ignoreLastRenderedPageBreak: true, renderChanges: false, renderComments: false });
-        if (!active) return;
-        canvas.current = new LetterCanvas(doc, pages, original, (next) => { if (active) setState(next); }, setError);
+        if (!active || !doc || !pages) return;
+        pages.replaceChildren();
+        canvas.current = new LetterCanvas(doc, pages, original, (next) => { if (active) setState(next); }, setError, () => closeRef.current());
         canvas.current.zoom(zoomRef.current);
         resize = new ResizeObserver(() => canvas.current?.zoom(zoomRef.current));
         if (frame.current) resize.observe(frame.current);
@@ -83,6 +93,33 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
     void render();
     return () => { active = false; resize?.disconnect(); canvas.current?.destroy(); canvas.current = null; };
   }, [original, frameReady]);
+
+  useEffect(() => {
+    if (!original || !canvasReady || busy || printed || changesKey === renderedKey || failedLayout.current === changesKey || inFlight.current) return;
+    const timer = window.setTimeout(async () => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      setSyncing(true);
+      try {
+        const layout = await refreshLetterLayout(file.url, original.version, JSON.parse(changesKey));
+        if (mounted.current && latestKey.current === changesKey) {
+          canvas.current?.updateLayout(layout);
+          canvas.current?.zoom(zoomRef.current);
+          setRenderedKey(changesKey);
+          failedLayout.current = "";
+        }
+      } catch (failure) {
+        if (mounted.current && latestKey.current === changesKey) {
+          failedLayout.current = changesKey;
+          setError(failure instanceof Error ? failure.message : "The layout could not refresh. Your edits are still here.");
+        }
+      } finally {
+        inFlight.current = false;
+        if (mounted.current) { setSyncing(false); setLayoutTick((value) => value + 1); }
+      }
+    }, 1100);
+    return () => window.clearTimeout(timer);
+  }, [original, canvasReady, changesKey, renderedKey, busy, printed, file.url, layoutTick]);
 
   useEffect(() => { canvas.current?.setLocked(busy || !!printed); }, [busy, printed, canvasReady]);
   useEffect(() => { if (!printed) canvas.current?.zoom(zoom); }, [zoom, canvasReady, printed]);
@@ -94,7 +131,7 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
   }
 
   async function preview() {
-    if (!original || busy) return;
+    if (!original || busy || syncing) return;
     setPreviewing(true);
     setError("");
     try { setPrinted(await previewLetterChanges(file.url, original.version, state.changes)); }
@@ -103,7 +140,7 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
   }
 
   async function save() {
-    if (!original || !state.changes.length || busy) return;
+    if (!original || !state.changes.length || busy || syncing) return;
     setSaving(true);
     setError("");
     try { await onSave(original.version, state.changes); }
@@ -117,7 +154,7 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
       <div><h2 id="letter-text-editor-title">Edit letter</h2><p>{file.name}</p></div>
       <div className="letter-editor-dialog__header-actions">
         {printed ? <button className="admin-open" type="button" disabled={busy} onClick={() => setPrinted(null)}>Back to editing</button>
-          : <button className="admin-open" type="button" disabled={!canvasReady || busy} onClick={preview}><Eye aria-hidden="true" />{previewing ? "Preparing preview…" : "Preview print layout"}</button>}
+          : <button className="admin-open" type="button" disabled={!canvasReady || busy || syncing} onClick={preview}><Eye aria-hidden="true" />{previewing ? "Preparing preview…" : "Preview print layout"}</button>}
         <button className="admin-ghost" type="button" disabled={busy} onClick={close} autoFocus>Cancel</button>
       </div>
     </header>
@@ -147,7 +184,7 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
       </div>
     </div>}
     <div className="letter-editor-dialog__hint">
-      <span>{printed ? "Print layout preview · Your edits are not saved yet." : "Click text to edit. Select words to format them. Print preview checks the final page breaks."}</span>
+      <span>{printed ? "Print layout preview · Your edits are not saved yet." : "Click text to edit. The page layout updates automatically as you work."}</span>
       {!printed && greeting && recipient.trim() && <button className="admin-small" type="button" disabled={!canvasReady || busy}
         onClick={() => canvas.current?.personalise(greeting.id, `Dear ${recipient.trim()},`)}>Use recipient name in greeting</button>}
     </div>
@@ -165,8 +202,9 @@ export function AdminLetterEditor({ file, recipient, onClose, onSave }: {
         <button className="admin-open" type="button" onClick={() => setDiscarding(false)}>Keep editing</button>
         <button className="admin-ghost" type="button" onClick={onClose}>Discard changes</button>
       </div> : <>
-        <p role="status">{saving ? "Saving Word and PDF files…" : state.changes.length ? "Unsaved letter changes" : "Changes apply only to this letter."}{canvasReady && !busy && <span className="letter-editor-dialog__page-count">{printed?.pageCount || state.pageCount} {(printed?.pageCount || state.pageCount) === 1 ? "page" : "pages"}</span>}</p>
-        <button className="admin-save" type="button" disabled={!canvasReady || !state.changes.length || busy} onClick={save}>{saving ? "Saving…" : "Save changes & preview"}</button>
+        <p role="status">{saving ? "Saving Word and PDF files…" : syncing ? "Updating page layout…" : state.changes.length ? "Unsaved letter changes" : "Changes apply only to this letter."}{canvasReady && !busy && <span className="letter-editor-dialog__page-count">{printed?.pageCount || state.pageCount} {(printed?.pageCount || state.pageCount) === 1 ? "page" : "pages"}</span>}</p>
+        {failedLayout.current === changesKey && <button className="admin-open" type="button" onClick={() => { failedLayout.current = ""; setError(""); setLayoutTick((value) => value + 1); }}>Refresh layout</button>}
+        <button className="admin-save" type="button" disabled={!canvasReady || !state.changes.length || busy || syncing} onClick={save}>{saving ? "Saving…" : "Save changes & preview"}</button>
       </>}
     </footer>
   </dialog>;
