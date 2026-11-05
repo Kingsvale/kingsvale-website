@@ -17,6 +17,7 @@ import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { defaultQrStyle } from "../lib/trackingNormalize";
 import { parseTrackingAddress, publicTrackingAddress } from "../lib/trackingAddress.js";
+import { formatPastedAddress } from "../lib/addressCapitalisation";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
@@ -76,6 +77,7 @@ function LetterAddressPaste({ onFill }: { onFill: (value: string) => void }) {
       value={text}
       maxLength={500}
       rows={2}
+      formatPaste={formatPastedAddress}
       helper="Paste a comma-separated or multiline address to fill the fields below automatically. Review the split and add any missing details."
       onChange={(value) => { setText(value); onFill(value); }}
     />
@@ -368,7 +370,7 @@ export function AdminSitesPanel() {
 
   function fillLetterAddress(value: string) {
     if (!value.trim()) return;
-    const parts = parseTrackingAddress(value);
+    const parts = parseTrackingAddress(formatPastedAddress(value));
     updateDraft((site) => {
       site.siteAddressParts = parts;
       site.siteAddress = buildAddressFromParts(parts);
@@ -572,6 +574,7 @@ export function AdminSitesPanel() {
                 )}
                 <TrackingTextarea
                   label="Site address (if different)"
+                  formatPaste={formatPastedAddress}
                   value={draft.landAddress ?? ""}
                   maxLength={trackingFieldLimits.landAddress}
                   error={errorsByPath.landAddress}
@@ -583,6 +586,7 @@ export function AdminSitesPanel() {
                 <LetterAddressPaste key={draft.id} onFill={fillLetterAddress} />
                 <TrackingTextInput
                   label="Address line 1"
+                  formatPaste={formatPastedAddress}
                   value={draft.siteAddressParts.line1}
                   maxLength={trackingFieldLimits.addressLine1}
                   error={errorsByPath["siteAddressParts.line1"]}
@@ -590,6 +594,7 @@ export function AdminSitesPanel() {
                 />
                 <TrackingTextInput
                   label="Address line 2"
+                  formatPaste={formatPastedAddress}
                   value={draft.siteAddressParts.line2}
                   maxLength={trackingFieldLimits.addressLine2}
                   error={errorsByPath["siteAddressParts.line2"]}
@@ -598,6 +603,7 @@ export function AdminSitesPanel() {
                 <div className="admin-grid admin-grid--three">
                   <TrackingTextInput
                     label="Town / city"
+                    formatPaste={formatPastedAddress}
                     value={draft.siteAddressParts.town}
                     maxLength={trackingFieldLimits.addressTown}
                     error={errorsByPath["siteAddressParts.town"]}
@@ -605,6 +611,7 @@ export function AdminSitesPanel() {
                   />
                   <TrackingTextInput
                     label="County"
+                    formatPaste={formatPastedAddress}
                     value={draft.siteAddressParts.county}
                     maxLength={trackingFieldLimits.addressCounty}
                     error={errorsByPath["siteAddressParts.county"]}
@@ -612,6 +619,7 @@ export function AdminSitesPanel() {
                   />
                   <TrackingTextInput
                     label="Postcode"
+                    formatPaste={formatPastedAddress}
                     value={draft.siteAddressParts.postcode}
                     maxLength={trackingFieldLimits.addressPostcode}
                     error={errorsByPath["siteAddressParts.postcode"]}

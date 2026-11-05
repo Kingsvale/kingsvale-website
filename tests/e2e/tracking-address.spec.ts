@@ -1,6 +1,16 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createTrackingSite } from "../../src/lib/trackingStorage";
 import { defaultStudioSettings } from "../../src/lib/studioSettings";
+
+async function pasteText(field: Locator, text: string) {
+  await field.focus();
+  await field.evaluate((element: HTMLInputElement | HTMLTextAreaElement, pasted: string) => {
+    element.select();
+    const clipboard = new DataTransfer();
+    clipboard.setData("text/plain", pasted);
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true, cancelable: true }));
+  }, text);
+}
 
 async function setup(page: Page) {
   let site = {
@@ -30,10 +40,17 @@ test("pasted letter details and a separate land address save independently acros
   await expect(siteAddress).toHaveValue("");
   await expect(page.getByText("QR page site address:").locator("..")).toContainText("5 Brailsford Road");
 
+  await pasteText(page.getByLabel("Paste full letter address", { exact: true }), "BALCOMBE LODGE, SPRING LANE, SWALLOWFIELD, RG7 1SU");
+  await expect(page.getByLabel("Paste full letter address", { exact: true })).toHaveValue("Balcombe Lodge, Spring Lane, Swallowfield, RG7 1SU");
+  await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("Balcombe Lodge");
+  await expect(page.getByLabel("Address line 2", { exact: true })).toHaveValue("Spring Lane");
+  await expect(page.getByLabel("Town / city", { exact: true })).toHaveValue("Swallowfield");
+  await expect(page.getByLabel("Postcode", { exact: true })).toHaveValue("RG7 1SU");
+
   await page.getByLabel("Paste full letter address", { exact: true }).fill("LAND ADJACENT TO 5, NEWNHAM LANE, OLD BASING, rg247at");
-  await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("LAND ADJACENT TO 5");
-  await expect(page.getByLabel("Address line 2", { exact: true })).toHaveValue("NEWNHAM LANE");
-  await expect(page.getByLabel("Town / city", { exact: true })).toHaveValue("OLD BASING");
+  await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("Land Adjacent to 5");
+  await expect(page.getByLabel("Address line 2", { exact: true })).toHaveValue("Newnham Lane");
+  await expect(page.getByLabel("Town / city", { exact: true })).toHaveValue("Old Basing");
   await expect(page.getByLabel("County", { exact: true })).toHaveValue("");
   await expect(page.getByLabel("Postcode", { exact: true })).toHaveValue("RG24 7AT");
   // The split fields remain editable after paste, including corrections to town/county.
@@ -44,14 +61,18 @@ test("pasted letter details and a separate land address save independently acros
 
   // Now use the owner's correspondence address for the actual mailing.
   await page.getByLabel("Paste full letter address", { exact: true }).fill("5 Brailsford Road\nLondon\nsw22tb");
-  const land = "Land adjacent to 5, Newnham Lane, Old Basing, RG24 7AT";
-  await siteAddress.fill(land);
+  const land = "Land Adjacent to 5, Newnham Lane, Old Basing, RG24 7AT";
+  await pasteText(siteAddress, "LAND ADJACENT TO 5, NEWNHAM LANE, OLD BASING, RG24 7AT");
+  await expect(siteAddress).toHaveValue(land);
   await expect(page.locator("#land-map-postcode")).toHaveValue("RG24 7AT");
   await expect.poll(() => state.site().landAddress).toBe(land);
   expect(state.site().siteAddressParts.postcode).toBe("SW2 2TB");
   await page.getByRole("tab", { name: "Mailing", exact: true }).click();
   await expect(page.getByLabel("Address line 1", { exact: true })).toHaveValue("5 Brailsford Road");
   await expect(page.getByLabel("Postcode", { exact: true })).toHaveValue("SW2 2TB");
+  await pasteText(page.getByLabel("Address line 2", { exact: true }), "MCDONALD HOUSE");
+  await expect(page.getByLabel("Address line 2", { exact: true })).toHaveValue("McDonald House");
+  await page.getByLabel("Address line 2", { exact: true }).fill("");
   await page.getByRole("tab", { name: "Sites", exact: true }).click();
   await expect(siteAddress).toHaveValue(land);
 

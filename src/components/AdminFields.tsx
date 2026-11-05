@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ClipboardEvent } from "react";
 
 type AdminTextInputProps = {
   id?: string;
@@ -10,6 +10,7 @@ type AdminTextInputProps = {
   error?: string;
   type?: "text" | "url" | "email" | "tel";
   placeholder?: string;
+  formatPaste?: (value: string) => string;
 };
 
 type AdminTextareaProps = Omit<AdminTextInputProps, "type" | "placeholder"> & {
@@ -46,6 +47,24 @@ type AdminRangeInputProps = {
   onChange: (value: number) => void;
 };
 
+function handleFormattedPaste(
+  event: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  format: ((value: string) => string) | undefined,
+  onChange: (value: string) => void,
+  maxLength: number
+) {
+  if (!format) return;
+  const text = event.clipboardData.getData("text/plain");
+  if (!text) return;
+  event.preventDefault();
+  const field = event.currentTarget;
+  const before = field.value.slice(0, field.selectionStart ?? field.value.length);
+  const after = field.value.slice(field.selectionEnd ?? field.value.length);
+  onChange(format(before + text + after).slice(0, maxLength));
+  const caret = Math.min(format(before + text).length, maxLength);
+  requestAnimationFrame(() => field.setSelectionRange(caret, caret));
+}
+
 export function AdminTextInput({
   id: preferredId,
   label,
@@ -55,7 +74,8 @@ export function AdminTextInput({
   helper,
   error,
   type = "text",
-  placeholder
+  placeholder,
+  formatPaste
 }: AdminTextInputProps) {
   const generatedId = useAdminFieldId(label);
   const id = preferredId ?? generatedId;
@@ -72,6 +92,7 @@ export function AdminTextInput({
         maxLength={maxLength}
         aria-invalid={Boolean(error)}
         onChange={(event) => onChange(event.target.value)}
+        onPaste={(event) => handleFormattedPaste(event, formatPaste, onChange, maxLength)}
       />
       <FieldHelper helper={helper} error={error} />
     </label>
@@ -86,7 +107,8 @@ export function AdminTextarea({
   maxLength,
   rows = 4,
   helper,
-  error
+  error,
+  formatPaste
 }: AdminTextareaProps) {
   const generatedId = useAdminFieldId(label);
   const id = preferredId ?? generatedId;
@@ -102,6 +124,7 @@ export function AdminTextarea({
         maxLength={maxLength}
         aria-invalid={Boolean(error)}
         onChange={(event) => onChange(event.target.value)}
+        onPaste={(event) => handleFormattedPaste(event, formatPaste, onChange, maxLength)}
       />
       <FieldHelper helper={helper} error={error} />
     </label>

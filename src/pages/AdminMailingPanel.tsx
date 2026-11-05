@@ -23,6 +23,7 @@ import {
 import { defaultStudioSettings, type StudioSettings } from "../lib/studioSettings";
 import { AdminDocumentPreview } from "./AdminDocumentPreview";
 import { buildAddressFromParts } from "../lib/trackingNormalize";
+import { formatPastedAddress } from "../lib/addressCapitalisation";
 import {
   isRemailReminderOverdue,
   priorityClass,
@@ -433,7 +434,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
                 <TextInput label="Recipient name" value={draft.customerName} maxLength={80} onChange={(value) => updateDraft((site) => { site.customerName = value; })} />
                 <SelectField label="Address letter to" value={draft.letterRecipientMode} options={Object.entries(letterRecipientModeLabels) as [LetterRecipientMode, string][]} onChange={(value) => updateDraft((site) => { site.letterRecipientMode = value as LetterRecipientMode; })} />
                 {([ ["line1", "Address line 1", 90], ["line2", "Address line 2", 90], ["town", "Town / city", 70], ["county", "County", 70], ["postcode", "Postcode", 12] ] as const).map(([part, label, limit]) =>
-                  <TextInput key={part} id={`mailing-address-${part}`} label={label} value={draft.siteAddressParts[part]} maxLength={limit} onChange={(value) => updateDraft((site) => {
+                  <TextInput key={part} id={`mailing-address-${part}`} label={label} value={draft.siteAddressParts[part]} maxLength={limit} formatPaste={formatPastedAddress} onChange={(value) => updateDraft((site) => {
                     site.siteAddressParts[part] = part === "postcode" ? value.toUpperCase() : value;
                     site.siteAddress = buildAddressFromParts(site.siteAddressParts);
                   })} />)}

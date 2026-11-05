@@ -22,6 +22,9 @@ Enter letter addresses directly in the address fields in Sites or Mailing. In
 Sites, **Paste full letter address** splits a comma-separated or multiline address
 into address lines, town, a supplied county and a formatted postcode. Review the
 split and edit any field as needed; missing details are not looked up or invented.
+Pasted addresses use normal capitalisation (for example, `BALCOMBE LODGE` becomes
+`Balcombe Lodge`), while postcodes stay uppercase. The separate site address and
+individual address fields also format pasted text; manual edits remain available.
 
 The QR page uses the letter address by default. When the owner lives elsewhere,
 enter the land address in **Site & owner > Site address (if different)**. That
