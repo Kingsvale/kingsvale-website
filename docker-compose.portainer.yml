@@ -1,6 +1,6 @@
 services:
   kingsvale:
-    image: ghcr.io/kingsvale/kingsvale-website:cc4727004b60a4b8b651c67b9af5c872a6809132
+    image: ghcr.io/kingsvale/kingsvale-website:60c833258eadd91ff67eec36897e088da3ab749e
     pull_policy: always
     container_name: kingsvale-site
     restart: unless-stopped
