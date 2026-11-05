@@ -2,12 +2,31 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { inflateRawSync } from "node:zlib";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { createTrackingSite } from "../../src/lib/trackingStorage.ts";
-import { extractLetterParagraphs } from "../../server/letter-generator.mjs";
+import { buildLetterTokens, extractLetterParagraphs, replaceDocxText } from "../../server/letter-generator.mjs";
 import { regenerateEnvelopeDocuments } from "../../server/envelope-generator.mjs";
+
+test("envelope address expands without a clipping frame and omits an unused second line", async () => {
+  const template = await readFile("public/templates/kingsvale-envelope-template.docx");
+  assert.doesNotMatch(wordDocumentXml(template), /<w:(?:drawing|pict|txbxContent)\b|<v:shape\b/,
+    "Address text must flow on the page rather than be clipped by a fixed-height text box");
+  for (const line2 of ["", "Mickleover"]) {
+    const word = replaceDocxText(template, buildLetterTokens({
+      customerName: "Beverley Anne Robertson-Bailey", letterRecipientMode: "title-owner",
+      siteAddressParts: { line1: "22 Alport Road", line2, town: "Derby", county: "", postcode: "DE3 0BD" }
+    }, ""));
+    const expected = ["Beverley Anne Robertson-Bailey", "22 Alport Road", line2, "Derby", "DE3 0BD"].filter(Boolean);
+    const paragraphs = extractLetterParagraphs(word);
+    assert.deepEqual(paragraphs.map((paragraph) => paragraph.text), expected);
+    assert.deepEqual(paragraphs.map((paragraph) => paragraph.id), expected.map((_, index) => index),
+      "No blank paragraph may remain between street and town");
+    assert.equal([...wordDocumentXml(word).matchAll(/<w:p\b/g)].length, expected.length);
+  }
+});
 
 test("envelope generation requires a recipient address before writing files", async () => {
   const template = await readFile("public/templates/kingsvale-envelope-template.docx");
@@ -63,3 +82,19 @@ test("authenticated envelope regeneration uses saved mailing details and preserv
   assert.deepEqual(loaded, saved, "Creating replacements must not mutate the letter or mailing record");
   assert.equal((await readdir(join(directory, "uploads"))).length, 3);
 });
+
+function wordDocumentXml(buffer) {
+  for (let offset = 0; buffer.readUInt32LE(offset) === 0x04034b50;) {
+    const size = buffer.readUInt32LE(offset + 18);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const start = offset + 30 + nameLength + extraLength;
+    const name = buffer.subarray(offset + 30, offset + 30 + nameLength).toString();
+    if (name === "word/document.xml") {
+      const bytes = buffer.subarray(start, start + size);
+      return (buffer.readUInt16LE(offset + 8) === 8 ? inflateRawSync(bytes) : bytes).toString();
+    }
+    offset = start + size;
+  }
+  throw new Error("Word document XML missing");
+}

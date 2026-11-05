@@ -60,11 +60,22 @@ for (const [index, page] of editedPreview.pages.entries()) {
 assert.ok(editedQrDecoded, "Edited letter QR must retain its original tracking link");
 console.log(`edited initial: ${editedPreview.pageCount} preview pages rendered; QR preserved`);
 
-const envelope = replaceDocxText(await readFile("public/templates/kingsvale-envelope-template.docx"), buildLetterTokens(site, link));
-await writeFile(join(directory, "envelope.docx"), envelope);
-const envelopePdf = await createLetterPdf(envelope);
-await writeFile(join(directory, "envelope.pdf"), envelopePdf);
-const envelopePreview = await renderLetterPreview(envelopePdf, ".pdf");
-assert.equal(envelopePreview.pageCount, 1, "Envelope must contain only the recipient address front");
-for (const [index, page] of envelopePreview.pages.entries()) await writeFile(join(directory, `envelope-${index + 1}.png`), Buffer.from(page.split(",")[1], "base64"));
-console.log("envelope: one address-only front page rendered successfully");
+const envelopeTemplate = await readFile("public/templates/kingsvale-envelope-template.docx");
+for (const [name, recipient] of [
+  ["envelope", site],
+  ["envelope-second-line", { ...site, customerName: "Beverley Anne Robertson-Bailey", siteAddressParts: { line1: "22 Example Road", line2: "Mickleover", town: "Derby", county: "", postcode: "DE3 0BD" } }],
+  ["envelope-long-address", { ...site, customerName: "The Trustees of Alexandra Robin Heather Chadwick-Williams and Christopher Jonathan Robertson-Bailey", siteAddressParts: { line1: "The Old Mill House and Land Adjoining The Former Station Buildings, 125 Example Road", line2: "", town: "London", county: "", postcode: "SW2 2TB" } }]
+]) {
+  const envelope = replaceDocxText(envelopeTemplate, buildLetterTokens(recipient, link));
+  await writeFile(join(directory, `${name}.docx`), envelope);
+  const envelopePdf = await createLetterPdf(envelope);
+  await writeFile(join(directory, `${name}.pdf`), envelopePdf);
+  const preview = await renderLetterPreview(envelopePdf, ".pdf", true);
+  assert.equal(preview.pageCount, 1, "Envelope must contain only the recipient address front");
+  const tops = [...preview.layoutXml.matchAll(/<text\b[^>]*top="([\d.]+)"/g)].map((match) => Number(match[1])).sort((a, b) => a - b);
+  const gaps = tops.slice(1).map((top, index) => top - tops[index]).filter((gap) => gap > 1);
+  assert.ok(gaps.length >= 3 && Math.max(...gaps) < Math.min(...gaps) * 1.5,
+    `${name}: all address lines must have consistent spacing, including when the second line is blank`);
+  for (const [index, page] of preview.pages.entries()) await writeFile(join(directory, `${name}-${index + 1}.png`), Buffer.from(page.split(",")[1], "base64"));
+  console.log(`${name}: one address-only front page rendered with consistent line spacing`);
+}
