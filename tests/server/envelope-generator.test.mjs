@@ -14,6 +14,10 @@ test("envelope address expands without a clipping frame and omits an unused seco
   const template = await readFile("public/templates/kingsvale-envelope-template.docx");
   assert.doesNotMatch(wordDocumentXml(template), /<w:(?:drawing|pict|txbxContent)\b|<v:shape\b/,
     "Address text must flow on the page rather than be clipped by a fixed-height text box");
+  const footer = wordDocumentXml(template, "word/footer1.xml");
+  assert.match(footer, /<w:jc w:val="center"\/>/);
+  assert.match(footer, /<a:blip\b[^>]*r:embed=/, "The bottom footer must retain the company logo");
+  assert.doesNotMatch(footer, /<w:txbxContent\b|Return Address/);
   for (const line2 of ["", "Mickleover"]) {
     const word = replaceDocxText(template, buildLetterTokens({
       customerName: "Beverley Anne Robertson-Bailey", letterRecipientMode: "title-owner",
@@ -83,14 +87,14 @@ test("authenticated envelope regeneration uses saved mailing details and preserv
   assert.equal((await readdir(join(directory, "uploads"))).length, 3);
 });
 
-function wordDocumentXml(buffer) {
+function wordDocumentXml(buffer, part = "word/document.xml") {
   for (let offset = 0; buffer.readUInt32LE(offset) === 0x04034b50;) {
     const size = buffer.readUInt32LE(offset + 18);
     const nameLength = buffer.readUInt16LE(offset + 26);
     const extraLength = buffer.readUInt16LE(offset + 28);
     const start = offset + 30 + nameLength + extraLength;
     const name = buffer.subarray(offset + 30, offset + 30 + nameLength).toString();
-    if (name === "word/document.xml") {
+    if (name === part) {
       const bytes = buffer.subarray(start, start + size);
       return (buffer.readUInt16LE(offset + 8) === 8 ? inflateRawSync(bytes) : bytes).toString();
     }

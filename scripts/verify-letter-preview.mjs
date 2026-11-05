@@ -71,11 +71,20 @@ for (const [name, recipient] of [
   const envelopePdf = await createLetterPdf(envelope);
   await writeFile(join(directory, `${name}.pdf`), envelopePdf);
   const preview = await renderLetterPreview(envelopePdf, ".pdf", true);
-  assert.equal(preview.pageCount, 1, "Envelope must contain only the recipient address front");
+  assert.equal(preview.pageCount, 1, "Envelope must contain a single front page");
   const tops = [...preview.layoutXml.matchAll(/<text\b[^>]*top="([\d.]+)"/g)].map((match) => Number(match[1])).sort((a, b) => a - b);
   const gaps = tops.slice(1).map((top, index) => top - tops[index]).filter((gap) => gap > 1);
   assert.ok(gaps.length >= 3 && Math.max(...gaps) < Math.min(...gaps) * 1.5,
     `${name}: all address lines must have consistent spacing, including when the second line is blank`);
   for (const [index, page] of preview.pages.entries()) await writeFile(join(directory, `${name}-${index + 1}.png`), Buffer.from(page.split(",")[1], "base64"));
-  console.log(`${name}: one address-only front page rendered with consistent line spacing`);
+  const pixels = await sharp(Buffer.from(preview.pages[0].split(",")[1], "base64")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let logoPixels = 0;
+  for (let y = Math.floor(pixels.info.height * 0.8); y < pixels.info.height; y++) {
+    for (let x = 0; x < pixels.info.width; x++) {
+      const offset = (y * pixels.info.width + x) * 4;
+      if (Math.min(...pixels.data.subarray(offset, offset + 3)) < 210) logoPixels++;
+    }
+  }
+  assert.ok(logoPixels > 100, `${name}: the company logo must remain visible below the address`);
+  console.log(`${name}: one front page rendered with consistent address spacing and a visible bottom logo`);
 }
