@@ -3,6 +3,8 @@ import { useId, useMemo, useState } from "react";
 import { contactPriorityLabels, mailingStatusLabels, type TrackingSite } from "../lib/trackingTypes";
 import { isRemailReminderOverdue, mailingStatusClass, priorityClass } from "../lib/trackingStorage";
 import { loadSiteGroupMode, rememberSiteGroupMode, type SiteGroupMode } from "../lib/siteListOrder";
+import type { QrEngagement } from "../hooks/useEngagement";
+import { ViewBadge } from "./AdminViewStatus";
 
 export const siteFolder = (site: TrackingSite) => site.region.trim() || "Uncategorised";
 export function folderNames(sites: TrackingSite[]) {
@@ -23,9 +25,10 @@ type Props = {
   sites: TrackingSite[]; allSites: TrackingSite[]; selectedId?: string; busy: boolean;
   onSelect: (site: TrackingSite) => void;
   onMove: (ids: string[], folder: string) => Promise<boolean>;
+  engagement?: Map<string, QrEngagement>;
 };
 
-export function AdminSiteFolders({ sites, allSites, selectedId, busy, onSelect, onMove }: Props) {
+export function AdminSiteFolders({ sites, allSites, selectedId, busy, onSelect, onMove, engagement }: Props) {
   const id = useId();
   const [groupBy, setGroupBy] = useState(loadSiteGroupMode);
   const [folder, setFolder] = useState("");
@@ -96,6 +99,7 @@ export function AdminSiteFolders({ sites, allSites, selectedId, busy, onSelect, 
           <span className="site-row__title">{site.title}</span><span className="site-row__meta">{site.siteAddress}{site.reference ? ` · ${site.reference}` : ""}</span>
           <span className="site-row__badges"><span className={`priority-badge ${priorityClass(site.contactPriority)}`}>{contactPriorityLabels[site.contactPriority]}</span><span className={`mailing-status ${mailingStatusClass(site.mailingStatus)}`}>{mailingStatusLabels[site.mailingStatus]}</span>{site.archived && <span className="mailing-status">Archived</span>}</span>
           {isRemailReminderOverdue(site) && <small className="site-library__overdue">Follow-up overdue</small>}
+          {engagement && <ViewBadge value={engagement.get(site.id)} />}
         </button>
       </div>)}
     </section>)}

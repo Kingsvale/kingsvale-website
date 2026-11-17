@@ -6,6 +6,8 @@ export async function fetchServerContent(): Promise<SiteContent | null> {
   try {
     const response = await fetch("/api/content", {
       credentials: "same-origin",
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
       headers: { Accept: "application/json" }
     });
 

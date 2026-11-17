@@ -56,6 +56,7 @@ jobs:
           node --test tests/server/deployment.test.mjs
           node node_modules/vitest/vitest.mjs run src/hooks/useSiteAutosave.test.tsx src/lib/siteNotes.test.ts
           npm run build:docker
+          node --import tsx --test tests/server/studio-upgrade.test.mjs
           node --import tsx --test tests/server/site-notes.test.mjs
           node --import tsx --test tests/server/letter-editor.test.mjs
           node --test tests/server/letter-layout.test.mjs

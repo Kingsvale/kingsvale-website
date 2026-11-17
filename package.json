@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build && npm run prerender",
-    "build:docker": "vite build && node scripts/create-app-shell.mjs",
+    "build": "tsc -b && vite build && npm run prerender && npm run build:server",
+    "build:server": "vite build --config vite.server.config.ts",
+    "build:docker": "vite build && node scripts/create-app-shell.mjs && npm run build:server",
     "prerender": "tsx --tsconfig tsconfig.app.json scripts/prerender.tsx",
     "preview": "vite preview --host 127.0.0.1",
     "serve:secure": "node server/secure-server.mjs",

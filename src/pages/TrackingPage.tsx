@@ -3,6 +3,7 @@ import { Logo } from "../components/Logo";
 import type { SiteContent } from "../lib/contentTypes";
 import { fetchTrackingSiteByToken } from "../lib/publicTrackingApi";
 import type { TrackingResource, TrackingResourceType, TrackingSite } from "../lib/trackingTypes";
+import { isStudioPreviewRequest } from "../lib/studioPreview";
 
 const LandMapCanvas = lazy(() => import("./LandMapCanvas"));
 
@@ -18,8 +19,28 @@ type TrackingPageProps = {
 };
 
 export function TrackingPage({ content, token }: TrackingPageProps) {
-  const [site, setSite] = useState<TrackingSite | null>(null);
+  const [site, setSite] = useState<(TrackingSite & { viewReceipt?: string }) | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!site?.viewReceipt || isStudioPreviewRequest()) return;
+    let sent = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (sent || document.visibilityState !== "visible") return;
+      timer = setTimeout(() => {
+        sent = true;
+        void fetch(`/api/tracking-sites/${encodeURIComponent(token)}/view`, {
+          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visible: true, receipt: site.viewReceipt }), keepalive: true
+        }).catch(() => {});
+      }, 1200);
+    };
+    schedule();
+    document.addEventListener("visibilitychange", schedule);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", schedule); };
+  }, [site, token]);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +168,7 @@ export function TrackingPage({ content, token }: TrackingPageProps) {
           </div>
         </section>
       )}
+      <footer className="tracking-privacy"><a href="/privacy">Privacy</a><p>We record visits to this page to understand interest in our correspondence. A visit does not identify who opened the link.</p></footer>
     </main>
   );
 }

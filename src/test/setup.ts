@@ -74,4 +74,5 @@ if (typeof window.localStorage?.clear !== "function") {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.history.replaceState(null, "", "/");
 });

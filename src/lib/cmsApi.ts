@@ -54,6 +54,7 @@ const trackingStorageStatusEvent = "kingsvale-tracking-storage-status";
 const backupSessionError = "Backup requires an active server session.";
 
 let authToken = "";
+let cmsRevision: string | undefined;
 authToken = readStoredAuthToken();
 let trackingStorageStatus: TrackingStorageStatus = {
   mode: "checking",
@@ -146,7 +147,9 @@ export async function fetchCmsDraft() {
   if (!response.ok) {
     throw new Error("CMS draft could not be loaded.");
   }
-  return (await response.json()) as {
+  const result = await response.json();
+  cmsRevision = result.revision;
+  return result as {
     draft: SiteContent | null;
     published: SiteContent | null;
     updatedAt: string | null;
@@ -158,11 +161,12 @@ export async function saveCmsDraft(content: SiteContent) {
     method: "PUT",
     credentials: "same-origin",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ content })
+    body: JSON.stringify({ content, baseRevision: cmsRevision })
   });
   if (!response.ok) {
-    throw new Error("CMS draft could not be saved.");
+    throw new Error((await response.json()).error || "CMS draft could not be saved.");
   }
+  cmsRevision = (await response.json()).revision;
 }
 
 export async function publishCmsContent(content: SiteContent) {
@@ -170,11 +174,12 @@ export async function publishCmsContent(content: SiteContent) {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ content })
+    body: JSON.stringify({ content, baseRevision: cmsRevision })
   });
   if (!response.ok) {
-    throw new Error("CMS content could not be published.");
+    throw new Error((await response.json()).error || "CMS content could not be published.");
   }
+  cmsRevision = (await response.json()).revision;
 }
 
 export async function listCmsRevisions() {
@@ -193,12 +198,15 @@ export async function restoreCmsRevision(id: string) {
   const response = await fetch(`/api/cms/revisions/${encodeURIComponent(id)}/restore`, {
     method: "POST",
     credentials: "same-origin",
-    headers: authHeaders()
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ baseRevision: cmsRevision })
   });
   if (!response.ok) {
     throw new Error("Revision could not be restored.");
   }
-  return (await response.json()) as { content: SiteContent };
+  const result = await response.json();
+  cmsRevision = result.revision;
+  return result as { content: SiteContent };
 }
 
 export async function uploadCmsImage(file: File): Promise<ImageAsset> {
@@ -462,11 +470,12 @@ export async function saveTrackingSiteWithResult(site: TrackingSite): Promise<Tr
       method: "PUT",
       credentials: "same-origin",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ site })
+      body: JSON.stringify({ site, baseUpdatedAt: site.updatedAt })
     });
 
     if (!response.ok) {
-      if (!isLocalDemoRuntime()) {
+      if (response.status === 409) throw Object.assign(new Error((await response.json()).error || "This site changed in another session."), { conflict: true });
+      if (!isLocalDemoRuntime() || hasServerSession()) {
         markTrackingStorageUnavailable();
         throw new Error("Tracking site could not be saved to the secure server.");
       }
@@ -482,8 +491,9 @@ export async function saveTrackingSiteWithResult(site: TrackingSite): Promise<Tr
     return {
       site: normalizeTrackingSite(payload.site)
     };
-  } catch {
-    if (!isLocalDemoRuntime()) {
+  } catch (error) {
+    if ((error as { conflict?: boolean })?.conflict) throw error;
+    if (!isLocalDemoRuntime() || hasServerSession()) {
       markTrackingStorageUnavailable();
       throw new Error("Tracking site could not be saved to the secure server.");
     }
@@ -849,6 +859,14 @@ function authHeaders(headers: Record<string, string> = {}) {
   return authToken
     ? { ...headers, Authorization: `Bearer ${authToken}` }
     : headers;
+}
+
+export async function studioRequest<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  const response = await fetch(`/api/studio/${path}`, { method, cache: "no-store", credentials: "same-origin", headers: authHeaders({ "Content-Type": "application/json" }), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  if (!isJsonResponse(response)) throw new Error("This feature requires the secure server.");
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "The Studio request failed. Sign in again or retry.");
+  return result as T;
 }
 
 export async function driveBackupRequest<T>(path = "", method = "GET", body?: unknown): Promise<T> {

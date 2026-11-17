@@ -9,7 +9,8 @@ const budgets = {
   largestJavaScriptGzip: 72_000,
   // Includes homepage project selection and the shared land/letter address
   // parser used by QR pages and the local demo (+1.1 KB gzip for addresses).
-  totalPublicJavaScriptGzip: 102_500,
+  // Adds first-paint content bootstrap, signed QR view receipts and the factual QR privacy notice (+1.5 KB ceiling).
+  totalPublicJavaScriptGzip: 104_000,
   totalCssGzip: 24_000,
   deferredMapJavaScriptGzip: 55_000,
   mapEditorJavaScriptGzip: 80_000,

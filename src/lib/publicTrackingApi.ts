@@ -5,7 +5,7 @@ import {
 } from "./trackingLocalRead";
 import type { TrackingSite } from "./trackingTypes";
 
-export async function fetchTrackingSiteByToken(token: string): Promise<TrackingSite | null> {
+export async function fetchTrackingSiteByToken(token: string): Promise<(TrackingSite & { viewReceipt?: string }) | null> {
   try {
     const response = await fetch(`/api/tracking-sites/${encodeURIComponent(token)}`, {
       cache: "no-store",
@@ -17,8 +17,8 @@ export async function fetchTrackingSiteByToken(token: string): Promise<TrackingS
       return isLocalDemoRuntime() ? findPublicLocalTrackingSiteByToken(token) : null;
     }
 
-    const payload = (await response.json()) as { site: TrackingSite | null };
-    return payload.site ? normalizePublicTrackingSite(payload.site) : null;
+    const payload = (await response.json()) as { site: TrackingSite | null; viewReceipt?: string };
+    return payload.site ? { ...normalizePublicTrackingSite(payload.site), viewReceipt: payload.viewReceipt } : null;
   } catch {
     return isLocalDemoRuntime() ? findPublicLocalTrackingSiteByToken(token) : null;
   }

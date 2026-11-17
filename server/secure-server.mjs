@@ -1,4 +1,8 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { atomicWrite, mutateState, revisionOf } from "./state-store.mjs";
+import { createQrEngagement, validateEngagementBackup } from "./qr-engagement.mjs";
+import { createStudioRelay } from "./studio-relay.mjs";
+import { resolveClientAddress } from "./client-address.mjs";
 import { createDriveBackup } from "./drive-backup.mjs";
 import { isStarterLetterTemplate } from "../src/lib/letterTemplates.js";
 import { publicTrackingAddress } from "../src/lib/trackingAddress.js";
@@ -58,7 +62,7 @@ const cmsEncryptionKey = process.env.CMS_ENCRYPTION_KEY ?? "";
 const leadWebhookSecret = process.env.LEAD_WEBHOOK_HMAC_SECRET ?? "";
 const royalMailTrackingApiUrl = process.env.ROYAL_MAIL_TRACKING_API_URL ?? "";
 const royalMailTrackingApiKey = process.env.ROYAL_MAIL_TRACKING_API_KEY ?? "";
-const maxCmsRevisions = 5;
+const maxCmsRevisions = clampNumber(process.env.CMS_MAX_REVISIONS, 5, 1, 100);
 const maxCmsBackups = clampNumber(process.env.CMS_MAX_BACKUPS, 30, 5, 120);
 const backupImportMaxBytes = clampNumber(process.env.BACKUP_IMPORT_MAX_MB, 250, 5, 1000) * 1_000_000;
 const requestBuckets = new Map();
@@ -73,6 +77,7 @@ const mimeTypes = {
   ".ico": "image/x-icon",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".md": "text/plain; charset=utf-8",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".doc": "application/msword",
@@ -102,6 +107,14 @@ if (process.env.NODE_ENV === "production" && !cmsEncryptionKey) {
 }
 
 await ensureDataDirs();
+const qrEngagement = createQrEngagement({ directory: dataDir, secret: cmsEncryptionKey || authTokenSecret, encode: encodeCmsStore, decode: decodeCmsStore, publicSite: publicTrackingSite });
+await qrEngagement.cleanup();
+const { renderPublishedPage } = await import("../dist/server-render/index.js");
+const pageCache = new Map();
+const studioRelay = createStudioRelay({ directory: dataDir, encode: encodeCmsStore, decode: decodeCmsStore,
+  sendJson, readJsonBody, requireSession, readCms: readCmsStore, writeCms: writeCmsStore, validateContent: validateSiteContent,
+  readTracking: readTrackingStore, writeTracking: writeTrackingStore, normalizeSite: normalizeTrackingSite,
+  validateSite: validateTrackingSite, uploadImage: handleImageUpload, audit: writeAudit });
 const driveBackup = await createDriveBackup({
   directory: join(dataDir, "private"), buildBackup: buildScheduledDriveBackup,
   encode: encodeCmsStore, decode: decodeCmsStore, encryptionAvailable: Boolean(cmsEncryptionKey),
@@ -113,7 +126,7 @@ const server = createServer(async (request, response) => {
   try {
     applySecurityHeaders(response);
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-    const clientId = `${request.socket.remoteAddress ?? "unknown"}:${url.pathname}`;
+    const clientId = `${resolveClientAddress(request).ip ?? request.socket.remoteAddress ?? "unknown"}:${url.pathname}`;
 
     if (!allowRequest(clientId)) {
       await writeAudit("rate_limited", request, { path: url.pathname });
@@ -122,7 +135,20 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname.startsWith("/api/")) {
-      await handleApiRequest(request, response, url);
+      response.setHeader("Cache-Control", "no-store");
+      const mutatesStore = !["GET", "HEAD"].includes(request.method) && (
+        url.pathname.startsWith("/api/cms/") || url.pathname.startsWith("/api/tracking-sites") ||
+        url.pathname.startsWith("/api/studio/") || url.pathname === "/api/studio-settings" ||
+        url.pathname === "/api/auth/login" || url.pathname === "/api/backup" ||
+        url.pathname === "/api/analytics/visit" ||
+        (url.pathname.startsWith("/api/relay/v1/") && url.pathname !== "/api/relay/v1/media")
+      );
+      if (mutatesStore) {
+        // Never hold the state queue while a client is still sending its body.
+        const limit = url.pathname === "/api/backup" ? backupImportMaxBytes : url.pathname.startsWith("/api/studio/") || url.pathname.startsWith("/api/auth/") ? 20_000 : 8_000_000;
+        request.bufferedBody = await readRequestBody(request, limit);
+        await mutateState(() => handleApiRequest(request, response, url));
+      } else await handleApiRequest(request, response, url);
       return;
     }
 
@@ -131,7 +157,8 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    await serveStatic(url.pathname, response);
+    if (url.pathname.startsWith("/server-render/")) { sendJson(response, 404, { error: "Not found." }); return; }
+    await serveStatic(url.pathname, response, request);
   } catch (error) {
     if (error instanceof HttpError) {
       sendJson(response, error.status, { error: error.message });
@@ -144,6 +171,9 @@ const server = createServer(async (request, response) => {
 });
 
 const mailTimer = setInterval(() => { void contactMailer.flush().catch(() => console.error("Contact email queue unavailable.")); }, 60000);
+const engagementTimer = setInterval(() => { void mutateState(() => qrEngagement.cleanup()).catch(() => console.error("QR visit retention cleanup failed.")); }, 3600000);
+engagementTimer.unref();
+server.requestTimeout = 30_000;
 mailTimer.unref();
 const driveBackupTimer = setInterval(() => { void driveBackup.tick().catch(() => console.error("Google Drive backup scheduler could not save its state.")); }, 60_000);
 driveBackupTimer.unref();
@@ -187,6 +217,26 @@ function allowRequest(clientId) {
 }
 
 async function handleApiRequest(request, response, url) {
+  if (url.pathname === "/api/studio/integrations" || url.pathname.startsWith("/api/relay/v1")) {
+    await studioRelay.handle(request, response, url); return;
+  }
+
+  if (url.pathname === "/api/studio/engagement") {
+    if (!requireSession(request, response)) return;
+    if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    sendJson(response, 200, { sites: await qrEngagement.summary((await readTrackingStore()).sites), settings: await qrEngagement.settings(request) });
+    return;
+  }
+  if (url.pathname === "/api/studio/network-exclusions") {
+    if (!requireSession(request, response)) return;
+    try {
+      if (request.method === "POST") await qrEngagement.exclude(request, await readJsonBody(request, 2000));
+      else if (request.method === "DELETE") await qrEngagement.removeExclusion((await readJsonBody(request, 2000)).id);
+      else { sendJson(response, 405, { error: "Method not allowed." }); return; }
+      sendJson(response, 200, { ok: true, settings: await qrEngagement.settings(request) });
+    } catch (error) { if (error.status) sendJson(response, error.status, { error: error.message }); else throw error; }
+    return;
+  }
 
   if (url.pathname.startsWith("/api/drive-backup")) {
     await handleDriveBackup(request, response, url);
@@ -342,6 +392,7 @@ async function handleApiRequest(request, response, url) {
       sendJson(response, 200, {
         draft: store.draft ?? store.published,
         published: store.published,
+        revision: revisionOf(store.draft ?? store.published),
         updatedAt: store.updatedAt ?? null
       });
       return;
@@ -356,11 +407,12 @@ async function handleApiRequest(request, response, url) {
       }
 
       const store = await readCmsStore();
+      if (payload.baseRevision && payload.baseRevision !== revisionOf(store.draft ?? store.published)) { sendJson(response, 409, { error: "The draft changed in another session. Reload the latest draft before saving.", revision: revisionOf(store.draft ?? store.published) }); return; }
       store.draft = payload.content;
       store.updatedAt = new Date().toISOString();
       await writeCmsStore(store);
       await writeAudit("draft_saved", request, { user: session.user });
-      sendJson(response, 200, { ok: true, updatedAt: store.updatedAt });
+      sendJson(response, 200, { ok: true, updatedAt: store.updatedAt, revision: revisionOf(store.draft) });
       return;
     }
 
@@ -388,6 +440,7 @@ async function handleApiRequest(request, response, url) {
     }
 
     const store = await readCmsStore();
+    if (payload.baseRevision && payload.baseRevision !== revisionOf(store.draft ?? store.published)) { sendJson(response, 409, { error: "The draft changed in another session. Reload it before publishing." }); return; }
     if (store.published) {
       store.revisions.unshift({
         id: randomBytes(8).toString("hex"),
@@ -407,7 +460,7 @@ async function handleApiRequest(request, response, url) {
       user: session.user,
       revisionCount: store.revisions.length
     });
-    sendJson(response, 200, { ok: true, updatedAt: store.updatedAt });
+    sendJson(response, 200, { ok: true, updatedAt: store.updatedAt, revision: revisionOf(store.draft) });
     return;
   }
 
@@ -439,32 +492,25 @@ async function handleApiRequest(request, response, url) {
     if (!session) {
       return;
     }
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
 
     const revisionId = url.pathname.split("/")[4];
     const store = await readCmsStore();
+    const payload = await readJsonBody(request, 2000);
+    if (payload.baseRevision && payload.baseRevision !== revisionOf(store.draft ?? store.published)) { sendJson(response, 409, { error: "The draft changed in another session. Reload before restoring a revision." }); return; }
     const revision = store.revisions.find((item) => item.id === revisionId);
     if (!revision) {
       sendJson(response, 404, { error: "Revision not found." });
       return;
     }
 
-    if (store.published) {
-      store.revisions.unshift({
-        id: randomBytes(8).toString("hex"),
-        createdAt: new Date().toISOString(),
-        user: session.user,
-        content: store.published
-      });
-    }
-
-    store.published = revision.content;
     store.draft = revision.content;
     store.updatedAt = new Date().toISOString();
     store.revisions = store.revisions.slice(0, maxCmsRevisions);
     await writeCmsStore(store);
     await writeCmsBackup(store, "restore", session.user);
     await writeAudit("revision_restored", request, { user: session.user, revisionId });
-    sendJson(response, 200, { ok: true, content: revision.content });
+    sendJson(response, 200, { ok: true, content: revision.content, revision: revisionOf(store.draft) });
     return;
   }
 
@@ -622,6 +668,7 @@ async function handleLogin(request, response) {
   }
 
   const session = createSession(username);
+  await qrEngagement.rememberEditor(request, response);
   await writeAudit("login_success", request, { user: username });
 
   if (request.headers["content-type"]?.includes("application/json")) {
@@ -813,6 +860,7 @@ async function handleTrackingSitesCollection(request, response) {
     const store = await readTrackingStore();
     const incoming = payload.site ?? {};
     const previous = store.sites.find((item) => item.id === incoming.id);
+    if (previous && payload.baseUpdatedAt && payload.baseUpdatedAt !== previous.updatedAt) { sendJson(response, 409, { error: "This site changed in another session. Reopen it before saving to avoid overwriting those changes." }); return; }
     const site = normalizeTrackingSite({ ...incoming, ...sharedSiteNotes(incoming, previous) });
     const validation = validateTrackingSite(site);
     if (!validation.valid) {
@@ -892,10 +940,19 @@ async function handleTrackingSiteItem(request, response, url) {
   const [, , , idOrToken, action] = url.pathname.split("/");
   const decodedIdOrToken = decodePathComponent(idOrToken ?? "");
 
+  if (action === "view" && request.method === "POST") {
+    const site = (await readTrackingStore()).sites.find(item => item.token === decodedIdOrToken && !item.archived);
+    if (!site) { sendJson(response, 404, { error: "Map link unavailable." }); return; }
+    const payload = await readJsonBody(request, 2000);
+    await qrEngagement.record(request, site, payload);
+    sendJson(response, 202, { ok: true });
+    return;
+  }
+
   if (!action && request.method === "GET") {
     const store = await readTrackingStore();
     const site = store.sites.find((item) => item.token === decodedIdOrToken && !item.archived);
-    sendJson(response, site ? 200 : 404, { site: site ? publicTrackingSite(site) : null });
+    sendJson(response, site ? 200 : 404, { site: site ? publicTrackingSite(site) : null, ...(site ? { viewReceipt: qrEngagement.receipt(site) } : {}) });
     return;
   }
 
@@ -1254,7 +1311,7 @@ async function handleImageUpload(request, response, session) {
     sendJson(response, 400, { error: error.message || "Image could not be processed." });
     return;
   }
-  await writeAudit("image_uploaded", request, { user: session.user, filename: image.filename, variants: image.variants.length });
+  await writeAudit("image_uploaded", request, { user: session.user, ...(session.keyId ? { keyId: session.keyId } : {}), filename: image.filename, variants: image.variants.length });
   sendJson(response, 201, { image });
 }
 
@@ -1472,14 +1529,15 @@ async function readCmsStore() {
       revisions: Array.isArray(parsed.revisions) ? parsed.revisions.slice(0, maxCmsRevisions) : [],
       updatedAt: parsed.updatedAt ?? null
     };
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     return { published: null, draft: null, revisions: [], updatedAt: null };
   }
 }
 
 async function writeCmsStore(store) {
   await mkdir(cmsDir, { recursive: true });
-  await writeFile(cmsStoreFile, encodeCmsStore({
+  await atomicWrite(cmsStoreFile, encodeCmsStore({
     ...store,
     revisions: Array.isArray(store.revisions) ? store.revisions.slice(0, maxCmsRevisions) : []
   }));
@@ -1496,28 +1554,30 @@ async function readTrackingStore() {
       sites,
       updatedAt: parsed.updatedAt ?? null
     };
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     return { sites: [], updatedAt: null };
   }
 }
 
 async function writeTrackingStore(store) {
   await mkdir(trackingDir, { recursive: true });
-  await writeFile(trackingStoreFile, encodeCmsStore(store));
+  await atomicWrite(trackingStoreFile, encodeCmsStore(store));
 }
 
 async function readStudioSettings() {
   try {
     const raw = await readFile(studioSettingsFile, "utf8");
     return normalizeStudioSettings(decodeCmsStore(raw));
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     return defaultStudioSettings();
   }
 }
 
 async function writeStudioSettings(settings) {
   await mkdir(dataDir, { recursive: true });
-  await writeFile(studioSettingsFile, encodeCmsStore(normalizeStudioSettings(settings)));
+  await atomicWrite(studioSettingsFile, encodeCmsStore(normalizeStudioSettings(settings)));
 }
 
 async function readAnalyticsStore() {
@@ -1528,14 +1588,15 @@ async function readAnalyticsStore() {
       visits: Array.isArray(parsed.visits) ? parsed.visits.filter(isAnalyticsVisit) : [],
       updatedAt: parsed.updatedAt ?? null
     };
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     return { visits: [], updatedAt: null };
   }
 }
 
 async function writeAnalyticsStore(store) {
   await mkdir(analyticsDir, { recursive: true });
-  await writeFile(analyticsStoreFile, encodeCmsStore(store));
+  await atomicWrite(analyticsStoreFile, encodeCmsStore(store));
 }
 
 async function buildScheduledDriveBackup() {
@@ -1558,6 +1619,7 @@ async function buildFullBackup() {
     tracking: await readTrackingStore(),
     settings: await readStudioSettings(),
     analytics: await readAnalyticsStore(),
+    qrEngagement: await qrEngagement.export(),
     leads: await readLeadStores()
   };
   const media = await collectMedia(uploadsDir);
@@ -1577,6 +1639,7 @@ async function buildFullBackup() {
 async function applyFullBackup(backup, mode) {
   const now = new Date().toISOString();
   const stores = backup.stores;
+  if (stores.qrEngagement) await qrEngagement.restore(stores.qrEngagement, mode === "merge");
 
   if (mode === "merge") {
     const currentTracking = await readTrackingStore();
@@ -1738,6 +1801,10 @@ async function readJsonBody(request, limit) {
 }
 
 async function readRequestBody(request, limit) {
+  if (request.bufferedBody) {
+    if (request.bufferedBody.length > limit) throw new HttpError(413, "Request body is too large.");
+    return request.bufferedBody;
+  }
   const chunks = [];
   let length = 0;
   for await (const chunk of request) {
@@ -2058,6 +2125,13 @@ function validateBackupPayload(backup) {
       errors.push({ path: `stores.settings.${error.path}`, message: error.message });
     });
   }
+  if (stores.qrEngagement) {
+    try {
+      const restored = validateEngagementBackup(stores.qrEngagement);
+      if (restored.keyId !== qrEngagement.keyId) throw new Error("QR engagement requires the same CMS encryption key as the source server. Keep that key when migrating this backup.");
+    }
+    catch (error) { errors.push({ path: "stores.qrEngagement", message: error.message }); }
+  }
   if (!stores.analytics || !Array.isArray(stores.analytics.visits)) {
     errors.push({ path: "stores.analytics", message: "Analytics store is missing." });
   }
@@ -2256,64 +2330,15 @@ function normalizeTrackingSite(site) {
 }
 
 function publicTrackingSite(site) {
-  const {
-    ownerContactName,
-    ownerAddress,
-    titleNumber,
-    plotDescription,
-    contactPriority,
-    mailingStatus,
-    firstMailedAt,
-    lastMailedAt,
-    royalMailTrackingNumber,
-    trackingStatus,
-    trackingLastCheckedAt,
-    privateNotes,
-    letterPresetId,
-    letterRecipientMode,
-    titleDeedFileName,
-    titleDeedFileUrl,
-    letterTemplateName,
-    letterTemplateUrl,
-    letterFileName,
-    letterFileUrl,
-    initialLetterGeneratedAt,
-    letterDocuments,
-    searchlandUrl,
-    remailReminderDays,
-    remailReminderDate,
-    mailingNotes,
-    mailingLastUpdatedAt,
-    ...publicSite
-  } = site;
-  void ownerContactName;
-  void letterDocuments;
-  void ownerAddress;
-  void titleNumber;
-  void plotDescription;
-  void contactPriority;
-  void mailingStatus;
-  void firstMailedAt;
-  void lastMailedAt;
-  void royalMailTrackingNumber;
-  void trackingStatus;
-  void trackingLastCheckedAt;
-  void privateNotes;
-  void letterPresetId;
-  void letterRecipientMode;
-  void titleDeedFileName;
-  void titleDeedFileUrl;
-  void letterTemplateName;
-  void letterTemplateUrl;
-  void letterFileName;
-  void letterFileUrl;
-  void initialLetterGeneratedAt;
-  void searchlandUrl;
-  void remailReminderDays;
-  void remailReminderDate;
-  void mailingNotes;
-  void mailingLastUpdatedAt;
-  return { ...publicSite, ...publicTrackingAddress(site), landMap: publicLandMap(site.landMap) };
+  // Explicit allowlist: new internal fields must never silently become public.
+  return {
+    id: site.id, token: site.token, title: site.title, customerName: site.customerName,
+    ...publicTrackingAddress(site), reference: site.reference, summary: site.summary,
+    mapEmbedUrl: site.mapEmbedUrl, landMap: publicLandMap(site.landMap),
+    currentStatus: site.currentStatus, statusNote: site.statusNote,
+    milestones: site.milestones, resources: site.resources,
+    createdAt: site.createdAt, updatedAt: site.updatedAt
+  };
 }
 
 function normalizeMapEmbedInput(value) {
@@ -2563,14 +2588,19 @@ function normalizeAnalyticsVisit(input) {
 }
 
 async function recordServerAnalyticsVisit(request, visit) {
+  if (visit.path.startsWith("/track/") || qrEngagement.isEditor(request) || String(request.headers.referer || "").includes("studio-preview=")) return;
   if (!shouldRecordServerAnalyticsVisit(request, visit)) {
     return;
   }
 
-  const store = await readAnalyticsStore();
-  store.visits = [visit, ...store.visits].slice(0, 5_000);
-  store.updatedAt = new Date().toISOString();
-  await writeAnalyticsStore(store);
+  // Pixel GETs share the mutation queue with JSON POSTs.
+  const save = async () => {
+    const store = await readAnalyticsStore();
+    store.visits = [visit, ...store.visits].slice(0, 5_000);
+    store.updatedAt = new Date().toISOString();
+    await writeAnalyticsStore(store);
+  };
+  if (request.method === "GET") await mutateState(save); else await save();
 }
 
 function shouldRecordServerAnalyticsVisit(request, visit) {
@@ -2582,7 +2612,7 @@ function shouldRecordServerAnalyticsVisit(request, visit) {
   }
 
   const visitor = createHash("sha256")
-    .update(`${request.socket.remoteAddress ?? "unknown"}:${request.headers["user-agent"] ?? ""}`)
+    .update(`${resolveClientAddress(request).ip ?? "unknown"}:${request.headers["user-agent"] ?? ""}`)
     .digest("hex")
     .slice(0, 16);
   const key = `${visitor}:${visit.routeType}:${visit.path}`;
@@ -2902,14 +2932,16 @@ async function serveMedia(pathname, response) {
   createReadStream(candidate).pipe(response);
 }
 
-async function serveStatic(pathname, response) {
+async function serveStatic(pathname, response, request) {
   const filePath = resolveStaticPath(pathname);
+  if (isPathInside(join(distDir, "server-render"), filePath)) { sendJson(response, 404, { error: "Not found." }); return; }
   let fileInfo;
 
   try {
     fileInfo = await stat(filePath);
   } catch {
-    return serveStatic("/app.html", response);
+    if (extname(pathname) && !pathname.endsWith(".html")) { sendJson(response, 404, { error: "Not found." }); return; }
+    return sendStaticFile(join(distDir, "app.html"), response, request);
   }
 
   if (fileInfo.isDirectory()) {
@@ -2917,17 +2949,17 @@ async function serveStatic(pathname, response) {
     try {
       const routeIndexInfo = await stat(routeIndex);
       if (!routeIndexInfo.isDirectory()) {
-        return sendStaticFile(routeIndex, response);
+        return sendStaticFile(routeIndex, response, request);
       }
     } catch {
-      return serveStatic("/app.html", response);
+      return sendStaticFile(join(distDir, "app.html"), response, request);
     }
   }
 
-  return sendStaticFile(filePath, response);
+  return sendStaticFile(filePath, response, request);
 }
 
-async function sendStaticFile(filePath, response) {
+async function sendStaticFile(filePath, response, request) {
   response.setHeader("Content-Type", mimeTypes[extname(filePath)] ?? "application/octet-stream");
   if (basename(filePath) === "app.html") {
     response.setHeader("Cache-Control", "no-store");
@@ -2940,8 +2972,21 @@ async function sendStaticFile(filePath, response) {
   }
 
   if (extname(filePath) === ".html") {
-    const html = await readFile(filePath, "utf8");
-    response.end(injectAnalyticsPixel(html));
+    response.setHeader("Cache-Control", "no-store");
+    const url = new URL(request.url, "http://localhost");
+    const privateRoute = url.pathname.startsWith("/track/") || url.pathname.startsWith("/studio") || url.pathname === "/admin";
+    const preview = url.searchParams.has("studio-preview");
+    if (privateRoute || preview) response.setHeader("X-Robots-Tag", "noindex, nofollow");
+    if (privateRoute) response.setHeader("Referrer-Policy", "no-referrer");
+    const store = await readCmsStore();
+    const key = `${revisionOf(store.published)}:${url.pathname}:${preview}`;
+    let html = pageCache.get(key);
+    if (!html) {
+      html = await renderPublishedPage(await readFile(join(distDir, "app.html"), "utf8"), store.published, url.pathname, preview);
+      if (pageCache.size >= 60) pageCache.clear();
+      pageCache.set(key, html);
+    }
+    response.end(privateRoute || preview ? html : injectAnalyticsPixel(html));
     return;
   }
 

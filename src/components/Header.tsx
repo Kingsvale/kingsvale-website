@@ -1,6 +1,6 @@
-import { SiteText } from "./SiteText";
+import { SiteText, SiteEditingContext } from "./SiteText";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { NavLink } from "../lib/contentTypes";
 import { Logo } from "./Logo";
 
@@ -12,7 +12,7 @@ type HeaderProps = {
 
 export function Header({ brandName, brandSuffix, navLinks }: HeaderProps) {
   const [open, setOpen] = useState(false);
-  const currentPath = window.location.pathname;
+  const currentPath = useContext(SiteEditingContext)?.route ?? (typeof window === "undefined" ? "/" : window.location.pathname);
 
   return (
     <header className="site-header" data-testid="site-header" data-menu-open={open}>

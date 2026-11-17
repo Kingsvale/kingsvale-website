@@ -1,6 +1,7 @@
 import { Clock, ExternalLink, FileText, Mail, Pencil, RefreshCw, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
+import { useEngagement } from "../hooks/useEngagement";
 import { AdminSiteFolders, SiteFolderField } from "./AdminSiteFolders";
 import { useSiteFolders } from "../hooks/useSiteFolders";
 import { lastWorkflowSite } from "../lib/workflowNavigation";
@@ -64,6 +65,7 @@ const letterTokens = [
 ];
 
 export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: string }) {
+  const engagement = useEngagement();
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
@@ -278,7 +280,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
       return;
     }
 
-    const generationDraft: TrackingSite = {
+    let generationDraft: TrackingSite = {
       ...draft,
       letterPresetId: selectedPreset?.id ?? draft.letterPresetId,
       letterTemplateName: selectedPreset?.templateName ?? draft.letterTemplateName,
@@ -293,7 +295,9 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
 
     setBusy(true);
     try {
-      if (!await autosave.flush()) return;
+      const acknowledged = await autosave.savedSnapshot();
+      if (!acknowledged) return;
+      generationDraft = { ...generationDraft, updatedAt: acknowledged.updatedAt };
       const generated = await generateLetterFromTemplate(generationDraft, publicLink, templateUrl, letterStage);
       if (!generated) {
         setStatus("The letter and print files could not be prepared. Please try again.");
@@ -326,7 +330,8 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     if (!draft) return;
     setBusy(true);
     try {
-      if (!await autosave.flush()) return;
+      const draft = await autosave.savedSnapshot();
+      if (!draft) return;
       const pdf = await createSavedLetterPdf(draft.letterFileUrl);
       const document = { kind: "letter-pdf" as const, name: draft.letterFileName.replace(/\.docx$/i, ".pdf"), url: pdf.url };
       const saved = await saveTrackingSite({ ...draft, letterDocuments: [...draft.letterDocuments?.filter((item) => item.kind !== "letter-pdf") ?? [], document] });
@@ -343,7 +348,8 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
     if (!draft || busy || !validation.valid) return;
     setBusy(true);
     try {
-      if (!await autosave.flush()) return;
+      const draft = await autosave.savedSnapshot();
+      if (!draft) return;
       const documents = await regenerateEnvelopes(draft.id);
       const saved = await saveTrackingSite({ ...draft,
         letterDocuments: [...draft.letterDocuments?.filter((item) => item.kind === "letter-pdf") ?? [], ...documents] });
@@ -453,7 +459,7 @@ export function AdminMailingPanel({ selectedSiteId = "" }: { selectedSiteId?: st
               ]}
             />
           </div>
-          <AdminSiteFolders sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy} onMove={moveSites} onSelect={selectSite} />
+          <AdminSiteFolders engagement={engagement.bySite} sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy} onMove={moveSites} onSelect={selectSite} />
         </aside>
 
         <div className="mailing-detail">

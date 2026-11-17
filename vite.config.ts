@@ -46,7 +46,11 @@ export default defineConfig({
             { name(id) {
           const normalizedId = id.replaceAll("\\", "/");
           if (normalizedId.includes("/src/pages/studioInlineEditing")) return "studio-inline";
-          if (normalizedId.includes("/src/hooks/useSiteAutosave") || normalizedId.includes("/src/hooks/useSiteFolders")) return "studio";
+          if (normalizedId.includes("/src/pages/AdminIntegrationsPanel")) return "studio-integrations";
+          if (normalizedId.includes("/src/pages/AdminMailingPanel")) return "studio-mailing";
+          if (normalizedId.includes("/src/pages/AdminDashboard")) return "studio-dashboard";
+          if (normalizedId.includes("/src/pages/AdminEngagement")) return "studio-engagement";
+          if (normalizedId.includes("/src/pages/Admin") || /\/src\/hooks\/(useSiteAutosave|useSiteFolders|useEngagement|useDraftHistory)/.test(normalizedId)) return "studio";
           if (/\/node_modules\/(docx-preview|jszip|pako|lie|immediate|setimmediate|readable-stream|saxes|xmlchars)\//.test(normalizedId)) return "studio-document-preview";
 
           if ((normalizedId.includes("/src/components/AdminFields") || normalizedId.includes("/src/components/TrackingQrCode"))) return "studio";

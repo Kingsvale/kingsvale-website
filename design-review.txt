@@ -1,0 +1,375 @@
+GATE: OPEN 69 (rounds used up)
+
+Kingsvale public website design review — 17 November 2026
+No waivers were applied. Existing identity and client copy were retained.
+Functional changes and prioritized recommendations: WEBSITE-REVIEW.md.
+
+Open findings:
+
+hero-fill: div#root > div.site-homepage > main.homepage-content > section.feature-strip "Award-winning craftsmanship"
+the next section shows on the first screen: it starts at 780px on a 900px screen (the hero ends at 780px)
+Suggested change: let the hero fill the first screen alone (min-height: 100svh, less above it): nothing of the next section on load
+
+flush: section#legacy > div.editorial-split__media > img.editorial-split__image "img: Hyde Heath Interior"
+its first line sits 0px under the top edge of section#legacy, where the ground changes
+Suggested change: give the section its padding at the edge where the ground changes (the closing call keeps a clear gap above the footer)
+
+flush: section#land-wanted > div.land-wanted__media > img.land-wanted__image "img: Barracks Land"
+its first line sits 0px under the top edge of section#land-wanted, where the ground changes
+Suggested change: give the section its padding at the edge where the ground changes (the closing call keeps a clear gap above the footer)
+
+nav: div#root > div.site-homepage > header.site-header
+the nav has no bar, and its pieces sit past the content's edges (36-1404px against 100-1340px)
+Suggested change: make the nav one bar from the content's left edge to its right edge, with every link and action inside it
+
+scroll-reveal: main.homepage-content > section.feature-strip > div.feature-strip__inner > div.feature:nth-of-type(4) "Customer at the heart We build lasting r"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: main.homepage-content > section.feature-strip > div.feature-strip__inner > div.feature:nth-of-type(1) "Award-winning craftsmanship Built to the"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: main.homepage-content > section.feature-strip > div.feature-strip__inner > div.feature:nth-of-type(2) "Exceptional locations Premium settings a"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#legacy > div.editorial-split__copy "OUR LEGACY Building homes. Creating lega"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: main.homepage-content > section.feature-strip > div.feature-strip__inner > div.feature:nth-of-type(3) "Sustainable by design Future-focused hom"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(1) "1 / 8 The Barracks NEWNHAM, RG27 9NW"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(5) "1 / 5 Queens Road DATCHET, SL3 9BN"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(4) "1 / 2 Oldway Lane SLOUGH, SL1 5LF"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(3) "1 / 10 Queens Acre WINDSOR, SL4 2BE"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(2) "1 / 11 Joiners Lane CHALFONT ST PETER, S"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#developments > div.development-grid > div.development-card:nth-of-type(6) "1 / 2 Iver Project IVER"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+scroll-reveal: section#land-wanted > div.land-wanted__copy "LAND WANTED Do you have land with potent"
+starts "opacity" (0.6 s) the moment it is scrolled into view (an IntersectionObserver)
+Suggested change: show it at rest: no fade, rise or unmask when it is scrolled into view
+
+card-layout: section#developments > div.development-grid "1 / 8 The Barracks NEWNHAM, RG27 9NW"
+6 of 6 cards drawn one way (one panel, ground, placement and fragment): copies of one card
+Suggested change: a card layout at most twice on a page: build the other sections another way
+
+copy-headline: h1#hero-title "Shaping exceptional communities. Buildin"
+"Shaping exceptional communities. Building lasting value." does not name what is sold (kingsvale homes and land development, kingsvale, homes, land, from flags); only the line under it does
+Suggested change: put the category noun in the h1 (and who it is for, or where), in 2 to 8 words
+
+copy-fact: h1#hero-title "Shaping exceptional communities. Buildin"
+the first screen holds no number, price, date, place, platform or genre
+Suggested change: put one hard fact from the brief on the first screen: a number, a price, a date, the place, the platforms it runs on or a game's genre; take it from the brief or remove the claim
+
+heading-scale: div.development-card:nth-of-type(1) > a.development-card__body > div.development-card__identity > h3 "The Barracks"
+an h3 at 34px, as large as the smallest h2 (21px) or larger (and 2 more like it: "Joiners Lane", "Queens Acre")
+Suggested change: size headings by level: the h1 largest, one size per level, each level below the one above
+
+heading-scale: h2#legacy-title "Building homes. Creating legacies."
+h2 headings in 2 sizes, 21px ("Award-winning craftsmans") to 46px (x2.19)
+Suggested change: size headings by level: the h1 largest, one size per level, each level below the one above
+
+off-grid: section#land-wanted > div.land-wanted__copy > p.eyebrow "LAND WANTED"
+left edge at 87px, 13px off the page margin at 100px (6 elements, like div.development-card:nth-of-type(4)); 3 more in this section off the grid too (h2#land-wanted-title at 87px, p:nth-of-type(2) at 87px, a.button-link.button-link--warm at 87px)
+Suggested change: move it onto the page margin, or the column edge its section uses
+
+off-grid: div.footer__brand > div.footer__socials > a:nth-of-type(1) > img "img: facebook.ico"
+left edge at 108.5px, 8.5px off the page margin at 100px (6 elements, like p)
+Suggested change: move it onto the page margin, or the column edge its section uses
+
+contrast: div.site-header__inner > nav.primary-nav > a:nth-of-type(6) > span "Our Developments"
+body text over a effect reads at 4.4:1 at its worst tenth (needs 4.5:1)
+Suggested change: put the text on a calm part of the picture, or on a solid panel
+
+text-contrast: section#land-wanted > div.land-wanted__copy > p:nth-of-type(2) > span "We are actively seeking land and develop"
+body text in #716a5d on #f7f3eb reads 4.84:1 (needs 7:1)
+Suggested change: body text in the ink at 7:1 or more; grey (4.5:1 or more) only for captions and labels
+
+street-number: footer#contact > div.footer__grid > address.footer__contact > p "71-75 Shelton St"
+a street with its house number: "71-75 Shelton St"; a real door, which the brief does not give
+Suggested change: print the street and the district only ("Weserstraße, Berlin-Neukölln"): no house number, unless the brief gives the address
+
+postcode: div.development-card:nth-of-type(1) > a.development-card__body > div.development-card__identity > p.development-card__location "RG27 9NW"
+a UK postcode: "RG27 9NW"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+postcode: div.development-card:nth-of-type(2) > a.development-card__body > div.development-card__identity > p.development-card__location "SL9 0AA"
+a UK postcode: "SL9 0AA"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+postcode: div.development-card:nth-of-type(3) > a.development-card__body > div.development-card__identity > p.development-card__location "SL4 2BE"
+a UK postcode: "SL4 2BE"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+postcode: div.development-card:nth-of-type(4) > a.development-card__body > div.development-card__identity > p.development-card__location "SL1 5LF"
+a UK postcode: "SL1 5LF"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+postcode: div.development-card:nth-of-type(5) > a.development-card__body > div.development-card__identity > p.development-card__location "SL3 9BN"
+a UK postcode: "SL3 9BN"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+postcode: footer#contact > div.footer__grid > address.footer__contact > p "WC2H 9JQ"
+a UK postcode: "WC2H 9JQ"; with the street it points at one building, which the brief does not give
+Suggested change: drop the postcode: the street and the district say where it is (copy.md, Address)
+
+phone-number: footer#contact > div.footer__grid > address.footer__contact > a:nth-of-type(1) "07379 749103"
+a phone number with its area code: "07379 749103"; a visitor can dial it and reach a stranger (and 1 more like it: again here)
+Suggested change: drop the number and its tel: link (a "Request a call" form may stand in), unless the brief gives the number
+
+field-label: input#newsletter-email
+a input[type=email] without a label you can see: its <label> is hidden
+Suggested change: put a <label for> with the field's name above it (references/system.md, Forms); a placeholder is no label
+
+focus-visible: section#legacy > div.editorial-split__copy:nth-of-type(2) > a.button-link.button-link--warm "Our vision & process"
+Tab stop 11, a "Our vision & process": the focus lands on something you cannot see
+Suggested change: keep the kit's ring (system.css :focus-visible, 2px in --action, there at once); a control that hides itself shows on focus
+
+focus-visible: section#developments > div.section-heading:nth-of-type(1) > a.button-link.button-link--dark "View all developments"
+Tab stop 12, a "View all developments": the focus lands on something you cannot see
+Suggested change: keep the kit's ring (system.css :focus-visible, 2px in --action, there at once); a control that hides itself shows on focus
+
+focus-visible: div.development-grid:nth-of-type(2) > div.development-card:nth-of-type(1) > div.development-card__media.project-carousel > a "View The Barracks gallery"
+Tab stop 13, a "View The Barracks gallery": the focus lands on something you cannot see
+Suggested change: keep the kit's ring (system.css :focus-visible, 2px in --action, there at once); a control that hides itself shows on focus
+
+focus-visible: div.development-card:nth-of-type(1) > div.development-card__media.project-carousel > div.project-carousel__controls > button:nth-of-type(1) "Previous The Barracks photograph"
+Tab stop 14, button "Previous The Barracks photograph": the focus lands on something you cannot see
+Suggested change: keep the kit's ring (system.css :focus-visible, 2px in --action, there at once); a control that hides itself shows on focus
+
+hero-enter: section#home
+the hero does not enter on load: no data-enter on the hero and no head line setting html.m-enter (motion.md, The hero's entrance)
+Suggested change: put data-enter on the hero <section> and keep the head line from starter.html that sets html.m-enter
+
+moment-none: (the page)
+a service page (--type) deals no moment: every kind carries one, two on a long page (moments.md)
+Suggested change: deal one (moments.mjs pick --page service --photo) and mount it in its own section
+
+hero-screen: section#home "Kingsvale HomesShaping exceptional commu"
+the hero ends at 780px on a 900px screen, 120px above the fold: it ends at the fold, 1px either way (SR-1)
+Suggested change: make the hero exactly one screen (height: 100svh, its content fitted inside), never taller or shorter
+
+hero-screen: div#root > div.site-homepage > main.homepage-content > section.feature-strip "Award-winning craftsmanshipBuilt to the "
+120px of the next section shows on the first screen (from 780px on a 900px screen): nothing below the hero shows at load (SR-1)
+Suggested change: end the hero at the fold so nothing of the next section shows at load (hero height: 100svh)
+
+hero-screen: section#home > img.hero__image "Barracks Building"
+the hero's background layer runs outside the hero's box (-14-1454 x -8-788px) (SR-1)
+Suggested change: keep the hero's background layer inside the hero (position: absolute; inset: 0 in the section)
+
+section-height: div#root > div.site-homepage > main.homepage-content > section.feature-strip "Award-winning craftsmanshipBuilt to the "
+the section is 207px tall (0.2 screens), 693px short of one screen (900px): every section after the hero is one screen or two, 2px either way (SR-2)
+Suggested change: set the section to one screen or two (height: calc(var(--h,1) * 100vh), --h 1 or 2) and cut or split its content to fit
+
+section-height: section#land-wanted "Land wantedDo you have land with potenti"
+the section is 490px tall (0.5 screens), 410px short of one screen (900px): every section after the hero is one screen or two, 2px either way (SR-2)
+Suggested change: set the section to one screen or two (height: calc(var(--h,1) * 100vh), --h 1 or 2) and cut or split its content to fit
+
+section-height: footer#contact "Creating exceptional homes and communiti"
+the section is 512px tall (0.6 screens), 388px short of one screen (900px): every section after the hero is one screen or two, 2px either way (and 2 more like it: "Our developmentsBeautifu", "Our legacyBuilding homes") (SR-2)
+Suggested change: set the section to one screen or two (height: calc(var(--h,1) * 100vh), --h 1 or 2) and cut or split its content to fit
+
+section-height: section#developments "Our developmentsBeautiful homes in excep"
+the section starts at 1528px, 272px above the screen grid (2 x 900px): sections start on whole screens (SR-2)
+Suggested change: make every section above it exactly one or two screens tall, so this one starts on a whole screen
+
+section-height: section#legacy "Our legacyBuilding homes. Creating legac"
+the section's content does not fit it: its lowest content ends 540px below its top, past 469px (the section less 72px of bottom padding) (and 2 more like it: "Creating exceptional hom", "Award-winning craftsmans") (SR-2)
+Suggested change: fit the content above the section's bottom padding (--padb), or make it two screens (.g2) in two groups
+
+section-air: div#root > div.site-homepage > main.homepage-content > section.feature-strip / section#legacy
+41px of air between the content of these two sections: 128-480px (64-600px WARN) (every gap out of the band at 1440px, top to bottom: 41px after "Award-winning crafts", 90px after "Our legacyBuilding h", 101px after "Our developmentsBeau") (SR-3)
+Suggested change: keep 128-480px of air between the content of neighbouring sections (112-420px on a phone): the sections' padding (--padt, --padb)
+
+one-section: footer#contact > div.footer__grid > address.footer__contact > h2 "Contact us"
+the screen at scroll 2815px (the top of section 5) shows 410px of section 6 and the heading of section 6 whole and the content of 2 sections, over 24px each beside section 5: a screen shows one section (another may peek 8px, 24px WARN) (SR-4)
+Suggested change: make each section exactly one screen or two, so a screen shows one section and no neighbour peeks
+
+one-section: h2#land-wanted-title "Do you have land with potential?"
+the screen at scroll 2918px (the top of section 6) shows 387px of section 5 and the heading of section 5 whole and the content of 2 sections, over 24px each beside section 6: a screen shows one section (another may peek 8px, 24px WARN) (SR-4)
+Suggested change: make each section exactly one screen or two, so a screen shows one section and no neighbour peeks
+
+one-section: h2#developments-title "Beautiful homes in exceptional locations"
+the screen at scroll 987px (the top of section 3) shows 359px of section 4 and the heading of section 4 whole and the content of 2 sections, over 24px each beside section 3: a screen shows one section (another may peek 8px, 24px WARN) (and 4 more like it: scroll 2700px, scroll 900px, scroll 780px) (SR-4)
+Suggested change: make each section exactly one screen or two, so a screen shows one section and no neighbour peeks
+
+one-heading: div.feature-strip__inner > div.feature:nth-of-type(2) > div > h2 "Exceptional locations"
+the section holds 4 h2 headings: one per section, first in its .wrap (SR-5)
+Suggested change: give each section one h2, first in its .wrap, and the hero only its h1
+
+one-heading: footer#contact > div.footer__grid > nav.footer__nav > h2 "Explore"
+the section holds 3 h2 headings: one per section, first in its .wrap (SR-5)
+Suggested change: give each section one h2, first in its .wrap, and the hero only its h1
+
+one-heading: h2#legacy-title "Building homes. Creating legacies."
+headings of two sections show whole on one screen at 24 of 59 scroll positions (40.7%; at scroll 350, 400, 450, 500px), here with "Award-winning craftsmanship": at most 3% on a desktop (SR-5)
+Suggested change: make the sections one screen tall so their headings sit a screen apart and two never share one
+
+container-edges: section#land-wanted "Land wantedDo you have land with potenti"
+the content of section 5 runs 87px from the left and 0px from the right (read from its outermost blocks: no .wrap): the page's container starts at 60px; 87 and 0px are not one margin (one container, equal margins, 2px either way) (SR-6)
+Suggested change: use one container on every section and the nav (.wrap): one margin left and right, 64-120px on a desktop, 16-24px on a phone
+
+container-edges: section#legacy "Our legacyBuilding homes. Creating legac"
+the content of section 3 runs 0px from the left and 50px from the right (read from its outermost blocks: no .wrap): the page's container starts at 60px; 0 and 50px are not one margin; the margin is 64-120px at 1440px (one container, equal margins, 2px either way) (and 5 more like it: "Our developmentsBeautifu", "Creating exceptional hom", "HomeDesign & Build Servi") (SR-6)
+Suggested change: use one container on every section and the nav (.wrap): one margin left and right, 64-120px on a desktop, 16-24px on a phone
+
+container-edges: div#root "HomeDesign & Build ServicesLand WantedOu"
+a <div> at the top of the page, outside header.nav, main, footer.closing and nav.actionbar (SR-6)
+Suggested change: build the page as header.nav, a main of sections (each one in-flow .wrap plus background layers) and footer.closing
+
+container-edges: section#home "Kingsvale HomesShaping exceptional commu"
+the section needs exactly one in-flow child .wrap (it has 1 in-flow child, 0 .wrap) (and 8 more like it: "Barracks Building", section#home > div.hero__overlay, "Kingsvale HomesShaping e") (SR-6)
+Suggested change: build the page as header.nav, a main of sections (each one in-flow .wrap plus background layers) and footer.closing
+
+container-edges: section#home > div.hero__overlay
+a box runs 0-1440px, outside the container lines of section 1 at 60-1380px: full width is for background layers and grounds only (and 3 more like it: "Kingsvale Homes home", "Lookup", "Lookup") (SR-6)
+Suggested change: keep it inside the container lines (.wrap): full width is for background layers and grounds only
+
+container-edges: div.feature-strip__inner > div.feature:nth-of-type(4) > div > h2 "Customer at the heart"
+the h2 starts 1104px right of the container's left: every h1 and h2 starts on it, 2px either way (and 10 more like it: "Newsletter", "Sustainable by design", "Building homes. Creating") (SR-6)
+Suggested change: start the text on the container's left, or on the one split line every split shares
+
+container-edges: section#developments > div.section-heading > p.eyebrow "Our developments"
+"Our developments" is set centred across 1240px, over half the 1240px container: text that wide is set left (and 1 more like it: "Beautiful homes in excep") (SR-6)
+Suggested change: set the text left (text-align: start)
+
+container-edges: section#legacy > div.editorial-split__media
+a box over half the container wide runs 0-720px, not on the container's lines at 0-1390px (and 2 more like it: section#land-wanted > div.land-wanted__media, section#home > div.hero__overlay) (SR-6)
+Suggested change: run the picture or box from the container's left line to its right line, or put it in a row or a split
+
+no-visual: div#root > div.site-homepage > main.homepage-content > section.feature-strip "Award-winning craftsmanship"
+no picture, effect or mock in this section; a feature section needs a visual
+Suggested change: give the section a visual: a UI fragment on a ground, real icons, or a photograph that fits
+
+off-grid: div.footer__brand > div.footer__socials > a:nth-of-type(2) > img "img: instagram.ico"
+left edge at 72.5px, 21.5px off a common edge of its section at 51px (3 elements, like span)
+Suggested change: move it onto the page margin, or the column edge its section uses
+
+section-gaps: section#legacy / section#developments
+110px between these sections, +244% against the median 32px
+Suggested change: use one gap between sections (all within 25% of each other)
+
+section-gaps: section#developments / section#land-wanted
+118px between these sections, +66% against the median 71px of gaps at a change of ground
+Suggested change: use one gap between sections (all within 25% of each other)
+
+container: page
+no .wrap
+Suggested change: put the content in one .wrap
+
+copy-slop-word: copy "meticulous" in "Built to the highest standards with meticulous attent..."
+old slop words (meticulous)
+Suggested change: replace each word with the fact it stands in for: the step count, the figure, the material, the place (a word in the client's own name is not counted when the logo, the title before its ":" or og:site_name writes the name) (references/copy-tells.md)
+
+Warnings retained for a separately scoped public-site design/copy revision:
+
+copy-headings: div.feature-strip__inner > div.feature:nth-of-type(3) > div > h2 "Sustainable by design"
+"Sustainable by design" names no product, part, place or section (the one brand line a page may have)
+
+copy-buttons: section#legacy > div.editorial-split__copy > a.button-link.button-link--warm "OUR VISION & PROCESS"
+"OUR VISION & PROCESS" does not start with a verb (book, buy, try, start, get, see...)
+
+copy-actions: (the page)
+the main action "Discover our developments" does not read word for word the same in the closing section
+
+off-grid: header.site-header > div.site-header__inner > nav.primary-nav > a:nth-of-type(5) "About Us"
+left edge at 1062px, 10px off a common edge of its section at 1072px (4 elements, none of them near it)
+
+off-grid: div.feature-strip__inner > div.feature:nth-of-type(1) > div > h2 "Award-winning craftsmanship"
+the section's heading starts at 174px, 74px off the page margin (100px), and no other section starts there
+
+section-gaps: section#home / div#root > div.site-homepage > main.homepage-content > section.feature-strip
+38px between these sections, -42% against the median 66px
+
+section-gaps: div#root > div.site-homepage > main.homepage-content > section.feature-strip / section#legacy
+41px between these sections, -37% against the median 66px
+
+section-gaps: section#legacy / section#developments
+90px between these sections, +37% against the median 66px
+
+section-gaps: section#developments / section#land-wanted
+100px between these sections, +53% against the median 66px
+
+photo-set: header.site-header > div.site-header__inner > a.logo > img.logo__image "kingsvale-white.png"
+10 photographs in more than one look: lightness from 0.18 to 0.67; saturation from 0.06 to 0.41; the odd one out is kingsvale-white.png
+
+heading-align: h2#developments-title "Beautiful homes in exceptional locations"
+6 section headings sit on the left, 1 centred: "Beautiful homes in excep"
+
+button-contrast: section#legacy > div.editorial-split__copy > a.button-link.button-link--warm "OUR VISION & PROCESS"
+the button "OUR VISION & PROCESS" (#efe7da) stands only 1.16:1 off the ground around it: it reads as part of the ground, or as switched off
+
+button-contrast: section#land-wanted > div.land-wanted__copy > a.button-link.button-link--warm "SUBMIT YOUR LAND"
+the button "SUBMIT YOUR LAND" (#efe7da) stands only 1.11:1 off the ground around it: it reads as part of the ground, or as switched off
+
+one-screen: section#legacy "Building homes. Creating legacies."
+1 section is shorter than the screen, so the next one's heading or picture shows with it: "Building homes. Creating legacies." is 541px of the 900px under the nav, and "Beautiful homes in exceptional" shows below it
+
+font-load: h1#hero-title "Cormorant Garamond"
+"Cormorant Garamond" is asked for by the h1 and the h2s but never loaded (no font link or @font-face loads it): it shows in its fallback
+
+font-load: body "Inter"
+"Inter" is asked for by the body text but never loaded (no font link or @font-face loads it): it shows in its fallback
+
+skip-link: div.site-homepage > header.site-header > div.site-header__inner > a.logo "Kingsvale Homes home"
+the first Tab stop is "Kingsvale Homes home", not a skip link: a keyboard user tabs through the whole nav on every visit
+
+form-fields: input#newsletter-email
+the email field lacks autocomplete="email": the phone shows the wrong keyboard and nothing fills it in
+
+form-fields: footer#contact > div.footer__grid:nth-of-type(1) > div.footer__newsletter:nth-of-type(2) > form
+the form has no status line (role="status"): sending, sent and errors are never read out
+
+section-air: section#legacy / section#developments
+90px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)
+
+section-air: section#developments / section#land-wanted
+101px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)
+
+tap-size: div.development-card:nth-of-type(1) > div.development-card__media.project-carousel > div.project-carousel__controls > button:nth-of-type(1)
+a 40x40px tap target (and 2 more like it on this screen): under the 44px a phone needs
+
+tap-size: div.footer__grid > div.footer__brand > div.footer__socials > a:nth-of-type(1)
+a 36x36px tap target (and 2 more like it on this screen): under the 44px a phone needs
+
+tap-size: footer#contact > div.footer__grid > address.footer__contact > a:nth-of-type(1) "07379 749103"
+a 358x23px tap target: under the 44px a phone needs
+
+tap-size: footer#contact > div.footer__grid > nav.footer__nav > a:nth-of-type(1) "Design & Build Services"
+a 146x23px tap target (and 7 more like it on this screen): under the 44px a phone needs
+
+tap-size: footer#contact > div.footer__bar > div:nth-of-type(2) > a:nth-of-type(1) "Privacy Policy"
+a 83x23px tap target (and 1 more like it on this screen): under the 44px a phone needs
+
+button-styles: div.site-homepage > header.site-header > div.site-header__inner > button.nav-toggle
+the menu button is filled in #22211d, a fill none of the page's buttons use (#f7f3eb, #efe7da): one more button look
+
+off-grid: header.site-header > div.site-header__inner > a.logo > img.logo__image "img: kingsvale-white.png"
+left edge at 14px, 2px off the page margin at 16px (37 elements, like p.eyebrow.hero__eyebrow)
+
+copy-two-fragment: copy x2: "Shaping exceptional c...", "Building homes. Creat..."
+two-fragment headings "X. Y.": 2, budget 1
+
+No new client facts, substitute photographs or coined names were introduced.
+The report records design findings, not an independent security or accessibility certification.

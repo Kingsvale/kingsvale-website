@@ -62,7 +62,7 @@ export function App() {
   const route = window.location.pathname;
   usePageSeo(content, route);
   useEffect(() => {
-    if (isStudioPreviewRequest()) {
+    if (isStudioPreviewRequest() || route.startsWith("/track/")) {
       return;
     }
 
@@ -88,7 +88,7 @@ export function App() {
   return <SiteContentProvider content={content} route={route}><Page content={content} route={route} /></SiteContentProvider>;
 }
 
-function Page({ content, route }: { content: SiteContent; route: string }) {
+export function Page({ content, route }: { content: SiteContent; route: string }) {
   if (route === "/") {
     return <Homepage content={content} />;
   }

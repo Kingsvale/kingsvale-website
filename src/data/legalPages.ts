@@ -2,7 +2,7 @@ export type LegalSection = { id: string; title: string; paragraphs: string[] };
 
 export const legalCompany = "Kingsvale Homes is the trading name of Kingsvale Ltd, registered in England and Wales with company number 17289813. Our registered office is 71–75 Shelton Street, Covent Garden, London, WC2H 9JQ, United Kingdom.";
 export const legalEmail = "enquiries@kingsvalehomes.co.uk";
-export const legalUpdated = "14 September 2026";
+export const legalUpdated = "17 November 2026";
 
 export const privacySections: LegalSection[] = [
   {
@@ -31,12 +31,12 @@ export const privacySections: LegalSection[] = [
   },
   {
     id: "property-links", title: "Letters, QR codes and property links",
-    paragraphs: ["A letter may include a QR code or reference leading to a property page. These pages can display a site address, recipient name, reference, plans, project summary and shared documents. They are accessible to anyone with the link, or the required reference and postcode; they are not an authenticated private account. Share the link carefully and contact us if details need correcting or access should be withdrawn. Opening the page may create a visit record associated with the property, helping us understand engagement with our correspondence."]
+    paragraphs: ["A letter may include a QR code or reference leading to a property page. These pages can display a site address, recipient name, reference, plans, project summary and shared documents. They are accessible to anyone with the link, or the required reference and postcode; they are not an authenticated private account. Share the link carefully and contact us if details need correcting or access should be withdrawn. After a valid page is displayed, we record the first and latest visit, a count of visits and whether the latest page content has been viewed. We use a secret-keyed identifier derived from the visitor’s IP address; IPv6 addresses on the same /64 network are grouped. Raw visitor IP addresses are not stored in these QR visit records. Studio and excluded home or office networks are omitted. Network visit histories expire 180 days after the network’s latest view and are removed by a scheduled cleanup; recovery backups may retain earlier copies. A network can be shared by several people and addresses can change, so a view does not identify the recipient or establish that they read the correspondence."]
   },
   {
     id: "browser-storage", title: "Browser storage, visits and external content",
     paragraphs: [
-      "Our own visit measurement records page views through website requests and a small tracking image. Session storage remembers the most recent page and time to avoid duplicate events and normally clears when that browser session ends. If a visit request fails, up to 500 visit records may be kept in local storage on that device. Local storage has no automatic time expiry and can be cleared through your browser’s site-data settings. Clearing it does not delete records already received by us. Authorised Studio users also use browser storage for editing and session functions.",
+      "Our own website visit measurement records page views through website requests and a small tracking image. Session storage remembers the most recent page and time to avoid duplicate events and normally clears when that browser session ends. If a website visit request fails, up to 500 visit records may be kept in local storage on that device. Local storage has no automatic time expiry and can be cleared through your browser’s site-data settings. QR page measurement uses the separate server records described above and does not set a visitor tracking cookie. Authorised Studio users use browser storage for editing and session functions; signing in sets a signed editor-exclusion cookie for 180 days so their page checks are excluded. Clearing browser data does not delete records already received by us.",
       "The website does not currently use Google Analytics or advertising pixels. Maps and externally hosted images can connect your browser to their providers, which receive technical request information such as your IP address. Depending on the page, these may include Esri/ArcGIS, OpenStreetMap, Google Maps and external image hosts. Their privacy notices explain their own processing. Browser privacy settings may restrict these features. Contact us to object to our use of identifiable visit information."
     ]
   },

@@ -1,4 +1,5 @@
 import { AdminOverviewEditor } from "./AdminOverviewEditor";
+import { useDraftHistory } from "../hooks/useDraftHistory";
 import { AdminContactDelivery } from "./AdminContactDelivery";
 import {
   AlertCircle,
@@ -23,6 +24,8 @@ import {
 import {
   type CSSProperties,
   type ReactNode,
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -71,10 +74,9 @@ import {
 } from "../lib/studioPreview";
 import { AdminAnalyticsPanel } from "./AdminAnalyticsPanel";
 import { AdminBackupPanel } from "./AdminBackupPanel";
-import { AdminMailingPanel } from "./AdminMailingPanel";
 import { AdminSettingsPanel } from "./AdminSettingsPanel";
 import { AdminSitesPanel } from "./AdminSitesPanel";
-import { flushWorkflowEdits } from "../lib/workflowNavigation";
+import { flushWorkflowEdits, rememberWorkflowSite } from "../lib/workflowNavigation";
 import { ImageEditor, ImageUploadContext } from "./AdminImageEditor";
 import { AdminImagesPanel } from "./AdminImagesPanel";
 import { ProjectGallery } from "./AdminProjectGallery";
@@ -83,6 +85,7 @@ import { normalizeSiteContent } from "../lib/contentNormalize";
 import { websiteDraftKey } from "../lib/websiteDraft";
 import "../studio-media.css";
 import "../studio-workflows.css";
+import "../studio-dashboard.css";
 import { applyTextEdit, readField, previewReadyMessage, previewEditMessage, previewSelectMessage, previewModeMessage, previewScrollMessage } from "../lib/siteEditing";
 
 type AdminPageProps = {
@@ -91,6 +94,10 @@ type AdminPageProps = {
   encryptedSnapshotSummary?: string;
   onLogout?: () => void;
 };
+const AdminEngagementPanel = lazy(() => import("./AdminEngagement").then(module => ({ default: module.AdminEngagementPanel })));
+const AdminDashboard = lazy(() => import("./AdminDashboard").then(module => ({ default: module.AdminDashboard })));
+const AdminMailingPanel = lazy(() => import("./AdminMailingPanel").then(module => ({ default: module.AdminMailingPanel })));
+const AdminIntegrationsPanel = lazy(() => import("./AdminIntegrationsPanel").then(module => ({ default: module.AdminIntegrationsPanel })));
 
 type RevisionSummary = {
   id: string;
@@ -99,7 +106,7 @@ type RevisionSummary = {
   title: string;
 };
 
-type AdminRootTab = "website" | "sites" | "mailing" | "analytics" | "backup" | "settings";
+type AdminRootTab = "overview" | "website" | "sites" | "mailing" | "qr" | "analytics" | "integrations" | "backup" | "settings";
 type PreviewRoute = string;
 type PreviewDevice = "desktop" | "tablet" | "mobile";
 
@@ -121,10 +128,13 @@ const editorSections = [
 ] as const;
 
 const adminRootTabs: { id: AdminRootTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
   { id: "website", label: "Website" },
   { id: "sites", label: "Sites" },
   { id: "mailing", label: "Mailing" },
+  { id: "qr", label: "QR views" },
   { id: "analytics", label: "Analytics" },
+  { id: "integrations", label: "AI connections" },
   { id: "backup", label: "Backup" },
   { id: "settings", label: "Settings" }
 ];
@@ -180,7 +190,7 @@ export function AdminPage({
     return cloneContent(publishedContent);
   });
   const [status, setStatus] = useState<string>("Draft changes are visible in the preview.");
-  const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "backup" ? "backup" : "website");
+  const [activeRootTab, setActiveRootTab] = useState<AdminRootTab>(() => { const tab = new URLSearchParams(window.location.search).get("tab"); return adminRootTabs.find(item => item.id === tab)?.id ?? "website"; });
   const [activePanel, setActivePanel] = useState<EditorSectionId>("hero");
   const [selectedMailingSiteId, setSelectedMailingSiteId] = useState("");
   const [previewRoute, setPreviewRoute] = useState<PreviewRoute>("/");
@@ -199,6 +209,9 @@ export function AdminPage({
   const [serverMode, setServerMode] = useState(false);
   const [checkingStorage, setCheckingStorage] = useState(true);
   const [savedDraft, setSavedDraft] = useState(() => JSON.stringify(draft));
+  const [liveContent, setLiveContent] = useState(publishedContent);
+  const draftHistory = useDraftHistory(draft, setDraft);
+  const changedSections = Object.keys(draft).filter(key => JSON.stringify(draft[key as keyof SiteContent]) !== JSON.stringify(liveContent[key as keyof SiteContent]));
   const [uploadsPending, setUploadsPending] = useState(0);
   const unsaved = JSON.stringify(draft) !== savedDraft;
   const storageUnavailable = !checkingStorage && !serverMode && (!isLocalDemoRuntime() || hasServerSession());
@@ -224,9 +237,10 @@ export function AdminPage({
           return;
         }
         setServerMode(true);
+        if (payload.published) setLiveContent(normalizeSiteContent(payload.published));
         if (payload.draft) {
           const loaded = normalizeSiteContent(payload.draft);
-          setDraft(loaded);
+          draftHistory.reset(loaded);
           setSavedDraft(JSON.stringify(loaded));
         }
         const revisionList = await listCmsRevisions();
@@ -282,7 +296,7 @@ export function AdminPage({
       else throw new Error("Backend unavailable");
       setSavedDraft(JSON.stringify(draft));
       setStatus(serverMode ? "Draft saved on the backend. The live website has not changed." : "Draft saved on this browser. The live website has not changed.");
-    } catch { setStatus("Draft could not be saved. Your edits are still here; check the connection and retry."); }
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Draft could not be saved. Your edits are still here; check the connection and retry."); }
     finally { setBusy(false); }
   }
 
@@ -324,6 +338,7 @@ export function AdminPage({
         await saveEncryptedEditorSnapshot(draft, studioSecret);
       }
       setSavedDraft(JSON.stringify(draft));
+      setLiveContent(draft);
       window.dispatchEvent(new Event("kingsvale-content-updated"));
       setStatus(
         serverMode
@@ -332,8 +347,8 @@ export function AdminPage({
             ? "Published. The public site is updated and an encrypted studio snapshot was refreshed."
             : "Published. The public site now uses this content."
       );
-    } catch {
-      setStatus("Publish failed. Check the server session and validation state.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Publish failed. Check the server session and validation state.");
     } finally {
       setBusy(false);
     }
@@ -371,13 +386,13 @@ export function AdminPage({
     setBusy(true);
     try {
       const payload = await restoreCmsRevision(selectedRevision);
-      setDraft(cloneContent(payload.content));
+      draftHistory.reset(cloneContent(payload.content));
       setSavedDraft(JSON.stringify(payload.content));
       setRevisions(await listCmsRevisions());
       setSelectedRevision("");
       setShowRevisionHistory(false);
       window.dispatchEvent(new Event("kingsvale-content-updated"));
-      setStatus("Revision restored and published.");
+      setStatus("Revision restored into your draft. Review it before publishing.");
     } catch {
       setStatus("Revision restore failed.");
     } finally {
@@ -391,6 +406,18 @@ export function AdminPage({
     setActivePanel((current) => current === "images" ? current : previewRoutePanels[route] ?? "developments");
   }
 
+  function openSite(id: string, area: "sites" | "mailing" = "sites") {
+    rememberWorkflowSite(id); setSelectedMailingSiteId(id); setActiveRootTab(area);
+  }
+  useEffect(() => {
+    const url = new URL(window.location.href); url.searchParams.set("tab", activeRootTab);
+    window.history.replaceState(null, "", url);
+  }, [activeRootTab]);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => { if (activeRootTab === "website" && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); if (!busy && !uploadsPending && validation.valid && !checkingStorage) void saveDraft(); } };
+    window.addEventListener("keydown", shortcut); return () => window.removeEventListener("keydown", shortcut);
+  });
+
   return (
     <ImageUploadContext.Provider value={(delta) => setUploadsPending((count) => count + delta)}>
     <div className="admin-page">
@@ -402,8 +429,7 @@ export function AdminPage({
           </a>
           <h1>Kingsvale private studio</h1>
           <p>
-            Edit one designed section at a time. The layout stays fixed, the
-            guardrails stay active, and the preview shows exactly what will publish.
+            Your website, sites and landowner correspondence in one place.
           </p>
 
         </div>
@@ -478,7 +504,7 @@ export function AdminPage({
             <div className="admin-modal__heading">
               <div>
                 <h2 id="revision-history-title">Revision history</h2>
-                <p>Restore the version that was live before a previous publish.</p>
+                <p>Load a previous version into your draft, then review and publish.</p>
               </div>
               <button type="button" className="admin-ghost" onClick={() => setShowRevisionHistory(false)}>
                 Close
@@ -531,6 +557,8 @@ export function AdminPage({
           </div>
 
           <p className="draft-state" role="status">{uploadsPending ? "Uploading images — wait before saving or publishing." : unsaved ? "Unsaved changes · save a draft to come back later" : "Draft is up to date"}</p>
+          <div className="studio-draft-tools"><button className="admin-ghost" disabled={!draftHistory.canUndo || busy || uploadsPending > 0} onClick={draftHistory.undo}>Undo edit</button><button className="admin-ghost" disabled={!draftHistory.canRedo || busy || uploadsPending > 0} onClick={draftHistory.redo}>Redo edit</button><button className="admin-ghost" disabled={busy || checkingStorage || uploadsPending > 0 || !serverMode} onClick={async () => { if (unsaved && !window.confirm("Discard your unsaved edits and load the latest saved draft?")) return; try { const result = await fetchCmsDraft(); if (result.draft) { const next = normalizeSiteContent(result.draft); draftHistory.reset(next); setSavedDraft(JSON.stringify(next)); } if (result.published) setLiveContent(normalizeSiteContent(result.published)); setStatus("Latest saved draft loaded."); } catch { setStatus("Could not reload the saved draft."); } }}>Reload saved draft</button></div>
+          <details className="studio-change-summary"><summary>{changedSections.length ? `${changedSections.length} content areas differ from the live website` : "Draft matches the live website"}</summary><p>{changedSections.map(key => key.replace(/([A-Z])/g, " $1").toLowerCase()).join(", ") || "There are no unpublished content changes."}</p></details>
           {!validation.valid && (
             <div className="admin-errors" role="alert" aria-label="Validation issues">
               <h2>Content guardrails</h2>
@@ -1077,9 +1105,12 @@ export function AdminPage({
         <AdminSitesPanel />
       </main>
       )}
+      {activeRootTab === "overview" && <main className="admin-root-main" id="admin-root-panel-overview" role="tabpanel"><Suspense fallback={<p role="status">Loading overview…</p>}><AdminDashboard openSite={openSite} openArea={setActiveRootTab} unpublished={changedSections.length > 0} /></Suspense></main>}
+      {activeRootTab === "qr" && <main className="admin-root-main" id="admin-root-panel-qr" role="tabpanel"><Suspense fallback={<p role="status">Loading QR views…</p>}><AdminEngagementPanel onOpenSite={openSite} /></Suspense></main>}
+      {activeRootTab === "integrations" && <main className="admin-root-main" id="admin-root-panel-integrations" role="tabpanel"><Suspense fallback={<p role="status">Loading connections…</p>}><AdminIntegrationsPanel /></Suspense></main>}
       {activeRootTab === "mailing" && (
       <main className="admin-root-main" id="admin-root-panel-mailing" role="tabpanel">
-        <AdminMailingPanel selectedSiteId={selectedMailingSiteId} />
+        <Suspense fallback={<p role="status">Loading mailing…</p>}><AdminMailingPanel selectedSiteId={selectedMailingSiteId} /></Suspense>
       </main>
       )}
       {activeRootTab === "analytics" && (
@@ -1091,7 +1122,7 @@ export function AdminPage({
       <main className="admin-root-main" id="admin-root-panel-backup" role="tabpanel">
           <AdminBackupPanel onImported={async () => {
             const restored = serverMode ? (await fetchCmsDraft()).draft : JSON.parse(localStorage.getItem(websiteDraftKey) ?? "null");
-            if (restored) { const content = normalizeSiteContent(restored); setDraft(content); setSavedDraft(JSON.stringify(content)); }
+            if (restored) { const content = normalizeSiteContent(restored); draftHistory.reset(content); setSavedDraft(JSON.stringify(content)); }
             window.dispatchEvent(new Event("kingsvale-content-updated"));
             setStatus("Imported website draft loaded. Review your images before editing further.");
           }} />

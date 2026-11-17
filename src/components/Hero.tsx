@@ -8,12 +8,15 @@ type HeroProps = {
 };
 
 export function Hero({ hero }: HeroProps) {
+  // Cover crops a wide photograph into a tall mobile frame. Select enough pixels
+  // for the full scaled photograph, rather than only the viewport's narrow width.
+  const coverWidth = hero.image.width && hero.image.height ? Math.ceil(780 * 1.05 * hero.image.width / hero.image.height) : 0;
   return (
     <section className="hero" id="home" aria-labelledby="hero-title">
       <ResponsiveImage
         image={hero.image}
         className="hero__image"
-        sizes="100vw"
+        sizes={coverWidth ? `max(100vw, ${coverWidth}px)` : "100vw"}
         widthHint={2000}
         priority
       />

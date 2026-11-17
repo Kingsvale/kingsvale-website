@@ -19,7 +19,7 @@ export function usePageSeo(content: SiteContent, route: string) {
 
     document.title = metadata.title;
     setMeta("name", "description", metadata.description);
-    setMeta("name", "robots", "index, follow, max-image-preview:large");
+    setMeta("name", "robots", route.startsWith("/track/") || route.startsWith("/studio") || route === "/admin" || new URLSearchParams(window.location.search).has("studio-preview") ? "noindex, nofollow" : "index, follow, max-image-preview:large");
     setMeta("property", "og:title", metadata.title);
     setMeta("property", "og:description", metadata.description);
     setMeta("property", "og:type", development ? "article" : "website");

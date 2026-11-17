@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { SiteContent } from "../lib/contentTypes";
 import { loadPublishedContent } from "../lib/storage";
 import { fetchServerContent } from "../lib/serverContent";
+import { getInitialContent } from "../lib/contentBootstrap";
 import {
   isStudioPreviewRequest,
   loadStudioPreviewContent,
@@ -11,7 +12,7 @@ import {
 } from "../lib/studioPreview";
 
 export function useSiteContent() {
-  const [content, setContent] = useState<SiteContent>(() => loadStudioPreviewContent() ?? loadPublishedContent());
+  const [content, setContent] = useState<SiteContent>(() => loadStudioPreviewContent() ?? getInitialContent() ?? loadPublishedContent());
 
   useEffect(() => {
     let active = true;
@@ -43,14 +44,15 @@ export function useSiteContent() {
       if (!active) {
         return;
       }
-      setContent(serverContent ?? loadPublishedContent());
+      // A transient API failure must never replace real content with placeholders.
+      if (serverContent) setContent(serverContent);
     };
 
     const handleUpdate = () => {
       void refresh();
     };
 
-    void refresh();
+    if (!getInitialContent()) void refresh();
     window.addEventListener("storage", handleUpdate);
     window.addEventListener("kingsvale-content-updated", handleUpdate);
     return () => {

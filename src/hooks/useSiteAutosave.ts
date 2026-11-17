@@ -22,6 +22,7 @@ export function useSiteAutosave(options: Options) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const mounted = useRef(true);
+  const acknowledgedSite = useRef<TrackingSite | null>(null);
   const fingerprint = siteFingerprint(options.draft);
   const dirty = fingerprint !== siteFingerprint(options.saved);
   useEffect(() => { if (options.draft) rememberWorkflowSite(options.draft.id); }, [options.draft?.id]);
@@ -30,6 +31,7 @@ export function useSiteAutosave(options: Options) {
     if (pending.current) return pending.current;
     const run = async () => {
       let acknowledged = siteFingerprint(latest.current.saved);
+      let acknowledgedTimestamp = latest.current.saved?.updatedAt;
       while (latest.current.draft && siteFingerprint(latest.current.draft) !== acknowledged) {
         const current = latest.current;
         if (!current.valid) {
@@ -37,15 +39,18 @@ export function useSiteAutosave(options: Options) {
           return false;
         }
         const snapshot = structuredClone(current.draft!);
+        if (acknowledgedTimestamp) snapshot.updatedAt = acknowledgedTimestamp;
         if (mounted.current) { setSaving(true); setError(""); }
         try {
           const { site } = await saveTrackingSiteWithResult(snapshot);
           acknowledged = siteFingerprint(snapshot);
+          acknowledgedTimestamp = site.updatedAt;
+          acknowledgedSite.current = site;
           if (mounted.current) latest.current.onSaved(site, snapshot);
           // Don't let a response for one site replace another selected site.
           if (latest.current.draft?.id !== snapshot.id) return true;
-        } catch {
-          if (mounted.current) setError("Could not save. Your changes are still here. Check your connection and retry.");
+        } catch (error) {
+          if (mounted.current) setError(error instanceof Error ? `Could not save. ${error.message} Your changes are still here.` : "Could not save. Your changes are still here. Check your connection and retry.");
           return false;
         }
       }
@@ -83,5 +88,12 @@ export function useSiteAutosave(options: Options) {
     return () => { mounted.current = false; unregister(); window.removeEventListener("beforeunload", beforeUnload); };
   }, [flush]);
 
-  return { dirty, saving, error, flush, label: saving ? "Saving changes…" : options.blocked ? "Finishing the current operation…" : dirty ? error || (options.valid ? "Changes will save automatically…" : "Complete the highlighted details to save") : "All changes saved" };
+  async function savedSnapshot() {
+    if (!await flush()) return null;
+    const current = latest.current;
+    const acknowledged = acknowledgedSite.current?.id === current.draft?.id ? acknowledgedSite.current : null;
+    const saved = acknowledged && (!current.saved || acknowledged.updatedAt >= current.saved.updatedAt) ? acknowledged : current.saved;
+    return saved ? structuredClone(saved) : null;
+  }
+  return { dirty, saving, error, flush, savedSnapshot, label: saving ? "Saving changes…" : options.blocked ? "Finishing the current operation…" : dirty ? error || (options.valid ? "Changes will save automatically…" : "Complete the highlighted details to save") : "All changes saved" };
 }

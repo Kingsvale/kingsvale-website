@@ -24,6 +24,8 @@ import { lastWorkflowSite } from "../lib/workflowNavigation";
 import { sortSites } from "../lib/siteListOrder";
 import LandMapEditor from "./LandMapEditor";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
+import { useEngagement } from "../hooks/useEngagement";
+import { ViewDetail } from "./AdminViewStatus";
 import {
   AdminColorInput,
   AdminRangeInput,
@@ -106,6 +108,7 @@ function TrackingSelectField({ id, label, ...props }: ComponentProps<typeof Admi
 }
 
 export function AdminSitesPanel() {
+  const engagement = useEngagement();
   const [sites, setSites] = useState<TrackingSite[]>([]);
   const [draft, setDraft] = useState<TrackingSite | null>(null);
   const [query, setQuery] = useState("");
@@ -472,7 +475,7 @@ export function AdminSitesPanel() {
             />
             <span>Show archived</span>
           </label>
-          <AdminSiteFolders sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy || mapBusy} onMove={moveSites} onSelect={async (site) => {
+          <AdminSiteFolders engagement={engagement.bySite} sites={visibleSites} allSites={sites} selectedId={draft?.id} busy={busy || mapBusy} onMove={moveSites} onSelect={async (site) => {
             if (busy || mapBusy || !await autosave.flush()) return;
             if (site.id !== draft?.id) setDraft(structuredClone(site));
           }} />
@@ -509,6 +512,7 @@ export function AdminSitesPanel() {
                 </div>
 
                 <div className="tracking-link-box">
+                  <ViewDetail value={engagement.bySite.get(draft.id)} />
                   <div>
                     <span>Public map page link</span>
                     <input

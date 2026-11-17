@@ -48,6 +48,7 @@ it("preserves typing during a slow save and serializes the subsequent save", asy
   expect(save).toHaveBeenCalledTimes(1);
   await act(async () => { finish(); });
   expect(save).toHaveBeenCalledTimes(2);
+  expect(save.mock.calls[1][0].updatedAt).toBe("later");
   expect(result.current.draft.title).toBe("More typing while saving");
   expect(result.current.saved.title).toBe("More typing while saving");
 });
