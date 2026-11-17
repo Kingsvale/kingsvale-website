@@ -12,6 +12,7 @@ type ResponsiveImageProps = Omit<
   widthHint?: number;
   priority?: boolean;
   field?: string;
+  cover?: { mobile: number; desktop: number; desktopWidth?: string };
 };
 
 export function ResponsiveImage({
@@ -22,16 +23,21 @@ export function ResponsiveImage({
   priority = false,
   loading,
   field,
+  cover,
   ...props
 }: ResponsiveImageProps) {
   const context = useContext(SiteEditingContext);
   const path = field ?? context?.bindings.images.get(image) ?? `imageOverrides.${copyKey(image.src, context?.route ?? "/")}`;
   const override = path.startsWith("imageOverrides.") ? context?.content.imageOverrides?.[path.slice(15)] : undefined;
   image = override ?? image;
+  const ratio = image.width && image.height ? image.width / image.height : 0;
+  if (cover && ratio) sizes = `(max-width: 860px) max(100vw, ${Math.ceil(cover.mobile * ratio * 1.03)}px), max(${cover.desktopWidth ?? "100vw"}, ${Math.ceil(cover.desktop * ratio * 1.03)}px)`;
   return (
     <img
       {...props}
       className={className}
+      width={props.width ?? image.width}
+      height={props.height ?? image.height}
       data-cms-image={path}
       src={getOptimizedImageUrl(image.src, widthHint)}
       srcSet={image.variants?.map((variant) => `${variant.src} ${variant.width}w`).join(", ") || getResponsiveSrcSet(image.src)}

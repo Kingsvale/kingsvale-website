@@ -63,14 +63,16 @@ test("starter letters generate on the backend and document previews require auth
   assert.equal(response.status, 201);
   const { file } = await response.json();
   assert.ok(file.url.startsWith("/media/"));
-  const bytes = Buffer.from(await (await fetch(`${server.url}${file.url}`)).arrayBuffer());
+  assert.equal((await fetch(`${server.url}${file.url}`)).status, 401);
+  const bytes = Buffer.from(await (await server.api(file.url)).arrayBuffer());
   assert.equal(bytes.subarray(0, 2).toString(), "PK");
   const denied = await fetch(`${server.url}/api/letters/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: file.url }) });
   assert.equal(denied.status, 401);
   assert.equal((await server.api("/api/letters/preview", "POST", { url: "https://example.com/private.docx" })).status, 422);
   assert.deepEqual(file.documents.map((document) => document.kind), ["letter-pdf", "envelope-docx", "envelope-pdf"]);
   for (const document of file.documents) {
-    const data = Buffer.from(await (await fetch(`${server.url}${document.url}`)).arrayBuffer());
+    assert.equal((await fetch(`${server.url}${document.url}`)).status, 401);
+    const data = Buffer.from(await (await server.api(document.url)).arrayBuffer());
     assert.equal(data.subarray(0, document.kind.endsWith("pdf") ? 5 : 2).toString(), document.kind.endsWith("pdf") ? "%PDF-" : "PK");
   }
   const saved = { ...site, letterFileName: file.name, letterFileUrl: file.url, letterDocuments: file.documents };
@@ -82,7 +84,7 @@ test("starter letters generate on the backend and document previews require auth
   const { backup } = await (await server.api("/api/backup")).json();
   const destination = await startServer(t);
   assert.equal((await destination.api("/api/backup", "PUT", { backup, mode: "replace" })).status, 200);
-  for (const document of file.documents) assert.equal((await fetch(`${destination.url}${document.url}`)).status, 200);
+  for (const document of file.documents) { assert.equal((await fetch(`${destination.url}${document.url}`)).status, 401); assert.equal((await destination.api(document.url)).status, 200); }
   const followUp = await server.api("/api/letters/generate", "POST", { site: saved, templateUrl: site.letterTemplateUrl, publicLink: `${server.url}/track/${site.token}`, stage: "follow-up" });
   assert.equal(followUp.status, 201);
   assert.deepEqual((await followUp.json()).file.documents.map((document) => document.kind), ["letter-pdf"]);

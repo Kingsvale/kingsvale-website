@@ -22,7 +22,7 @@ export function Homepage({ content, preview = false }: HomepageProps) {
         brandSuffix={content.brandSuffix}
         navLinks={content.navLinks}
       />
-      <ContentWrapper className="homepage-content">
+      <ContentWrapper className="homepage-content" id="main-content" tabIndex={-1}>
         <Hero hero={content.hero} />
         <FeatureStrip features={content.features} />
         <EditorialSection content={content.about} />

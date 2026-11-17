@@ -48,6 +48,11 @@
 .studio-key-reveal { margin-top:18px; padding:18px; border:1px solid #799b82; background:#edf5ed; border-radius:8px; }
 .studio-key-reveal textarea { display:block; margin:10px 0; word-break:break-all; min-height:95px; }
 .studio-draft-tools { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.document-sharing { margin:16px; padding:16px; border:1px solid #d5dfd4; background:#f8faf6; }
+.document-sharing summary { cursor:pointer; min-height:44px; align-content:center; font-weight:600; }
+.document-sharing label { display:grid; gap:8px; margin:12px 0; }
+.document-sharing select,.document-sharing input { padding:10px; min-height:44px; max-width:100%; }
+.document-sharing__entry { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #d5dfd4; }
 .studio-change-summary { background:#f0f4ed; padding:5px 14px; border-radius:8px; margin-bottom:16px; font-size:13px; }
 .studio-change-summary p { line-height:1.7; text-transform:capitalize; }
 .tracking-privacy { padding:24px clamp(24px,5vw,72px); color:#58665d; border-top:1px solid #dce2db; font-size:13px; }

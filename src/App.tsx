@@ -12,6 +12,7 @@ import {
   type AnalyticsRouteType
 } from "./lib/analytics";
 import type { SiteContent } from "./lib/contentTypes";
+import { findDevelopment } from "./lib/publicRoutes.js";
 
 const AboutPage = lazyNamed("AboutPage");
 const ContactPage = lazyNamed("ContactPage");
@@ -119,8 +120,7 @@ export function Page({ content, route }: { content: SiteContent; route: string }
   }
 
   if (route.startsWith("/developments/")) {
-    const developmentId = route.split("/").filter(Boolean)[1];
-    const development = content.developments.find((item) => item.ctaHref === route || item.id === developmentId);
+    const development = findDevelopment(content, route);
     return (
       <RouteBoundary>
         {development ? (

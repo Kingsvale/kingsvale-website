@@ -14,7 +14,7 @@ import {
   Trash2
 } from "lucide-react";
 import type { ComponentProps } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { defaultQrStyle } from "../lib/trackingNormalize";
 import { parseTrackingAddress, publicTrackingAddress } from "../lib/trackingAddress.js";
 import { formatPastedAddress } from "../lib/addressCapitalisation";
@@ -26,6 +26,7 @@ import LandMapEditor from "./LandMapEditor";
 import { siteFingerprint, useSiteAutosave } from "../hooks/useSiteAutosave";
 import { useEngagement } from "../hooks/useEngagement";
 import { ViewDetail } from "./AdminViewStatus";
+const AdminDocumentPreview = lazy(() => import("./AdminDocumentPreview").then(module => ({ default: module.AdminDocumentPreview })));
 import {
   AdminColorInput,
   AdminRangeInput,
@@ -114,6 +115,7 @@ export function AdminSitesPanel() {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [documentPreview, setDocumentPreview] = useState<{ url: string; name: string } | null>(null);
   const [mapBusy, setMapBusy] = useState(false);
   const [status, setStatus] = useState("Create QR-ready land interest map pages.");
   const [storageStatus, setStorageStatus] = useState(() => getTrackingStorageStatus());
@@ -431,6 +433,7 @@ export function AdminSitesPanel() {
 
   return (
     <section className="sites-admin" aria-label="Land interest map pages">
+      {documentPreview && <Suspense fallback={<p role="status">Loading document…</p>}><AdminDocumentPreview key={documentPreview.url} file={documentPreview} onClose={() => setDocumentPreview(null)} /></Suspense>}
       <div className="sites-admin__toolbar">
         <div className="admin-status sites-admin__status" role="status">
           <Link aria-hidden="true" />
@@ -656,10 +659,10 @@ export function AdminSitesPanel() {
                   </div>
                   <div className="letter-upload__actions">
                     {draft.titleDeedFileUrl && (
-                      <a href={draft.titleDeedFileUrl} download={draft.titleDeedFileName || "title-deed"} className="admin-open">
+                      <><button className="admin-open" type="button" onClick={() => setDocumentPreview({ url: draft.titleDeedFileUrl, name: draft.titleDeedFileName })}>Preview / Share</button><a href={draft.titleDeedFileUrl} download={draft.titleDeedFileName || "title-deed"} className="admin-open">
                         <ExternalLink aria-hidden="true" />
                         Open
-                      </a>
+                      </a></>
                     )}
                     <label className="admin-small">
                       Upload title deed

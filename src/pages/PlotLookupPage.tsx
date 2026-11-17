@@ -33,9 +33,9 @@ export function PlotLookupPage({ content }: PlotLookupPageProps) {
   return (
     <div className="site-homepage inner-site">
       <Header brandName={content.brandName} brandSuffix={content.brandSuffix} navLinks={content.navLinks} />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section className="lookup-hero" aria-labelledby="lookup-title">
-          <ResponsiveImage image={content.hero.image} className="lookup-hero__image" priority widthHint={1800} sizes="100vw" />
+          <ResponsiveImage image={content.hero.image} className="lookup-hero__image" priority widthHint={1800} sizes="100vw" cover={{ mobile: 520, desktop: 560 }} />
           <div className="hero__overlay" aria-hidden="true" />
           <div className="lookup-hero__content">
             <p className="eyebrow hero__eyebrow"><SiteText>Received a Kingsvale letter?</SiteText></p>

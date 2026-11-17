@@ -15,6 +15,7 @@ export function EditorialSection({ content }: EditorialSectionProps) {
         <ResponsiveImage
           image={content.image}
           sizes="(max-width: 860px) 100vw, 50vw"
+          cover={{ mobile: 360, desktop: 520, desktopWidth: "50vw" }}
           widthHint={1200}
           className="editorial-split__image"
         />

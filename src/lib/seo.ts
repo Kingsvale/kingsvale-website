@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { faqItems, faqPageSeo, guidePageSeo, guidePageTopics, isGuidePageRoute } from "../data/answerSeo";
 import type { Development, SiteContent } from "./contentTypes";
+import { findDevelopment, publicRouteExists, developmentRoute } from "./publicRoutes.js";
 
 export const siteOrigin = "https://www.kingsvalehomes.co.uk";
 export const brandDisplayName = "Kingsvale Homes";
@@ -11,15 +12,13 @@ export const defaultSeoDescription =
 
 export function usePageSeo(content: SiteContent, route: string) {
   useEffect(() => {
-    const development = route.startsWith("/developments/")
-      ? content.developments.find((item) => item.ctaHref === route || item.id === route.split("/").filter(Boolean)[1])
-      : undefined;
+    const development = findDevelopment(content, route);
     const metadata = getRouteMetadata(content, route, development);
-    const canonical = `${siteOrigin}${development?.ctaHref ?? (route === "/" ? "/" : route)}`;
+    const canonical = `${siteOrigin}${development ? developmentRoute(development) : route}`;
 
     document.title = metadata.title;
     setMeta("name", "description", metadata.description);
-    setMeta("name", "robots", route.startsWith("/track/") || route.startsWith("/studio") || route === "/admin" || new URLSearchParams(window.location.search).has("studio-preview") ? "noindex, nofollow" : "index, follow, max-image-preview:large");
+    setMeta("name", "robots", !publicRouteExists(content, route) || new URLSearchParams(window.location.search).has("studio-preview") ? "noindex, nofollow" : "index, follow, max-image-preview:large");
     setMeta("property", "og:title", metadata.title);
     setMeta("property", "og:description", metadata.description);
     setMeta("property", "og:type", development ? "article" : "website");

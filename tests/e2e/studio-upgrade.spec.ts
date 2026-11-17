@@ -13,14 +13,75 @@ test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "kingsvale-ui-upgrade-"));
   await mkdir(join(directory, "cms")); await mkdir(join(directory, "tracking-sites")); await mkdir(join(directory, "uploads"));
   await copyFile("public/brand/kingsvale-logo.png", join(directory, "uploads/selected-hero.png"));
+  await copyFile("public/brand/kingsvale-logo.png", join(directory, "uploads/private-deed.png"));
   const content = structuredClone(defaultContent);
   content.hero.image = { src: "/media/selected-hero.png", alt: "Selected hero fixture", focalPoint: "50% 50%" };
   await writeFile(join(directory, "cms/content.json"), JSON.stringify({ published: content, draft: content, revisions: [], updatedAt: new Date().toISOString() }));
-  const site = { ...createTrackingSite(), id: "browser-site", token: "browser-site-qr-token", reference: "KV-TEST-001", title: "Studio test site", mailingStatus: "ready-to-mail", remailReminderDate: "2020-01-01", mapEmbedUrl: "" };
+  const site = { ...createTrackingSite(), id: "browser-site", token: "browser-site-qr-token", reference: "KV-TEST-001", title: "Studio test site", mailingStatus: "ready-to-mail", remailReminderDate: "2020-01-01", mapEmbedUrl: "", titleDeedFileUrl: "/media/private-deed.png", titleDeedFileName: "Test deed.png" };
   await writeFile(join(directory, "tracking-sites/sites.json"), JSON.stringify({ sites: [site] }));
   server = spawn(process.execPath, ["server/secure-server.mjs"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, PORT: "0", KINGSVALE_DATA_DIR: directory, NODE_ENV: "test", STUDIO_USER: "kingsvale", STUDIO_PASSWORD: password, STUDIO_AUTH_TOKEN_SECRET: "browser-test-key", CMS_ENCRYPTION_KEY: "", STUDIO_TOTP_SECRET: "", SMTP_PASSWORD: "", TRUSTED_PROXY_CIDRS: "127.0.0.1/32,::1/128", CLIENT_IP_HEADER: "x-forwarded-for" } });
   let errors = ""; server.stderr?.on("data", data => { errors += data.toString(); });
   base = await new Promise<string>((done, reject) => { const timer = setTimeout(() => reject(new Error(errors || "Server timeout")), 10000); server.stdout?.on("data", data => { const match = data.toString().match(/http:\/\/127\.0\.0\.1:\d+/); if (match) { clearTimeout(timer); done(match[0]); } }); server.once("exit", code => { clearTimeout(timer); reject(new Error(`Server ${code}: ${errors}`)); }); });
+});
+
+test("private document previews, native downloads, temporary sharing and session renewal", async ({ page, context, browser }, testInfo) => {
+  await page.goto(`${base}/studio?tab=sites`);
+  await page.getByLabel("Studio passphrase").fill(password);
+  await page.getByRole("button", { name: "Unlock studio" }).click();
+  await page.getByRole("button", { name: "Preview / Share" }).click();
+  const preview = page.getByRole("dialog");
+  const picture = preview.getByRole("img", { name: "Document preview", exact: true });
+  await expect(picture).toBeVisible();
+  await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  const download = page.waitForEvent("download");
+  await preview.getByRole("link", { name: "Download", exact: true }).click();
+  expect((await download).suggestedFilename()).toBe("private-deed.png");
+  await preview.getByText("Share this document temporarily", { exact: true }).click();
+  await preview.getByRole("button", { name: "Create temporary link" }).click();
+  const shared = await preview.getByLabel("Share link", { exact: true }).inputValue();
+  const outsider = await browser.newContext();
+  expect((await outsider.request.get(`${base}/media/private-deed.png`)).status()).toBe(401);
+  expect((await outsider.request.get(shared)).status()).toBe(200);
+  await page.screenshot({ path: testInfo.outputPath("private-document-sharing.png"), fullPage: true });
+  await preview.getByRole("button", { name: "Revoke link" }).click();
+  await expect(preview.getByRole("status")).toHaveText("Access through that link has been revoked.");
+  expect((await outsider.request.get(shared)).status()).toBe(404);
+  await outsider.close();
+  await preview.getByRole("button", { name: "Close preview" }).click();
+  await context.clearCookies();
+  await page.reload();
+  await page.getByRole("button", { name: "Preview / Share" }).click();
+  await expect.poll(() => page.getByRole("img", { name: "Document preview", exact: true }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  const cookie = (await context.cookies(`${base}/media/private-deed.png`)).find(item => item.name === "kingsvale_documents");
+  expect(cookie?.httpOnly).toBe(true);
+  expect(cookie?.sameSite).toBe("Strict");
+});
+
+test("keyboard navigation, visible content and narrow layouts", async ({ page }) => {
+  await page.goto(`${base}/`);
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await page.locator("main h2").evaluateAll(elements => elements.every(element => getComputedStyle(element).visibility !== "hidden" && getComputedStyle(element).opacity !== "0"))).toBe(true);
+    if (width <= 860) {
+      await page.getByRole("button", { name: "Open navigation" }).press("Enter");
+      await expect(page.locator("#primary-navigation a").first()).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(page.getByRole("button", { name: "Close navigation" })).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(page.locator("#primary-navigation a").last()).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("button", { name: "Open navigation" })).toBeFocused();
+      expect(await page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
+    }
+  }
+  expect((await page.goto(`${base}/missing-browser-page`))?.status()).toBe(404);
+  await page.getByRole("link", { name: "Return to homepage", exact: true }).click();
+  await expect(page.locator(".hero__image")).toBeVisible();
 });
 test.afterAll(async () => {
   if (server?.exitCode === null) { const closed = new Promise(done => server.once("exit", done)); server.kill(); await closed; }

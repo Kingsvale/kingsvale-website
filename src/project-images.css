@@ -2,7 +2,7 @@
 .project-carousel__image { animation: project-photo-in 650ms ease both; }
 @keyframes project-photo-in { from { opacity: .25; } to { opacity: 1; } }
 .project-carousel__controls { position: absolute; bottom: 12px; right: 12px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid #ffffff55; background: #22251ede; color: white; border-radius: 7px; backdrop-filter: blur(8px); }
-.project-carousel__controls button, .project-gallery-public__arrows button, .project-gallery-public__expand, .project-lightbox__close { display: grid; place-items: center; width: 40px; height: 40px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+.project-carousel__controls button, .project-gallery-public__arrows button, .project-gallery-public__expand, .project-lightbox__close { display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
 .project-carousel__controls button:hover { background: #ffffff26; }
 .project-carousel__controls span { font-size: 12px; min-width: 34px; text-align: center; }
 .project-carousel__controls svg { width: 17px; height: 17px; }

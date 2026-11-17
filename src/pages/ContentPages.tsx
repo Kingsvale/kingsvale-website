@@ -441,6 +441,7 @@ export function NotFoundPage({ content }: ContentPageProps) {
         title="This page has not been planned."
         body="Return to the homepage or explore the current Kingsvale developments."
         image={content.hero.image}
+        actions={<a className="button-link button-link--light" href="/">Return to homepage</a>}
       />
     </PublicShell>
   );
@@ -454,7 +455,7 @@ function PublicShell({ content, children }: ContentPageProps & { children: React
         brandSuffix={content.brandSuffix}
         navLinks={content.navLinks}
       />
-      <main>{children}</main>
+      <main id="main-content" tabIndex={-1}>{children}</main>
       <Footer
         brandName={content.brandName}
         brandSuffix={content.brandSuffix}
@@ -468,22 +469,24 @@ function InnerHero({
   eyebrow,
   title,
   body,
-  image, textKeys
+  image, textKeys, actions
 }: {
   textKeys?: { eyebrow: string; title: string; body: string };
   eyebrow: string;
   title: string;
   body: string;
   image: ImageAsset;
+  actions?: ReactNode;
 }) {
   return (
     <section className="inner-hero">
-      <ResponsiveImage image={image} className="inner-hero__image" priority widthHint={1800} sizes="100vw" />
+      <ResponsiveImage image={image} className="inner-hero__image" priority widthHint={1800} sizes="100vw" cover={{ mobile: 520, desktop: 560 }} />
       <div className="hero__overlay" aria-hidden="true" />
       <div className="inner-hero__content">
         <p className="eyebrow hero__eyebrow"><SiteText copy={textKeys?.eyebrow}>{eyebrow}</SiteText></p>
         <h1><SiteText copy={textKeys?.title}>{title}</SiteText></h1>
         <p><SiteText copy={textKeys?.body}>{body}</SiteText></p>
+        {actions}
       </div>
     </section>
   );

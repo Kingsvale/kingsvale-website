@@ -1,4 +1,6 @@
 import { createContactMailer } from "./contact-mail.mjs";
+import { createDocumentAccess, documentFilename, privateMediaHeaders, validateDocumentAccess } from "./document-access.mjs";
+import { createSearchIndexing, sitemapXml, isIndexableRoute } from "./search-indexing.mjs";
 import { atomicWrite, mutateState, revisionOf } from "./state-store.mjs";
 import { createQrEngagement, validateEngagementBackup } from "./qr-engagement.mjs";
 import { createStudioRelay } from "./studio-relay.mjs";
@@ -107,9 +109,17 @@ if (process.env.NODE_ENV === "production" && !cmsEncryptionKey) {
 }
 
 await ensureDataDirs();
+const documents = createDocumentAccess({ directory: dataDir, uploads: uploadsDir, encode: encodeCmsStore, decode: decodeCmsStore, secret: authTokenSecret });
+let publicMediaAtStartup = [];
+try { publicMediaAtStartup = [...mediaReferences(await readCmsStore())]; }
+catch { console.error("CMS content is unreadable. Unclassified legacy media stays private until it is repaired."); }
+await documents.initialize([await readTrackingStore(), await readStudioSettings()], publicMediaAtStartup);
 const qrEngagement = createQrEngagement({ directory: dataDir, secret: cmsEncryptionKey || authTokenSecret, encode: encodeCmsStore, decode: decodeCmsStore, publicSite: publicTrackingSite });
 await qrEngagement.cleanup();
-const { renderPublishedPage } = await import("../dist/server-render/index.js");
+const { renderPublishedPage, publicPageInfo } = await import("../dist/server-render/index.js");
+const publicOrigin = "https://www.kingsvalehomes.co.uk";
+const searchIndexing = await createSearchIndexing({ directory: dataDir, secret: cmsEncryptionKey || authTokenSecret, encode: encodeCmsStore, decode: decodeCmsStore, origin: publicOrigin });
+await flushIndexingOutbox().catch(() => console.error("Search publication notifications await recovery."));
 const pageCache = new Map();
 const studioRelay = createStudioRelay({ directory: dataDir, encode: encodeCmsStore, decode: decodeCmsStore,
   sendJson, readJsonBody, requireSession, readCms: readCmsStore, writeCms: writeCmsStore, validateContent: validateSiteContent,
@@ -129,9 +139,18 @@ const server = createServer(async (request, response) => {
     const clientId = `${resolveClientAddress(request).ip ?? request.socket.remoteAddress ?? "unknown"}:${url.pathname}`;
 
     if (!allowRequest(clientId)) {
-      await writeAudit("rate_limited", request, { path: url.pathname });
+      await writeAudit("rate_limited", request, { path: url.pathname.startsWith("/shared-document/") ? "/shared-document/[redacted]" : url.pathname });
       sendJson(response, 429, { error: "Too many requests." });
       return;
+    }
+
+    if (url.pathname === "/sitemap.xml" || url.pathname === searchIndexing.keyPath) {
+      if (!["GET", "HEAD"].includes(request.method)) { sendJson(response, 405, { error: "Method not allowed." }); return; }
+      response.setHeader("Cache-Control", "no-store");
+      if (url.pathname === searchIndexing.keyPath) { response.setHeader("Content-Type", "text/plain; charset=utf-8"); response.end(request.method === "HEAD" ? undefined : searchIndexing.key); return; }
+      const store = await readCmsStore();
+      response.setHeader("Content-Type", "application/xml; charset=utf-8");
+      response.end(request.method === "HEAD" ? undefined : sitemapXml(publicPageInfo(store.published, "/").routes, publicOrigin, store.publishedAt)); return;
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -153,7 +172,14 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname.startsWith("/media/")) {
-      await serveMedia(url.pathname, response);
+      await serveMedia(url.pathname, response, request);
+      return;
+    }
+    if (url.pathname.startsWith("/shared-document/")) {
+      const filename = documents.sharedFile(url.pathname.slice("/shared-document/".length));
+      privateMediaHeaders(response, filename || "document.pdf");
+      if (!filename) { sendJson(response, 404, { error: "This document link is unavailable or has expired." }); return; }
+      await serveMedia(`/media/${filename}`, response, request, true);
       return;
     }
 
@@ -171,6 +197,8 @@ const server = createServer(async (request, response) => {
 });
 
 const mailTimer = setInterval(() => { void contactMailer.flush().catch(() => console.error("Contact email queue unavailable.")); }, 60000);
+const indexingTimer = setInterval(() => { void mutateState(flushIndexingOutbox).then(() => searchIndexing.tick()).catch(() => console.error("Search indexing queue unavailable.")); }, 60000);
+indexingTimer.unref();
 const engagementTimer = setInterval(() => { void mutateState(() => qrEngagement.cleanup()).catch(() => console.error("QR visit retention cleanup failed.")); }, 3600000);
 engagementTimer.unref();
 server.requestTimeout = 30_000;
@@ -217,6 +245,32 @@ function allowRequest(clientId) {
 }
 
 async function handleApiRequest(request, response, url) {
+  if (url.pathname === "/api/cms/indexing" || url.pathname === "/api/studio/search-indexing") {
+    if (!requireSession(request, response)) return;
+    if (request.method === "POST") { const store = await readCmsStore(); await searchIndexing.enqueue(publicPageInfo(store.published, "/").routes); void searchIndexing.tick().catch(() => console.error("Search indexing queue unavailable.")); }
+    else if (request.method !== "GET") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    sendJson(response, 200, searchIndexing.status()); return;
+  }
+  if (url.pathname === "/api/studio/document-shares") {
+    const session = requireSession(request, response); if (!session) return;
+    if (request.method === "DELETE") {
+      const payload = await readJsonBody(request, 2000); await documents.revoke(payload.id);
+      await writeAudit("document_share_revoked", request, { user: session.user, shareId: payload.id });
+      sendJson(response, 200, { ok: true }); return;
+    }
+    const payload = request.method === "GET" ? { url: url.searchParams.get("url") } : await readJsonBody(request, 2000);
+    const filename = documentFilename(payload.url);
+    if (!filename || !documents.isPrivate(filename)) { sendJson(response, 422, { error: "Choose a saved private document." }); return; }
+    try { await stat(join(uploadsDir, filename)); } catch { sendJson(response, 404, { error: "Document unavailable." }); return; }
+    if (request.method === "GET") { sendJson(response, 200, { shares: documents.shares(filename) }); return; }
+    if (request.method !== "POST") { sendJson(response, 405, { error: "Method not allowed." }); return; }
+    try {
+      const share = await documents.createShare(filename, Number(payload.hours));
+      await writeAudit("document_shared", request, { user: session.user, filename, shareId: share.id, expiresAt: share.expiresAt });
+      sendJson(response, 201, { share });
+    } catch (error) { sendJson(response, 422, { error: error.message }); }
+    return;
+  }
   if (url.pathname === "/api/studio/integrations" || url.pathname.startsWith("/api/relay/v1")) {
     await studioRelay.handle(request, response, url); return;
   }
@@ -281,6 +335,7 @@ async function handleApiRequest(request, response, url) {
       return;
     }
 
+    documents.setCookie(response, session);
     sendJson(response, 200, {
       authenticated: true,
       user: { name: session.user, role: "editor" },
@@ -290,6 +345,7 @@ async function handleApiRequest(request, response, url) {
   }
 
   if (url.pathname === "/api/auth/logout") {
+    documents.setCookie(response, { expiresAt: 0 });
     const session = requireSession(request, response);
     if (!session) {
       return;
@@ -451,10 +507,17 @@ async function handleApiRequest(request, response, url) {
       store.revisions = store.revisions.slice(0, maxCmsRevisions);
     }
 
+    const previousRoutes = publicPageInfo(store.published, "/").routes;
     store.published = nextContent;
     store.draft = nextContent;
     store.updatedAt = new Date().toISOString();
+    store.publishedAt = store.updatedAt;
+    store.pendingIndexingRoutes = [...new Set([...(store.pendingIndexingRoutes ?? []), ...previousRoutes, ...publicPageInfo(nextContent, "/").routes])];
     await writeCmsStore(store);
+    // Publication has succeeded even if the independent notification queue is
+    // temporarily unavailable. Report its failure separately in Studio.
+    await flushIndexingOutbox().catch(() => console.error("Published content; search indexing queue unavailable."));
+    void searchIndexing.tick().catch(() => console.error("Search indexing queue unavailable."));
     await writeCmsBackup(store, "publish", session.user);
     await writeAudit("content_published", request, {
       user: session.user,
@@ -669,6 +732,7 @@ async function handleLogin(request, response) {
 
   const session = createSession(username);
   await qrEngagement.rememberEditor(request, response);
+  documents.setCookie(response, session);
   await writeAudit("login_success", request, { user: username });
 
   if (request.headers["content-type"]?.includes("application/json")) {
@@ -1206,8 +1270,10 @@ async function handleBackup(request, response) {
     try { restoreMedia = await prepareMediaRestore(backup, uploadsDir); }
     catch (error) { sendJson(response, 400, { error: error.message }); return; }
     await saveFullBackup(await buildFullBackup(), "before-import", session.user);
+    await protectBackupDocuments(backup);
     await restoreMedia();
     await applyFullBackup(backup, mode);
+    await flushIndexingOutbox().catch(() => console.error("Restored content; search indexing queue unavailable."));
     await writeAudit("backup_imported", request, { user: session.user, mode });
     sendJson(response, 200, { ok: true, importedAt: new Date().toISOString(), mode });
     return;
@@ -1336,7 +1402,8 @@ async function handleLetterUpload(request, response, session) {
 
   const extension = normalizeLetterExtension(upload.filename, upload.contentType);
   const slug = toSlug(upload.filename.replace(/\.[^.]+$/, "")) || "letter";
-  const filename = `${slug}-${Date.now()}-${randomBytes(4).toString("hex")}${extension}`;
+  const filename = `private-${slug}-${Date.now()}-${randomBytes(4).toString("hex")}${extension}`;
+  await documents.protect([filename]);
   await mkdir(uploadsDir, { recursive: true });
   await writeFile(join(uploadsDir, filename), upload.data);
   await writeAudit("letter_uploaded", request, {
@@ -1527,7 +1594,9 @@ async function readCmsStore() {
       published: parsed.published ?? null,
       draft: parsed.draft ?? null,
       revisions: Array.isArray(parsed.revisions) ? parsed.revisions.slice(0, maxCmsRevisions) : [],
-      updatedAt: parsed.updatedAt ?? null
+      updatedAt: parsed.updatedAt ?? null,
+      publishedAt: parsed.publishedAt ?? null,
+      pendingIndexingRoutes: Array.isArray(parsed.pendingIndexingRoutes) ? parsed.pendingIndexingRoutes.filter(route => typeof route === "string") : []
     };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -1541,6 +1610,24 @@ async function writeCmsStore(store) {
     ...store,
     revisions: Array.isArray(store.revisions) ? store.revisions.slice(0, maxCmsRevisions) : []
   }));
+}
+
+// Caller holds the state queue (or is still starting the server). The outbox is
+// committed with publication, so a crash between files only causes a retry.
+async function flushIndexingOutbox() {
+  const store = await readCmsStore();
+  if (!store.pendingIndexingRoutes?.length) return;
+  await searchIndexing.enqueue(store.pendingIndexingRoutes);
+  store.pendingIndexingRoutes = [];
+  await writeCmsStore(store);
+}
+
+async function writeRestoredCms(store) {
+  const current = await readCmsStore();
+  await writeCmsStore({ ...store, pendingIndexingRoutes: [...new Set([
+    ...(current.pendingIndexingRoutes ?? []), ...(Array.isArray(store.pendingIndexingRoutes) ? store.pendingIndexingRoutes.filter(isIndexableRoute) : []), ...publicPageInfo(current.published, "/").routes,
+    ...publicPageInfo(store.published, "/").routes
+  ])] });
 }
 
 async function readTrackingStore() {
@@ -1561,6 +1648,7 @@ async function readTrackingStore() {
 }
 
 async function writeTrackingStore(store) {
+  await documents.protectReferences(store);
   await mkdir(trackingDir, { recursive: true });
   await atomicWrite(trackingStoreFile, encodeCmsStore(store));
 }
@@ -1576,6 +1664,7 @@ async function readStudioSettings() {
 }
 
 async function writeStudioSettings(settings) {
+  await documents.protectReferences(settings);
   await mkdir(dataDir, { recursive: true });
   await atomicWrite(studioSettingsFile, encodeCmsStore(normalizeStudioSettings(settings)));
 }
@@ -1620,6 +1709,7 @@ async function buildFullBackup() {
     settings: await readStudioSettings(),
     analytics: await readAnalyticsStore(),
     qrEngagement: await qrEngagement.export(),
+    privateDocuments: documents.export(),
     leads: await readLeadStores()
   };
   const media = await collectMedia(uploadsDir);
@@ -1634,6 +1724,13 @@ async function buildFullBackup() {
     media,
     stores
   };
+}
+
+async function protectBackupDocuments(backup) {
+  const stores = backup.stores;
+  await documents.classify((backup.media ?? []).map(file => file.filename), [...mediaReferences(stores.cms), ...mediaReferences(await readCmsStore())]);
+  if (stores.privateDocuments) await documents.restore(stores.privateDocuments);
+  await documents.protectReferences(stores);
 }
 
 async function applyFullBackup(backup, mode) {
@@ -1654,12 +1751,12 @@ async function applyFullBackup(backup, mode) {
     const mergedVisits = [...stores.analytics.visits, ...currentAnalytics.visits].slice(0, 5_000);
     await writeAnalyticsStore({ visits: mergedVisits.filter(isAnalyticsVisit), updatedAt: now });
     await appendLeadStores(stores.leads);
-    await writeCmsStore({ ...stores.cms, updatedAt: now });
+    await writeRestoredCms({ ...stores.cms, updatedAt: now });
     await writeStudioSettings(mergeStudioSettings(await readStudioSettings(), stores.settings));
     return;
   }
 
-  await writeCmsStore({ ...stores.cms, updatedAt: now });
+  await writeRestoredCms({ ...stores.cms, updatedAt: now });
   await writeTrackingStore({
     sites: stores.tracking.sites.map(normalizeTrackingSite).filter((site) => validateTrackingSite(site).valid),
     updatedAt: now
@@ -2131,6 +2228,10 @@ function validateBackupPayload(backup) {
       if (restored.keyId !== qrEngagement.keyId) throw new Error("QR engagement requires the same CMS encryption key as the source server. Keep that key when migrating this backup.");
     }
     catch (error) { errors.push({ path: "stores.qrEngagement", message: error.message }); }
+  }
+  if (stores.privateDocuments) {
+    try { validateDocumentAccess(stores.privateDocuments); }
+    catch (error) { errors.push({ path: "stores.privateDocuments", message: error.message }); }
   }
   if (!stores.analytics || !Array.isArray(stores.analytics.visits)) {
     errors.push({ path: "stores.analytics", message: "Analytics store is missing." });
@@ -2912,27 +3013,49 @@ function clampNumber(value, fallback, min, max) {
   return Math.min(max, Math.max(min, Math.trunc(parsed)));
 }
 
-async function serveMedia(pathname, response) {
-  const safePath = normalize(decodePathComponent(pathname.replace(/^\/media\//, ""))).replace(/^(\.\.[/\\])+/, "");
-  const candidate = resolve(uploadsDir, safePath);
-  if (!isPathInside(uploadsDir, candidate)) {
+async function serveMedia(pathname, response, request, shared = false) {
+  if (!["GET", "HEAD"].includes(request.method)) { sendJson(response, 405, { error: "Method not allowed." }); return; }
+  const filename = documentFilename(pathname);
+  if (!filename) {
     sendJson(response, 404, { error: "Media not found." });
     return;
   }
+  const candidate = join(uploadsDir, filename);
+  const restricted = documents.isPrivate(filename);
+  if (restricted || shared) {
+    privateMediaHeaders(response, filename);
+    if (!shared && !getSession(request) && !documents.hasSession(request)) { sendJson(response, 401, { error: "Sign into Studio to open this document." }); return; }
+  }
 
+  let info;
   try {
-    await stat(candidate);
+    info = await stat(candidate);
+    if (!info.isFile()) throw new Error("Not a file");
   } catch {
     sendJson(response, 404, { error: "Media not found." });
     return;
   }
 
-  response.setHeader("Content-Type", mimeTypes[extname(candidate)] ?? "application/octet-stream");
-  response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  createReadStream(candidate).pipe(response);
+  response.setHeader("Content-Type", mimeTypes[extname(candidate).toLowerCase()] ?? "application/octet-stream");
+  if (!restricted && !shared) response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  response.setHeader("Accept-Ranges", "bytes");
+  let start = 0, end = info.size - 1;
+  if (request.headers.range && request.method === "GET") {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+    if (match && (match[1] || match[2])) {
+      start = match[1] ? Number(match[1]) : Math.max(0, info.size - Number(match[2]));
+      end = match[1] && match[2] ? Math.min(info.size - 1, Number(match[2])) : info.size - 1;
+    } else start = -1;
+    if (start < 0 || start >= info.size || end < start) { response.statusCode = 416; response.setHeader("Content-Range", `bytes */${info.size}`); response.end(); return; }
+    response.statusCode = 206; response.setHeader("Content-Range", `bytes ${start}-${end}/${info.size}`);
+  }
+  response.setHeader("Content-Length", Math.max(0, end - start + 1));
+  if (request.method === "HEAD" || !info.size) response.end();
+  else createReadStream(candidate, { start, end }).pipe(response);
 }
 
 async function serveStatic(pathname, response, request) {
+  if (pathname.length > 1 && pathname.endsWith("/")) { response.writeHead(308, { Location: pathname.replace(/\/+$/, "") + new URL(request.url, "http://localhost").search }); response.end(); return; }
   const filePath = resolveStaticPath(pathname);
   if (isPathInside(join(distDir, "server-render"), filePath)) { sendJson(response, 404, { error: "Not found." }); return; }
   let fileInfo;
@@ -2979,6 +3102,10 @@ async function sendStaticFile(filePath, response, request) {
     if (privateRoute || preview) response.setHeader("X-Robots-Tag", "noindex, nofollow");
     if (privateRoute) response.setHeader("Referrer-Policy", "no-referrer");
     const store = await readCmsStore();
+    const publicPage = publicPageInfo(store.published, url.pathname);
+    let exists = publicPage.exists || url.pathname === "/studio" || url.pathname === "/admin";
+    if (/^\/track\/[^/]+$/.test(url.pathname)) exists = (await readTrackingStore()).sites.some(site => !site.archived && site.token === url.pathname.slice(7));
+    if (!exists) { response.statusCode = 404; response.setHeader("X-Robots-Tag", "noindex, nofollow"); }
     const key = `${revisionOf(store.published)}:${url.pathname}:${preview}`;
     let html = pageCache.get(key);
     if (!html) {
@@ -2986,7 +3113,7 @@ async function sendStaticFile(filePath, response, request) {
       if (pageCache.size >= 60) pageCache.clear();
       pageCache.set(key, html);
     }
-    response.end(privateRoute || preview ? html : injectAnalyticsPixel(html));
+    response.end(request.method === "HEAD" ? undefined : privateRoute || preview ? html : injectAnalyticsPixel(html));
     return;
   }
 

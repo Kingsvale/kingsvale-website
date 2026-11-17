@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { previewLetterDocument } from "../lib/cmsApi";
 import { isLocalDemoRuntime } from "../lib/runtimeMode";
+import { AdminDocumentSharing } from "./AdminDocumentSharing";
 
 type DocumentFile = { url: string; name: string };
 
@@ -92,6 +93,7 @@ export function AdminDocumentPreview({ file, onClose }: { file: DocumentFile; on
         <button type="button" className="admin-ghost" onClick={onClose} autoFocus>Close preview</button>
       </div>
     </header>
+    {file.url.startsWith("/media/") && <AdminDocumentSharing url={file.url} />}
     {safeUrl && (isDocx || isPdf) ? <>
       <p className="document-preview__status" role={failed ? "alert" : "status"}>{status}</p>
       {failed && <button type="button" className="admin-small" onClick={() => { setFailed(false); setStatus("Loading preview…"); setAttempt((value) => value + 1); }}>Retry preview</button>}

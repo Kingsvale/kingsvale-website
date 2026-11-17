@@ -4,7 +4,11 @@ GATE: OPEN 69 (rounds used up)
 
 This review used the actual published public content and uploaded media in an isolated local server. The established Kingsvale identity and copy were retained. Functional improvements in this release are described in [STUDIO-UPGRADE.md](STUDIO-UPGRADE.md).
 
-## Recommended next changes
+## Follow-up status
+
+The approved recommendations below have been implemented in the follow-up release described in [WEBSITE-FOLLOWUP.md](WEBSITE-FOLLOWUP.md). The homepage headline and broad claims are deliberately retained at the user's request. Visual refinements are limited to the existing layout and interactions; the original design gate findings remain recorded rather than represented as passed.
+
+## Original recommendations
 
 | Priority | Finding | Recommended change |
 | --- | --- | --- |

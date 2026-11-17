@@ -1,6 +1,7 @@
 import { AdminOverviewEditor } from "./AdminOverviewEditor";
 import { useDraftHistory } from "../hooks/useDraftHistory";
 import { AdminContactDelivery } from "./AdminContactDelivery";
+import { AdminSearchIndexing } from "./AdminSearchIndexing";
 import {
   AlertCircle,
   ArrowRight,
@@ -875,6 +876,7 @@ export function AdminPage({
 
           {activePanel === "seo" && (
           <EditorPanel title="SEO and social sharing" id="editor-panel-seo">
+            <AdminSearchIndexing />
             <SeoEditor
               title="Homepage"
               value={draft.seo.home}

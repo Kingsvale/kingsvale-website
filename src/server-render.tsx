@@ -6,13 +6,20 @@ import { defaultContent } from "./data/defaultContent";
 import { normalizeSiteContent } from "./lib/contentNormalize";
 import { getRouteMetadata, buildStructuredData, absolutize, siteOrigin } from "./lib/seo";
 import type { SiteContent } from "./lib/contentTypes";
+import { publicRouteExists, publishedRoutes, findDevelopment, developmentRoute } from "./lib/publicRoutes.js";
+
+export function publicPageInfo(published: SiteContent | null, route: string) {
+  const content = normalizeSiteContent(published ?? defaultContent);
+  return { exists: publicRouteExists(content, route), routes: publishedRoutes(content) };
+}
 
 export async function renderPublishedPage(template: string, published: SiteContent | null, route: string, preview = false) {
   const content = normalizeSiteContent(published ?? defaultContent);
   const privateRoute = route.startsWith("/track/") || route === "/studio" || route === "/admin";
-  const development = content.developments.find(item => item.ctaHref === route || route === `/developments/${item.id}`);
+  const development = findDevelopment(content, route);
+  const missing = !privateRoute && !publicRouteExists(content, route);
   const metadata = getRouteMetadata(content, route, development);
-  const canonical = `${siteOrigin}${route}`;
+  const canonical = `${siteOrigin}${development ? developmentRoute(development) : route}`;
   let html = template.replace(/<title>.*?<\/title>/s, `<title>${escapeText(metadata.title)}</title>`);
   const meta = (attribute: string, name: string, value: string) => {
     const tag = `<meta ${attribute}="${name}" content="${escapeText(value)}" />`;
@@ -20,7 +27,7 @@ export async function renderPublishedPage(template: string, published: SiteConte
     html = pattern.test(html) ? html.replace(pattern, () => tag) : html.replace("</head>", `${tag}</head>`);
   };
   meta("name", "description", metadata.description);
-  meta("name", "robots", privateRoute || preview ? "noindex, nofollow" : "index, follow, max-image-preview:large");
+  meta("name", "robots", privateRoute || preview || missing ? "noindex, nofollow" : "index, follow, max-image-preview:large");
   for (const prefix of ["og", "twitter"]) {
     const attribute = prefix === "og" ? "property" : "name";
     meta(attribute, `${prefix}:title`, metadata.title);
