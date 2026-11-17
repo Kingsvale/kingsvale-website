@@ -1,6 +1,6 @@
 services:
   kingsvale:
-    image: ghcr.io/kingsvale/kingsvale-website:ab5efa8cf97edb77421e3a552e1395a6f2ea967e
+    image: ghcr.io/kingsvale/kingsvale-website:7dc6b0d0384941345a840d450df3bcb356927bb3
     pull_policy: always
     container_name: kingsvale-site
     restart: unless-stopped
@@ -13,6 +13,10 @@ services:
       STUDIO_PASSWORD: "${STUDIO_PASSWORD:?Set STUDIO_PASSWORD in Portainer}"
       STUDIO_AUTH_TOKEN_SECRET: "${STUDIO_AUTH_TOKEN_SECRET:?Set STUDIO_AUTH_TOKEN_SECRET in Portainer}"
       CMS_ENCRYPTION_KEY: "${CMS_ENCRYPTION_KEY:?Set CMS_ENCRYPTION_KEY in Portainer}"
+      # Verified Kingsvale Docker gateway, behind NPM and Cloudflare Tunnel.
+      # Override both values if the hosting/proxy topology changes.
+      TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS:-172.30.0.1/32}"
+      CLIENT_IP_HEADER: "${CLIENT_IP_HEADER:-cf-connecting-ip}"
       GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-}"
       STUDIO_TOTP_SECRET: "${STUDIO_TOTP_SECRET:-}"
       CMS_MAX_REVISIONS: "${CMS_MAX_REVISIONS:-5}"
